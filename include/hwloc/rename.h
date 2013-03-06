@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
- * Copyright © 2010-2012 Inria.  All rights reserved.
+ * Copyright © 2010-2013 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -80,6 +80,7 @@ extern "C" {
 #define HWLOC_OBJ_OSDEV_NETWORK HWLOC_NAME_CAPS(OBJ_OSDEV_NETWORK)
 #define HWLOC_OBJ_OSDEV_OPENFABRICS HWLOC_NAME_CAPS(OBJ_OSDEV_OPENFABRICS)
 #define HWLOC_OBJ_OSDEV_DMA HWLOC_NAME_CAPS(OBJ_OSDEV_DMA)
+#define HWLOC_OBJ_OSDEV_COPROC HWLOC_NAME_CAPS(OBJ_OSDEV_COPROC)
 
 #define hwloc_compare_types HWLOC_NAME(compare_types)
 
@@ -408,6 +409,12 @@ extern "C" {
 #define hwloc_nvml_get_device_cpuset HWLOC_NAME(nvml_get_device_cpuset)
 #define hwloc_nvml_get_device_osdev HWLOC_NAME(nvml_get_device_osdev)
 #define hwloc_nvml_get_device_osdev_by_index HWLOC_NAME(nvml_get_device_osdev_by_index)
+
+/* gl.h */
+
+#define hwloc_gl_get_display_osdev_by_port_device HWLOC_NAME(gl_get_display_osdev_by_port_device)
+#define hwloc_gl_get_display_osdev_by_name HWLOC_NAME(gl_get_display_osdev_by_name)
+#define hwloc_gl_get_display_by_osdev HWLOC_NAME(gl_get_display_by_osdev)
 
 /* hwloc/plugins.h */
 

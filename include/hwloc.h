@@ -270,13 +270,18 @@ typedef enum hwloc_obj_osdev_type_e {
   HWLOC_OBJ_OSDEV_BLOCK,	/**< \brief Operating system block device.
 				  * For instance "sda" on Linux. */
   HWLOC_OBJ_OSDEV_GPU,		/**< \brief Operating system GPU device.
-				  * For instance the "card0" DRM device on Linux. */
+				  * For instance ":0.0" for a GL display,
+				  * "card0" for a Linux DRM device. */
   HWLOC_OBJ_OSDEV_NETWORK,	/**< \brief Operating system network device.
 				  * For instance the "eth0" interface on Linux. */
   HWLOC_OBJ_OSDEV_OPENFABRICS,	/**< \brief Operating system openfabrics device.
 				  * For instance the "mlx4_0" InfiniBand HCA device on Linux. */
-  HWLOC_OBJ_OSDEV_DMA		/**< \brief Operating system dma engine device.
+  HWLOC_OBJ_OSDEV_DMA,		/**< \brief Operating system dma engine device.
 				  * For instance the "dma0chan0" DMA channel on Linux. */
+  HWLOC_OBJ_OSDEV_COPROC	/**< \brief Operating system co-processor device.
+				  * For instance "mic0" for a Xeon Phi (MIC) on Linux,
+				  * "opencl0d0" for a OpenCL device,
+				  * "cuda0" for a CUDA device. */
 } hwloc_obj_osdev_type_t;
 
 /** \brief Compare the depth of two object types
@@ -487,7 +492,7 @@ union hwloc_obj_attr_u {
   struct hwloc_cache_attr_s {
     hwloc_uint64_t size;			  /**< \brief Size of cache in bytes */
     unsigned depth;			  /**< \brief Depth of cache (e.g., L1, L2, ...etc.) */
-    unsigned linesize;			  /**< \brief Cache-line size in bytes */
+    unsigned linesize;			  /**< \brief Cache-line size in bytes. 0 if unknown */
     int associativity;			  /**< \brief Ways of associativity,
     					    *  -1 if fully associative, 0 if unknown */
     hwloc_obj_cache_type_t type;          /**< \brief Cache type */
@@ -597,7 +602,9 @@ HWLOC_DECLSPEC int hwloc_topology_init (hwloc_topology_t *topologyp);
  *
  * \note On failure, the topology is reinitialized. It should be either
  * destroyed with hwloc_topology_destroy() or configured and loaded again.
- * 
+ *
+ * \note This function may be called only once per topology.
+ *
  * \sa hwlocality_configuration
  */
 HWLOC_DECLSPEC int hwloc_topology_load(hwloc_topology_t topology);
@@ -1212,7 +1219,7 @@ enum hwloc_restrict_flags_e {
  *
  * \note This call may not be reverted by restricting back to a larger
  * cpuset. Once dropped during restriction, objects may not be brought
- * back, except by reloading the entire topology with hwloc_topology_load().
+ * back, except by loading another topology with hwloc_topology_load().
  *
  * \return 0 on success.
  *

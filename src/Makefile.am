@@ -1,4 +1,4 @@
-# Copyright © 2009-2012 Inria.  All rights reserved.
+# Copyright © 2009-2013 Inria.  All rights reserved.
 # Copyright © 2009-2012 Université Bordeaux 1
 # Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
 # Copyright © 2011-2012 Oracle and/or its affiliates.  All rights reserved.
@@ -55,16 +55,16 @@ hwloc_xml_libxml_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_LIBXML2_LIBS)
 endif
 endif HWLOC_HAVE_LIBXML2
 
-if HWLOC_HAVE_LIBPCI
-if HWLOC_LIBPCI_BUILD_STATIC
-sources += topology-libpci.c
+if HWLOC_HAVE_PCI
+if HWLOC_PCI_BUILD_STATIC
+sources += topology-pci.c
 else
-plugins_LTLIBRARIES += hwloc_libpci.la
-hwloc_libpci_la_SOURCES = topology-libpci.c
-hwloc_libpci_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_PCI_CFLAGS) -DHWLOC_INSIDE_PLUGIN
-hwloc_libpci_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_PCI_LIBS)
+plugins_LTLIBRARIES += hwloc_pci.la
+hwloc_pci_la_SOURCES = topology-pci.c
+hwloc_pci_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_PCIUTILS_CFLAGS) $(HWLOC_PCIACCESS_CFLAGS) -DHWLOC_INSIDE_PLUGIN
+hwloc_pci_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_PCIUTILS_LIBS) $(HWLOC_PCIACCESS_LIBS)
 endif
-endif HWLOC_HAVE_LIBPCI
+endif HWLOC_HAVE_PCI
 
 if HWLOC_HAVE_OPENCL
 if HWLOC_OPENCL_BUILD_STATIC
@@ -99,6 +99,17 @@ hwloc_nvml_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_NVML_LIBS)
 endif
 endif HWLOC_HAVE_NVML
 
+if HWLOC_HAVE_GL
+if HWLOC_GL_BUILD_STATIC
+sources += topology-gl.c
+else
+plugins_LTLIBRARIES += hwloc_gl.la
+hwloc_gl_la_SOURCES = topology-gl.c
+hwloc_gl_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_GL_CFLAGS) -DHWLOC_INSIDE_PLUGIN
+hwloc_gl_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_GL_LIBS)
+endif
+endif HWLOC_HAVE_GL
+
 if HWLOC_HAVE_SOLARIS
 sources += topology-solaris.c
 sources += topology-solaris-chiptype.c
@@ -107,6 +118,10 @@ endif HWLOC_HAVE_SOLARIS
 if HWLOC_HAVE_LINUX
 sources += topology-linux.c
 endif HWLOC_HAVE_LINUX
+
+if HWLOC_HAVE_BGQ
+sources += topology-bgq.c
+endif HWLOC_HAVE_BGQ
 
 if HWLOC_HAVE_AIX
 sources += topology-aix.c
@@ -193,8 +208,9 @@ AM_CPPFLAGS += $(LTDLINCL)
 libhwloc_la_LDFLAGS += -export-dynamic
 libhwloc_la_LIBADD = $(LIBLTDL)
 libhwloc_la_DEPENDENCIES = $(LTDLDEPS)
-
+if HWLOC_LTDL_INCLUDED
 SUBDIRS = libltdl
+endif
 endif
 
 # Embedded library (note the lack of a .so version number -- that

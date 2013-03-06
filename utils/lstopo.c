@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2012 Inria.  All rights reserved.
+ * Copyright © 2009-2013 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux 1
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -39,6 +39,7 @@ hwloc_pid_t lstopo_pid;
 hwloc_obj_type_t lstopo_show_only = (hwloc_obj_type_t) -1;
 int lstopo_show_cpuset = 0;
 int lstopo_show_taskset = 0;
+int lstopo_ignore_pus = 0;
 
 unsigned int fontsize = 10;
 unsigned int gridsize = 10;
@@ -264,11 +265,9 @@ void usage(const char *name, FILE *where)
                   "                        impact\n");
   fprintf (where, "  --restrict <cpuset>   Restrict the topology to processors listed in <cpuset>\n");
   fprintf (where, "  --restrict binding    Restrict the topology to the current process binding\n");
-#ifdef HWLOC_HAVE_LIBPCI
   fprintf (where, "  --no-io               Do not show any I/O device or bridge\n");
   fprintf (where, "  --no-bridges          Do not any I/O bridge except hostbridges\n");
   fprintf (where, "  --whole-io            Show all I/O devices and bridges\n");
-#endif
 #ifdef HWLOC_HAVE_CUDART
   fprintf (where, "  --whole-accelerators  Show all cores in accelerators\n");
 #endif
@@ -406,14 +405,23 @@ main (int argc, char *argv[])
 	  exit(EXIT_FAILURE);
 	}
         lstopo_show_only = hwloc_obj_type_of_string(argv[1]);
+	if (lstopo_show_only == (hwloc_obj_type_t) -1)
+	  fprintf(stderr, "Unsupported type `%s' passed to --only, ignoring.\n", argv[1]);
 	opt = 1;
       }
       else if (!strcmp (argv[0], "--ignore")) {
+	hwloc_obj_type_t type;
 	if (argc < 2) {
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
-        hwloc_topology_ignore_type(topology, hwloc_obj_type_of_string(argv[1]));
+	type = hwloc_obj_type_of_string(argv[1]);
+	if (type == (hwloc_obj_type_t) -1)
+	  fprintf(stderr, "Unsupported type `%s' passed to --ignore, ignoring.\n", argv[1]);
+	else if (type == HWLOC_OBJ_PU)
+	  lstopo_ignore_pus = 1;
+	else
+	  hwloc_topology_ignore_type(topology, type);
 	opt = 1;
       }
       else if (!strcmp (argv[0], "--no-caches"))
@@ -463,6 +471,8 @@ main (int argc, char *argv[])
 	  type = hwloc_obj_type_of_string(tmp);
 	  if (type != (hwloc_obj_type_t) -1)
 	    force_orient[type] = orient;
+	  else
+	    fprintf(stderr, "Unsupported type `%s' passed to %s, ignoring.\n", tmp, argv[0]);
 	  if (!end)
 	    break;
 	  tmp = end+1;
@@ -575,12 +585,6 @@ main (int argc, char *argv[])
     }
     hwloc_bitmap_free(restrictset);
     free(restrictstring);
-  }
-
-  if (!filename && !strcmp(callname,"hwloc-info")) {
-    /* behave kind-of plpa-info */
-    filename = "-";
-    verbose_mode--;
   }
 
   /* if the output format wasn't enforced, look at the filename */

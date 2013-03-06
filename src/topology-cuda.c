@@ -13,7 +13,6 @@
 #include <private/misc.h>
 #include <private/debug.h>
 
-#include <cuda.h>
 #include <cuda_runtime_api.h>
 
 struct hwloc_cuda_backend_data_s {
@@ -134,25 +133,26 @@ hwloc_cuda_backend_notify_new_object(struct hwloc_backend *backend, struct hwloc
     if (info->pcifunc != pcidev->attr->pcidev.func)
       continue;
 
-    hwloc_debug("cuda %d\n", info->idx);
-
-    cures = cudaGetDeviceProperties(&prop, info->idx);
-    if (cures)
-      continue;
-
-    cores = hwloc_cuda_cores_per_MP(prop.major, prop.minor);
-
     cuda_device = hwloc_alloc_setup_object(HWLOC_OBJ_OS_DEVICE, -1);
     snprintf(cuda_name, sizeof(cuda_name), "cuda%d", info->idx);
     cuda_device->name = strdup(cuda_name);
     cuda_device->depth = (unsigned) HWLOC_TYPE_DEPTH_UNKNOWN;
-    cuda_device->attr->osdev.type = HWLOC_OBJ_OSDEV_GPU;
+    cuda_device->attr->osdev.type = HWLOC_OBJ_OSDEV_COPROC;
 
+    hwloc_obj_add_info(cuda_device, "CoProcType", "CUDA");
     hwloc_obj_add_info(cuda_device, "Backend", "CUDA");
-    hwloc_obj_add_info(cuda_device, "Vendor", "NVIDIA Corporation");
-    hwloc_obj_add_info(cuda_device, "Name", prop.name);
+    hwloc_obj_add_info(cuda_device, "GPUVendor", "NVIDIA Corporation");
+
+    cures = cudaGetDeviceProperties(&prop, info->idx);
+    if (!cures)
+      hwloc_obj_add_info(cuda_device, "GPUModel", prop.name);
 
     hwloc_insert_object_by_parent(topology, pcidev, cuda_device);
+
+    cures = cudaGetDeviceProperties(&prop, info->idx);
+    if (cures)
+      continue;
+    cores = hwloc_cuda_cores_per_MP(prop.major, prop.minor);
 
     space = memory = hwloc_alloc_setup_object(HWLOC_OBJ_NODE, -1);
     memory->name = strdup("Global");

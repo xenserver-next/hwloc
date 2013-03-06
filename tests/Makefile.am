@@ -61,6 +61,10 @@ if HWLOC_HAVE_LIBIBVERBS
 check_PROGRAMS += openfabrics-verbs
 endif HWLOC_HAVE_LIBIBVERBS
 
+if HWLOC_HAVE_GL
+check_PROGRAMS += gl
+endif HWLOC_HAVE_GL
+
 if HWLOC_HAVE_MYRIEXPRESS
 check_PROGRAMS += myriexpress
 endif HWLOC_HAVE_MYRIEXPRESS
@@ -100,8 +104,6 @@ opencl_LDADD = $(LDADD) -lOpenCL
 cuda_LDADD = $(LDADD) -lcuda
 cudart_LDADD = $(LDADD) -lcuda -lcudart
 nvml_LDADD = $(LDADD) -lnvidia-ml
-xmlbuffer_LDADD = $(LDADD) $(HWLOC_LIBXML2_LIBS)
-hwloc_backends_LDADD = $(LDADD) $(HWLOC_LIBXML2_LIBS)
 hwloc_bind_LDADD = $(LDADD)
 if HWLOC_HAVE_PTHREAD
 hwloc_bind_LDADD += -lpthread

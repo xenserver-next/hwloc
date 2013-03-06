@@ -63,7 +63,10 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
     # PCI?
     AC_ARG_ENABLE([pci],
                   AS_HELP_STRING([--disable-pci],
-                                 [Disable the PCI device discovery using libpci]))
+                                 [Disable the PCI device discovery]))
+    AC_ARG_ENABLE([libpci],
+		  AS_HELP_STRING([--enable-libpci],
+				 [Use libpci for PCI support. Note that hwloc may be tainted by the pciutils GPL license.]))
 
     # OpenCL?
     AC_ARG_ENABLE([opencl],
@@ -79,6 +82,11 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
     AC_ARG_ENABLE([nvml],
                   AS_HELP_STRING([--disable-nvml],
                                  [Disable the NVML device discovery]))
+
+    # GL/Display
+    AC_ARG_ENABLE([gl],
+		  AS_HELP_STRING([--disable-gl],
+				 [Disable the GL display device discovery]))
 
     # Linux libnuma
     AC_ARG_ENABLE([libnuma],
@@ -361,12 +369,12 @@ EOF
     AC_CHECK_HEADERS([myriexpress.h], [
       AC_MSG_CHECKING(if MX_NUMA_NODE exists)
       AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <myriexpress.h>]],
-                                         [[int a = MX_NUMA_NODE;]],
+                                         [[int a = MX_NUMA_NODE;]])],
                         [AC_MSG_RESULT(yes)
                          AC_CHECK_LIB([myriexpress], [mx_get_info],
                                       [AC_DEFINE([HAVE_MYRIEXPRESS], 1, [Define to 1 if we have -lmyriexpress])
                                        hwloc_have_myriexpress=yes])],
-                        [AC_MSG_RESULT(no)])])])
+                        [AC_MSG_RESULT(no)])])
 
     AC_CHECK_PROGS(XMLLINT, [xmllint])
 
@@ -406,10 +414,11 @@ int foo(void) {
         hwloc_config_prefix[utils/test-hwloc-calc.sh]
         hwloc_config_prefix[utils/test-hwloc-distances.sh]
         hwloc_config_prefix[utils/test-hwloc-distrib.sh]
+        hwloc_config_prefix[utils/test-hwloc-info.sh]
         hwloc_config_prefix[utils/test-hwloc-ls.sh]
         hwloc_config_prefix[utils/test-fake-plugin.sh])
 
-    AC_CONFIG_COMMANDS([chmoding-scripts], [chmod +x ]hwloc_config_prefix[tests/linux/test-topology.sh ]hwloc_config_prefix[tests/xml/test-topology.sh ]hwloc_config_prefix[tests/linux/hwloc-gather-topology ]hwloc_config_prefix[tests/linux/gather/test-gather-topology.sh ]hwloc_config_prefix[tests/wrapper.sh ]hwloc_config_prefix[utils/hwloc-assembler-remote ]hwloc_config_prefix[utils/test-hwloc-annotate.sh ]hwloc_config_prefix[utils/test-hwloc-assembler.sh ]hwloc_config_prefix[utils/test-hwloc-calc.sh ]hwloc_config_prefix[utils/test-hwloc-distances.sh ]hwloc_config_prefix[utils/test-hwloc-distrib.sh ]hwloc_config_prefix[utils/test-hwloc-ls.sh ]hwloc_config_prefix[utils/test-fake-plugin.sh])
+    AC_CONFIG_COMMANDS([chmoding-scripts], [chmod +x ]hwloc_config_prefix[tests/linux/test-topology.sh ]hwloc_config_prefix[tests/xml/test-topology.sh ]hwloc_config_prefix[tests/linux/hwloc-gather-topology ]hwloc_config_prefix[tests/linux/gather/test-gather-topology.sh ]hwloc_config_prefix[tests/wrapper.sh ]hwloc_config_prefix[utils/hwloc-assembler-remote ]hwloc_config_prefix[utils/test-hwloc-annotate.sh ]hwloc_config_prefix[utils/test-hwloc-assembler.sh ]hwloc_config_prefix[utils/test-hwloc-calc.sh ]hwloc_config_prefix[utils/test-hwloc-distances.sh ]hwloc_config_prefix[utils/test-hwloc-distrib.sh ]hwloc_config_prefix[utils/test-hwloc-info.sh ]hwloc_config_prefix[utils/test-hwloc-ls.sh ]hwloc_config_prefix[utils/test-fake-plugin.sh])
 
     # These links are only needed in standalone mode.  It would
     # be nice to m4 foreach this somehow, but whenever I tried
@@ -426,6 +435,11 @@ int foo(void) {
 	hwloc_config_prefix[tests/ports/topology-darwin.c]:hwloc_config_prefix[src/topology-darwin.c]
 	hwloc_config_prefix[tests/ports/topology-freebsd.c]:hwloc_config_prefix[src/topology-freebsd.c]
 	hwloc_config_prefix[tests/ports/topology-netbsd.c]:hwloc_config_prefix[src/topology-netbsd.c]
-	hwloc_config_prefix[tests/ports/topology-hpux.c]:hwloc_config_prefix[src/topology-hpux.c])
+	hwloc_config_prefix[tests/ports/topology-hpux.c]:hwloc_config_prefix[src/topology-hpux.c]
+	hwloc_config_prefix[tests/ports/topology-bgq.c]:hwloc_config_prefix[src/topology-bgq.c]
+	hwloc_config_prefix[tests/ports/topology-opencl.c]:hwloc_config_prefix[src/topology-opencl.c]
+	hwloc_config_prefix[tests/ports/topology-cuda.c]:hwloc_config_prefix[src/topology-cuda.c]
+	hwloc_config_prefix[tests/ports/topology-nvml.c]:hwloc_config_prefix[src/topology-nvml.c]
+	hwloc_config_prefix[tests/ports/topology-gl.c]:hwloc_config_prefix[src/topology-gl.c])
     ])
 ])dnl

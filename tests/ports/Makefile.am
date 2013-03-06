@@ -12,13 +12,18 @@ SRC = $(HWLOC_top_srcdir)/src
 if HWLOC_HAVE_LINUX
 check_LTLIBRARIES = \
 	libhwloc-port-aix.la \
+	libhwloc-port-bgq.la \
 	libhwloc-port-darwin.la \
 	libhwloc-port-freebsd.la \
 	libhwloc-port-hpux.la \
 	libhwloc-port-netbsd.la \
 	libhwloc-port-osf.la \
 	libhwloc-port-solaris.la \
-	libhwloc-port-windows.la
+	libhwloc-port-windows.la \
+	libhwloc-port-opencl.la \
+	libhwloc-port-cuda.la \
+	libhwloc-port-nvml.la \
+	libhwloc-port-gl.la
 endif HWLOC_HAVE_LINUX
 
 # Note that AC_CONFIG_LINKS sets up the sym links for the files in
@@ -47,6 +52,14 @@ libhwloc_port_aix_la_CPPFLAGS = $(common_CPPFLAGS) \
 	-DHWLOC_AIX_SYS \
 	-DHWLOC_HAVE_PTHREAD_GETTHRDS_NP \
 	-DHAVE__SC_LARGE_PAGESIZE -D_SC_LARGE_PAGESIZE=33
+
+nodist_libhwloc_port_bgq_la_SOURCES = topology-bgq.c
+libhwloc_port_bgq_la_SOURCES = \
+	include/bgq/spi/include/kernel/location.h \
+	include/bgq/spi/include/kernel/process.h
+libhwloc_port_bgq_la_CPPFLAGS = $(common_CPPFLAGS) \
+	-I$(HWLOC_top_srcdir)/tests/ports/include/bgq \
+	-DHWLOC_BGQ_SYS
 
 nodist_libhwloc_port_darwin_la_SOURCES = topology-darwin.c
 libhwloc_port_darwin_la_SOURCES = \
@@ -123,3 +136,29 @@ libhwloc_port_windows_la_CPPFLAGS = $(common_CPPFLAGS) \
 	-I$(HWLOC_top_srcdir)/tests/ports/include/windows \
 	-DHWLOC_WIN_SYS \
 	-DHAVE__SC_LARGE_PAGESIZE -D_SC_LARGE_PAGESIZE=33
+
+nodist_libhwloc_port_opencl_la_SOURCES = topology-opencl.c
+libhwloc_port_opencl_la_SOURCES = \
+	include/opencl/CL/cl_ext.h
+libhwloc_port_opencl_la_CPPFLAGS = $(common_CPPFLAGS) \
+	-I$(HWLOC_top_srcdir)/tests/ports/include/opencl
+
+nodist_libhwloc_port_cuda_la_SOURCES = topology-cuda.c
+libhwloc_port_cuda_la_SOURCES = \
+	include/cuda/cuda_runtime_api.h
+libhwloc_port_cuda_la_CPPFLAGS = $(common_CPPFLAGS) \
+	-I$(HWLOC_top_srcdir)/tests/ports/include/cuda
+
+nodist_libhwloc_port_nvml_la_SOURCES = topology-nvml.c
+libhwloc_port_nvml_la_SOURCES = \
+	include/nvml/nvml.h
+libhwloc_port_nvml_la_CPPFLAGS = $(common_CPPFLAGS) \
+	-I$(HWLOC_top_srcdir)/tests/ports/include/nvml
+
+nodist_libhwloc_port_gl_la_SOURCES = topology-gl.c
+libhwloc_port_gl_la_SOURCES = \
+	include/gl/X11/Xlib.h \
+	include/gl/NVCtrl/NVCtrl.h \
+	include/gl/NVCtrl/NVCtrlLib.h
+libhwloc_port_gl_la_CPPFLAGS = $(common_CPPFLAGS) \
+	-I$(HWLOC_top_srcdir)/tests/ports/include/gl
