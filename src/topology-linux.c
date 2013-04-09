@@ -559,7 +559,10 @@ hwloc_linux_foreach_proc_tid(hwloc_topology_t topology,
       goto out_with_tids;
     }
     goto retry;
+  } else {
+    free(newtids);
   }
+
   /* if all threads failed, return the last errno. */
   if (failed) {
     err = -1;
@@ -568,7 +571,6 @@ hwloc_linux_foreach_proc_tid(hwloc_topology_t topology,
   }
 
   err = 0;
-  free(newtids);
  out_with_tids:
   free(tids);
  out_with_dir:
@@ -1094,6 +1096,7 @@ hwloc_linux_membind_mask_from_nodeset(hwloc_topology_t topology __hwloc_attribut
 
   linuxmask = calloc(max_os_index/HWLOC_BITS_PER_LONG, sizeof(long));
   if (!linuxmask) {
+    hwloc_bitmap_free(linux_nodeset);
     errno = ENOMEM;
     return -1;
   }
@@ -1922,12 +1925,12 @@ hwloc_parse_hugepages_info(struct hwloc_linux_backend_data_s *data,
       hpfd = hwloc_fopen(path, "r", data->root_fd);
       if (hpfd) {
         if (fgets(line, sizeof(line), hpfd)) {
-          fclose(hpfd);
           /* these are the actual total amount of huge pages */
           memory->page_types[index_].count = strtoull(line, NULL, 0);
           *remaining_local_memory -= memory->page_types[index_].count * memory->page_types[index_].size;
           index_++;
         }
+	fclose(hpfd);
       }
     }
     closedir(dir);
@@ -2073,7 +2076,7 @@ hwloc_sysfs_node_meminfo_info(struct hwloc_topology *topology,
 
   sprintf(meminfopath, "%s/node%d/meminfo", syspath, node);
   hwloc_parse_meminfo_info(data, meminfopath,
-			   hwloc_snprintf(NULL, 0, "Node %d ", node),
+			   snprintf(NULL, 0, "Node %d ", node),
 			   &memory->local_memory,
 			   &meminfo_hugepages_count, NULL /* no hugepage size in node-specific meminfo */,
 			   memory->page_types == NULL);
@@ -2280,6 +2283,7 @@ hwloc_read_unit32be(const char *p, const char *p1, uint32_t *buf, int root_fd)
   uint32_t *tmp = hwloc_read_raw(p, p1, &cb, root_fd);
   if (sizeof(*buf) != cb) {
     errno = EINVAL;
+    free(tmp); /* tmp is either NULL or contains useless things */
     return -1;
   }
   *buf = htonl(*tmp);
@@ -2368,7 +2372,6 @@ try__add_cache_from_device_tree_cpu(struct hwloc_topology *topology,
 			   type == HWLOC_OBJ_CACHE_UNIFIED ? "unified" : (type == HWLOC_OBJ_CACHE_DATA ? "data" : "instruction"),
 			   level, c->cpuset);
   hwloc_insert_object_by_cpuset(topology, c);
-
 }
 
 static void
@@ -2495,7 +2498,7 @@ look_powerpc_device_tree(struct hwloc_topology *topology,
         hwloc_debug("%s has no \"reg\" property, skipping\n", cpu);
       } else {
         struct hwloc_obj *core = NULL;
-        add_device_tree_cpus_node(&cpus, cpuset, l2_cache, phandle, dirent->d_name); 
+        add_device_tree_cpus_node(&cpus, cpuset, l2_cache, phandle, dirent->d_name);
 
         /* Add core */
         core = hwloc_alloc_setup_object(HWLOC_OBJ_CORE, reg);
@@ -2507,8 +2510,8 @@ look_powerpc_device_tree(struct hwloc_topology *topology,
 
         hwloc_bitmap_free(cpuset);
       }
-      free(device_type);
     }
+    free(device_type);
 cont:
     free(cpu);
   }
@@ -2583,7 +2586,6 @@ look_sysfsnode(struct hwloc_topology *topology,
   unsigned nbnodes = 0;
   DIR *dir;
   struct dirent *dirent;
-  hwloc_obj_t node;
   hwloc_bitmap_t nodeset;
 
   *found = 0;
@@ -2624,6 +2626,7 @@ look_sysfsnode(struct hwloc_topology *topology,
           free(nodes);
           free(indexes);
           free(distances);
+          hwloc_bitmap_free(nodeset);
           goto out;
       }
 
@@ -2649,6 +2652,8 @@ look_sysfsnode(struct hwloc_topology *topology,
       for (index_ = 0; index_ < nbnodes; index_++) {
           char nodepath[SYSFS_NUMA_NODE_PATH_LEN];
           hwloc_bitmap_t cpuset;
+          hwloc_obj_t node, res_obj;
+
 	  osnode = indexes[index_];
 
           sprintf(nodepath, "%s/node%u/cpumap", path, osnode);
@@ -2665,7 +2670,9 @@ look_sysfsnode(struct hwloc_topology *topology,
 
           hwloc_debug_1arg_bitmap("os node %u has cpuset %s\n",
                                   osnode, node->cpuset);
-          hwloc_insert_object_by_cpuset(topology, node);
+          res_obj = hwloc_insert_object_by_cpuset(topology, node);
+          assert(node == res_obj); /* if we got merged, somebody else added NODEs earlier, things went wrong?! */
+
           nodes[index_] = node;
 
 	  /* Linux nodeX/distance file contains distance from X to other localities (from ACPI SLIT table or so),
@@ -2753,7 +2760,6 @@ look_sysfscpu(struct hwloc_topology *topology,
   caches_added = 0;
   hwloc_bitmap_foreach_begin(i, cpuset)
     {
-      struct hwloc_obj *sock, *core, *book, *thread;
       hwloc_bitmap_t socketset, coreset, bookset, threadset, savedcoreset;
       unsigned mysocketid, mycoreid, mybookid;
       int threadwithcoreid = 0;
@@ -2767,11 +2773,10 @@ look_sysfscpu(struct hwloc_topology *topology,
       socketset = hwloc_parse_cpumap(str, data->root_fd);
       if (socketset && hwloc_bitmap_first(socketset) == i) {
         /* first cpu in this socket, add the socket */
-        sock = hwloc_alloc_setup_object(HWLOC_OBJ_SOCKET, mysocketid);
+        struct hwloc_obj *sock = hwloc_alloc_setup_object(HWLOC_OBJ_SOCKET, mysocketid);
         sock->cpuset = socketset;
         hwloc_debug_1arg_bitmap("os socket %u has cpuset %s\n",
                      mysocketid, socketset);
-        hwloc_insert_object_by_cpuset(topology, sock);
 	/* add cpuinfo */
 	if (cpuinfo_Lprocs) {
 	  for(j=0; j<(int) cpuinfo_numprocs; j++)
@@ -2781,6 +2786,7 @@ look_sysfscpu(struct hwloc_topology *topology,
 	      hwloc_obj_add_info(sock, "CPUModel", cpuinfo_Lprocs[j].cpumodel);
 	    }
 	}
+        hwloc_insert_object_by_cpuset(topology, sock);
         socketset = NULL; /* don't free it */
       }
       hwloc_bitmap_free(socketset);
@@ -2810,7 +2816,7 @@ look_sysfscpu(struct hwloc_topology *topology,
 
       if (coreset && (hwloc_bitmap_first(coreset) == i || threadwithcoreid)) {
 	/* regular core */
-        core = hwloc_alloc_setup_object(HWLOC_OBJ_CORE, mycoreid);
+        struct hwloc_obj *core = hwloc_alloc_setup_object(HWLOC_OBJ_CORE, mycoreid);
 	if (threadwithcoreid) {
 	  /* amd multicore compute-unit, create one core per thread */
 	  core->cpuset = hwloc_bitmap_alloc();
@@ -2832,7 +2838,7 @@ look_sysfscpu(struct hwloc_topology *topology,
         sprintf(str, "%s/cpu%d/topology/book_siblings", path, i);
         bookset = hwloc_parse_cpumap(str, data->root_fd);
         if (bookset && hwloc_bitmap_first(bookset) == i) {
-          book = hwloc_alloc_setup_object(HWLOC_OBJ_GROUP, mybookid);
+          struct hwloc_obj *book = hwloc_alloc_setup_object(HWLOC_OBJ_GROUP, mybookid);
           book->cpuset = bookset;
           hwloc_debug_1arg_bitmap("os book %u has cpuset %s\n",
                        mybookid, bookset);
@@ -2841,23 +2847,22 @@ look_sysfscpu(struct hwloc_topology *topology,
         }
       }
 
+      {
       /* look at the thread */
+      struct hwloc_obj *thread = hwloc_alloc_setup_object(HWLOC_OBJ_PU, i);
       threadset = hwloc_bitmap_alloc();
       hwloc_bitmap_only(threadset, i);
-
-      /* add the thread */
-      thread = hwloc_alloc_setup_object(HWLOC_OBJ_PU, i);
       thread->cpuset = threadset;
       hwloc_debug_1arg_bitmap("thread %d has cpuset %s\n",
 		 i, threadset);
       hwloc_insert_object_by_cpuset(topology, thread);
+      }
 
       /* look at the caches */
       for(j=0; j<10; j++) {
 #define SHARED_CPU_MAP_STRLEN 128
 	char mappath[SHARED_CPU_MAP_STRLEN];
 	char str2[20]; /* enough for a level number (one digit) or a type (Data/Instruction/Unified) */
-	struct hwloc_obj *cache;
 	hwloc_bitmap_t cacheset;
 	unsigned long kB = 0;
 	unsigned linesize = 0;
@@ -2869,11 +2874,12 @@ look_sysfscpu(struct hwloc_topology *topology,
 	sprintf(mappath, "%s/cpu%d/cache/index%d/level", path, i, j);
 	fd = hwloc_fopen(mappath, "r", data->root_fd);
 	if (fd) {
-	  if (fgets(str2,sizeof(str2), fd))
+	  char *res = fgets(str2,sizeof(str2), fd);
+	  fclose(fd);
+	  if (res)
 	    depth = strtoul(str2, NULL, 10)-1;
 	  else
 	    continue;
-	  fclose(fd);
 	} else
 	  continue;
 
@@ -2950,7 +2956,7 @@ look_sysfscpu(struct hwloc_topology *topology,
 
           if (hwloc_bitmap_first(cacheset) == i) {
             /* first cpu in this cache, add the cache */
-            cache = hwloc_alloc_setup_object(HWLOC_OBJ_CACHE, -1);
+            struct hwloc_obj *cache = hwloc_alloc_setup_object(HWLOC_OBJ_CACHE, -1);
             cache->attr->cache.size = kB << 10;
             cache->attr->cache.depth = depth+1;
             cache->attr->cache.linesize = linesize;
@@ -3094,12 +3100,10 @@ hwloc_linux_parse_cpuinfo(struct hwloc_linux_backend_data_s *data,
       var = strtoul(value,&endptr,0);					\
       if (endptr==value) {						\
 	hwloc_debug("no number in "field" field of %s\n", path);	\
-	free(str);							\
-	return -1;							\
+	goto err;							\
       } else if (var==ULONG_MAX) {					\
 	hwloc_debug("too big "field" number in %s\n", path); 		\
-	free(str);							\
-	return -1;							\
+	goto err;							\
       }									\
       hwloc_debug(field " %lu\n", var)
 #   define getprocnb_end()						\
@@ -3147,6 +3151,13 @@ hwloc_linux_parse_cpuinfo(struct hwloc_linux_backend_data_s *data,
 
   *Lprocs_p = Lprocs;
   return numprocs;
+
+ err:
+  fclose(fd);
+  free(str);
+  free(global_cpumodel);
+  free(Lprocs);
+  return -1;
 }
 
 static void
@@ -3381,14 +3392,15 @@ hwloc_look_linuxfs(struct hwloc_backend *backend)
       node = strtoul(dirent->d_name+4, NULL, 0);
       snprintf(path, sizeof(path), "/proc/nodes/node%lu/cpuinfo", node);
       err = look_cpuinfo(topology, data, path, machine_online_set);
-      if (err < 0)
+      if (err < 0) {
+        hwloc_bitmap_free(machine_online_set);
         continue;
+      }
       hwloc_bitmap_or(topology->levels[0][0]->online_cpuset, topology->levels[0][0]->online_cpuset, machine_online_set);
       machine = hwloc_alloc_setup_object(HWLOC_OBJ_MACHINE, node);
       machine->cpuset = machine_online_set;
       hwloc_debug_1arg_bitmap("machine number %lu has cpuset %s\n",
 		 node, machine_online_set);
-      hwloc_insert_object_by_cpuset(topology, machine);
 
       /* Get the machine memory attributes */
       hwloc_get_kerrighed_node_meminfo_info(topology, data, node, &machine->memory);
@@ -3396,6 +3408,8 @@ hwloc_look_linuxfs(struct hwloc_backend *backend)
       /* Gather DMI info */
       /* FIXME: get the right DMI info of each machine */
       hwloc__get_dmi_info(data, machine);
+
+      hwloc_insert_object_by_cpuset(topology, machine);
     }
     closedir(nodes_dir);
   } else {
@@ -3474,6 +3488,7 @@ hwloc_linux_add_os_device(struct hwloc_topology *topology, struct hwloc_obj *pci
   obj->attr->osdev.type = type;
 
   hwloc_insert_object_by_parent(topology, pcidev, obj);
+  /* insert_object_by_parent() doesn't merge during insert, so obj is still valid */
 
   return obj;
 }

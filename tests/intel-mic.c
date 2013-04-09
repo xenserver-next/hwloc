@@ -1,65 +1,57 @@
 /*
- * Copyright © 2010-2012 Inria.  All rights reserved.
- * Copyright © 2011 Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2013 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
 #include <stdio.h>
 #include <assert.h>
-#include <cuda_runtime_api.h>
 #include <hwloc.h>
-#include <hwloc/cudart.h>
-
-/* check the CUDA Runtime API helpers */
+#include <hwloc/intel-mic.h>
 
 int main(void)
 {
   hwloc_topology_t topology;
-  cudaError_t cerr;
-  int count, i;
+  int i;
   int err;
-
-  cerr = cudaGetDeviceCount(&count);
-  if (cerr) {
-    printf("cudaGetDeviceCount failed %d\n", cerr);
-    return 0;
-  }
-  printf("cudaGetDeviceCount found %d devices\n", count);
 
   hwloc_topology_init(&topology);
   hwloc_topology_set_flags(topology, HWLOC_TOPOLOGY_FLAG_IO_DEVICES);
   hwloc_topology_load(topology);
 
-  for(i=0; i<count; i++) {
+  for(i=0; ; i++) {
     hwloc_bitmap_t set;
     hwloc_obj_t osdev, ancestor;
     const char *value;
 
-    osdev = hwloc_cudart_get_device_osdev_by_index(topology, i);
+    osdev = hwloc_intel_mic_get_device_osdev_by_index(topology, i);
+    if (!osdev)
+      break;
     assert(osdev);
 
     ancestor = hwloc_get_non_io_ancestor_obj(topology, osdev);
 
     printf("found OSDev %s\n", osdev->name);
-    err = strncmp(osdev->name, "cuda", 4);
+    err = strncmp(osdev->name, "mic", 3);
     assert(!err);
-    assert(atoi(osdev->name+4) == (int) i);
-
-    value = hwloc_obj_get_info_by_name(osdev, "Backend");
-    err = strcmp(value, "CUDA");
-    assert(!err);
+    assert(atoi(osdev->name+3) == (int) i);
 
     assert(osdev->attr->osdev.type == HWLOC_OBJ_OSDEV_COPROC);
 
     value = hwloc_obj_get_info_by_name(osdev, "CoProcType");
-    err = strcmp(value, "CUDA");
+    err = strcmp(value, "MIC");
     assert(!err);
     
-    value = hwloc_obj_get_info_by_name(osdev, "GPUModel");
-    printf("found OSDev model %s\n", value);
+    value = hwloc_obj_get_info_by_name(osdev, "MICFamily");
+    printf("found MICFamily %s\n", value);
+    value = hwloc_obj_get_info_by_name(osdev, "MICSKU");
+    printf("found MICSKU %s\n", value);
+    value = hwloc_obj_get_info_by_name(osdev, "MICActiveCores");
+    printf("found MICActiveCores %s\n", value);
+    value = hwloc_obj_get_info_by_name(osdev, "MICMemorySize");
+    printf("found MICMemorySize %s\n", value);
 
     set = hwloc_bitmap_alloc();
-    err = hwloc_cudart_get_device_cpuset(topology, i, set);
+    err = hwloc_intel_mic_get_device_cpuset(topology, i, set);
     if (err < 0) {
       printf("failed to get cpuset for device %d\n", i);
     } else {

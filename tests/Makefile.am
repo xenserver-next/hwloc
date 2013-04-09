@@ -1,4 +1,4 @@
-# Copyright © 2009-2012 Inria.  All rights reserved.
+# Copyright © 2009-2013 Inria.  All rights reserved.
 # Copyright © 2009-2012 Université Bordeaux 1
 # Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -16,7 +16,7 @@ endif HWLOC_HAVE_LINUX
 
 LDADD =
 
-TESTS_ENVIRONMENT = $(builddir)/wrapper.sh
+LOG_COMPILER = $(builddir)/wrapper.sh
 
 check_PROGRAMS = hwloc_list_components \
 	hwloc_bitmap \
@@ -47,7 +47,9 @@ check_PROGRAMS = hwloc_list_components \
 	hwloc_topology_restrict \
 	hwloc_obj_infos \
 	hwloc_iodevs \
-	xmlbuffer
+	xmlbuffer \
+	gl \
+	intel-mic
 
 if HWLOC_HAVE_LINUX_LIBNUMA
 check_PROGRAMS += linux-libnuma
@@ -60,10 +62,6 @@ endif HWLOC_HAVE_SCHED_SETAFFINITY
 if HWLOC_HAVE_LIBIBVERBS
 check_PROGRAMS += openfabrics-verbs
 endif HWLOC_HAVE_LIBIBVERBS
-
-if HWLOC_HAVE_GL
-check_PROGRAMS += gl
-endif HWLOC_HAVE_GL
 
 if HWLOC_HAVE_MYRIEXPRESS
 check_PROGRAMS += myriexpress

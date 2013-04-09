@@ -383,6 +383,11 @@ extern "C" {
 #define hwloc_mx_board_get_device_cpuset HWLOC_NAME(mx_board_get_device_cpuset)
 #define hwloc_mx_endpoint_get_device_cpuset HWLOC_NAME(mx_endpoint_get_device_cpuset)
 
+/* intel-mic.h */
+
+#define hwloc_intel_mic_get_device_cpuset HWLOC_NAME(intel_mic_get_device_cpuset)
+#define hwloc_intel_mic_get_device_osdev_by_index HWLOC_NAME(intel_mic_get_device_osdev_by_index)
+
 /* opencl.h */
 
 #define hwloc_opencl_get_device_cpuset HWLOC_NAME(opencl_get_device_cpuset)
@@ -421,8 +426,7 @@ extern "C" {
 #define hwloc_disc_component_type_e HWLOC_NAME(disc_component_type_e)
 #define HWLOC_DISC_COMPONENT_TYPE_CPU HWLOC_NAME_CAPS(DISC_COMPONENT_TYPE_CPU)
 #define HWLOC_DISC_COMPONENT_TYPE_GLOBAL HWLOC_NAME_CAPS(DISC_COMPONENT_TYPE_GLOBAL)
-#define HWLOC_DISC_COMPONENT_TYPE_ADDITIONAL HWLOC_NAME_CAPS(DISC_COMPONENT_TYPE_ADDITIONAL)
-#define HWLOC_DISC_COMPONENT_TYPE_MAX HWLOC_NAME_CAPS(DISC_COMPONENT_TYPE_MAX)
+#define HWLOC_DISC_COMPONENT_TYPE_MISC HWLOC_NAME_CAPS(DISC_COMPONENT_TYPE_MISC)
 #define hwloc_disc_component_type_t HWLOC_NAME(disc_component_type_t)
 #define hwloc_disc_component HWLOC_NAME(disc_component)
 
@@ -438,7 +442,6 @@ extern "C" {
 #define hwloc_component_type_e HWLOC_NAME(component_type_e)
 #define HWLOC_COMPONENT_TYPE_DISC HWLOC_NAME_CAPS(COMPONENT_TYPE_DISC)
 #define HWLOC_COMPONENT_TYPE_XML HWLOC_NAME_CAPS(COMPONENT_TYPE_XML)
-#define HWLOC_COMPONENT_TYPE_MAX HWLOC_NAME_CAPS(COMPONENT_TYPE_MAX)
 #define hwloc_component_type_t HWLOC_NAME(component_type_t)
 #define hwloc_component HWLOC_NAME(component)
 

@@ -1,7 +1,7 @@
 # -*- shell-script -*-
 #
 # Copyright © 2009      CNRS
-# Copyright © 2009-2012 Inria.  All rights reserved.
+# Copyright © 2009-2013 Inria.  All rights reserved.
 # Copyright © 2009, 2011-2012      Université Bordeaux 1
 # Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
 #
@@ -33,7 +33,7 @@ EOF
 AC_CANONICAL_TARGET
 
 # Init automake
-AM_INIT_AUTOMAKE([1.10 dist-bzip2 subdir-objects foreign tar-ustar -Wall -Werror])
+AM_INIT_AUTOMAKE([1.11 dist-bzip2 subdir-objects foreign tar-ustar parallel-tests -Wall -Werror])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 # We want new Libtool.  None of that old stuff.  Pfft.    
@@ -227,6 +227,9 @@ test "x$hwloc_opencl_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list 
 test "x$hwloc_have_cudart" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list CUDA"
 test "x$hwloc_nvml_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list NVML"
 test "x$hwloc_gl_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list GL"
+# if anything but PCI, that anything will be useless
+test "x$hwloc_pci_happy" != "xyes" && test "x$hwloc_probeio_list" != "x" && hwloc_probeio_list="$hwloc_probeio_list (cannot work without PCI)"
+# if nothing, say "no"
 test "x$hwloc_probeio_list" = "x" && hwloc_probeio_list=" no"
 
 # Beginning of generic support

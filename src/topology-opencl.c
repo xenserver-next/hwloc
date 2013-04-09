@@ -298,11 +298,11 @@ hwloc_opencl_component_instantiate(struct hwloc_disc_component *component,
 }
 
 static struct hwloc_disc_component hwloc_opencl_disc_component = {
-  HWLOC_DISC_COMPONENT_TYPE_ADDITIONAL,
+  HWLOC_DISC_COMPONENT_TYPE_MISC,
   "opencl",
   HWLOC_DISC_COMPONENT_TYPE_GLOBAL,
   hwloc_opencl_component_instantiate,
-  19, /* after libpci */
+  10, /* after pci */
   NULL
 };
 

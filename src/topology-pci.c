@@ -362,12 +362,11 @@ hwloc_pci_find_hostbridge_parent(struct hwloc_topology *topology, struct hwloc_b
       parent = parent->parent;
   } else {
     /* the object we found is too large, insert an intermediate group */
-    hwloc_obj_t group_obj = group_obj = hwloc_alloc_setup_object(HWLOC_OBJ_GROUP, -1);
+    hwloc_obj_t group_obj = hwloc_alloc_setup_object(HWLOC_OBJ_GROUP, -1);
     if (group_obj) {
       group_obj->cpuset = hwloc_bitmap_dup(cpuset);
       group_obj->attr->group.depth = (unsigned) -1;
-      hwloc__insert_object_by_cpuset(topology, group_obj, hwloc_report_os_error);
-      parent = group_obj;
+      parent = hwloc__insert_object_by_cpuset(topology, group_obj, hwloc_report_os_error);
     }
   }
 
@@ -762,7 +761,7 @@ hwloc_pci_component_instantiate(struct hwloc_disc_component *component,
 }
 
 static struct hwloc_disc_component hwloc_pci_disc_component = {
-  HWLOC_DISC_COMPONENT_TYPE_ADDITIONAL,
+  HWLOC_DISC_COMPONENT_TYPE_MISC,
   "pci",
   HWLOC_DISC_COMPONENT_TYPE_GLOBAL,
   hwloc_pci_component_instantiate,

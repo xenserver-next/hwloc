@@ -141,7 +141,7 @@ hwloc_gl_backend_notify_new_object(struct hwloc_backend *backend, struct hwloc_b
 {
   struct hwloc_topology *topology = backend->topology;
   struct hwloc_gl_backend_data_s *data = backend->private_data;
-  unsigned i;
+  unsigned i, res;
 
   if (!(hwloc_topology_get_flags(topology) & (HWLOC_TOPOLOGY_FLAG_IO_DEVICES|HWLOC_TOPOLOGY_FLAG_WHOLE_IO)))
     return 0;
@@ -165,6 +165,7 @@ hwloc_gl_backend_notify_new_object(struct hwloc_backend *backend, struct hwloc_b
     return 0;
 
   /* now the display array is ready to use */
+  res = 0;
   for(i=0; i<data->nr_display; i++) {
     struct hwloc_gl_display_info_s *info = &data->display[i];
     hwloc_obj_t osdev;
@@ -187,10 +188,12 @@ hwloc_gl_backend_notify_new_object(struct hwloc_backend *backend, struct hwloc_b
     if (info->productname)
       hwloc_obj_add_info(osdev, "GPUModel", info->productname);
     hwloc_insert_object_by_parent(topology, pcidev, osdev);
-    return 1;
+
+    res++;
+    /* there may be others */
   }
 
-  return 0;
+  return res;
 }
 
 static void
@@ -238,11 +241,11 @@ hwloc_gl_component_instantiate(struct hwloc_disc_component *component,
 }
 
 static struct hwloc_disc_component hwloc_gl_disc_component = {
-  HWLOC_DISC_COMPONENT_TYPE_ADDITIONAL,
+  HWLOC_DISC_COMPONENT_TYPE_MISC,
   "gl",
   HWLOC_DISC_COMPONENT_TYPE_GLOBAL,
   hwloc_gl_component_instantiate,
-  19, /* after libpci */
+  10, /* after pci */
   NULL
 };
 

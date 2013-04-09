@@ -29,7 +29,8 @@ Version 1.7.0
     and Erik Schnetter for their help.
   + Add NetBSD support, thanks to Aleksej Saushev.
 * New I/O device discovery
-  + Add co-processor OS devices such as "mic0" for Intel Xeon Phi on Linux.
+  + Add co-processor OS devices such as "mic0" for Intel Xeon Phi (MIC)
+    on Linux. Thanks to Jerome Vienne for helping.
   + Add co-processor OS devices such as "cuda0" for NVIDIA CUDA-capable GPUs.
   + Add co-processor OS devices such as "opencl0d0" for OpenCL GPU devices
     on the AMD OpenCL implementation.
@@ -52,9 +53,10 @@ Version 1.7.0
   + Add hwloc/plugins.h for building external plugins.
     See the Adding new discovery components and plugins section.
 * Interoperability
-  + Add hwloc/opencl.h, hwloc/nvml.h and hwloc/gl.h to retrieve the
-    locality of OS devices that correspond to AMD OpenCL GPU devices
-    or indexes, to NVML devices or indexes, or to NVIDIA X11 displays.
+  + Add hwloc/opencl.h, hwloc/nvml.h, hwloc/gl.h and hwloc/intel-mic.h
+    to retrieve the locality of OS devices that correspond to AMD OpenCL
+    GPU devices or indexes, to NVML devices or indexes, to NVIDIA X11
+    displays, or to Intel Xeon Phi (MIC) device indexes.
   + Add new helpers in hwloc/cuda.h and hwloc/cudart.h to convert
     between CUDA devices or indexes and hwloc OS devices.
   + Add hwloc_ibv_get_device_osdev() and clarify the requirements
@@ -75,6 +77,14 @@ Version 1.7.0
     names are prefixed with '-'.
   + lstopo --ignore PU now works when displaying the topology in
     graphical and textual mode (not when exporting to XML).
+  + Make sure I/O options always appear in lstopo usage, not only when
+    using pciutils/libpci.
+  + Remove some unneeded Linux specific includes from some interoperability
+    headers.
+  + Fix some inconsistencies in hwloc-distrib and hwloc-assembler-remote
+    manpages. Thanks to Guy Streeter for the report.
+  + Fix a memory leak on AIX when getting memory binding.
+  + Fix many small memory leaks on Linux.
   + The `libpci' component is now called `pci' but the old name is still
     accepted in the HWLOC_COMPONENTS variable for backward compatibility.
 
