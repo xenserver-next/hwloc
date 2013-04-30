@@ -213,6 +213,11 @@ SUBDIRS = libltdl
 endif
 endif
 
+if HWLOC_MAYENTER_SRC_LIBLTDL
+# only enter libltdl whenever configure.ac did everything needed to configure it
+DIST_SUBDIRS = libltdl
+endif
+
 # Embedded library (note the lack of a .so version number -- that
 # intentionally only appears in the installable library).  Also note
 # the lack of _LDFLAGS -- all libs are added by the upper layer (via

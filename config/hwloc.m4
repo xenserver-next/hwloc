@@ -1191,6 +1191,9 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_GL_BUILD_STATIC], [test "x$hwloc_gl_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_XML_LIBXML_BUILD_STATIC], [test "x$hwloc_xml_libxml_component" = "xstatic"])
 
+        AM_CONDITIONAL([HWLOC_LTDL_INCLUDED], [test "x$with_included_ltdl" = "xyes"])
+        AM_CONDITIONAL([HWLOC_MAYENTER_SRC_LIBLTDL], [test "x$hwloc_mayenter_src_libltdl" = "xyes"])
+
         AM_CONDITIONAL([HWLOC_HAVE_CXX], [test "x$hwloc_have_cxx" = "xyes"])
     ])
     hwloc_did_am_conditionals=yes

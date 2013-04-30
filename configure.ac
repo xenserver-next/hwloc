@@ -154,9 +154,6 @@ cat <<EOF
 ###
 EOF
 
-# Run the AM_CONDITIONALs
-HWLOC_DO_AM_CONDITIONALS
-
 # Set the final flags
 CFLAGS="$HWLOC_EMBEDDED_CFLAGS $CFLAGS"
 CPPFLAGS="$HWLOC_EMBEDDED_CPPFLAGS $CPPFLAGS"
@@ -168,10 +165,13 @@ AM_ENABLE_SHARED
 AM_DISABLE_STATIC
 AM_PROG_LIBTOOL([dlopen win32-dll])
 LT_LANG([C])
+
+# Here's what we need to configure ltdl properly
 LT_CONFIG_LTDL_DIR([src/libltdl])
 LTDL_INIT([recursive convenience])
 AC_CONFIG_FILES([src/libltdl/Makefile])
-
+# Tell src/Makefile.am that things were configured under src/libltdl/
+hwloc_mayenter_src_libltdl=yes
 # Workarounds for libtool LT_CONFIG_H bug
 #CPPFLAGS="$CPPFLAGS -I$HWLOC_top_builddir"
 AC_CONFIG_COMMANDS_PRE([LT_CONFIG_H=`expr "$LT_CONFIG_H" : '.*/\(.*\)'`])
@@ -184,9 +184,9 @@ if test "x$hwloc_have_plugins" = xyes; then
   HWLOC_LIBS_PRIVATE="$HWLOC_LIBS_PRIVATE $lt_cv_dlopen_libs"
 fi
 
-# Is ltdl included?
-AM_CONDITIONAL([HWLOC_LTDL_INCLUDED], [test "x$with_included_ltdl" = xyes])
 
+# Run the AM_CONDITIONALs
+HWLOC_DO_AM_CONDITIONALS
 
 # Party on
 AC_OUTPUT
