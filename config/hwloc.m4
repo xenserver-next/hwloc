@@ -1,6 +1,6 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2009-2013 Inria.  All rights reserved.
+dnl Copyright © 2009-2014 Inria.  All rights reserved.
 dnl Copyright (c) 2009-2012 Université Bordeaux 1
 dnl Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
@@ -914,6 +914,31 @@ EOF])
     fi
     # don't add LIBS/CFLAGS/REQUIRES yet, depends on plugins
 
+    # Xen support
+    hwloc_xen_happy=no
+    if test "x$enable_xen" != "xno"; then
+	hwloc_xen_happy=yes
+	AC_CHECK_HEADERS([xenctrl.h], [
+	  AC_CHECK_LIB([xenctrl], [xc_topologyinfo_bounced], [HWLOC_XEN_LIBS="-lxenctrl"], [hwloc_xen_happy=no])
+        ], [hwloc_xen_happy=no])
+    fi
+    AC_SUBST(HWLOC_XEN_LIBS)
+    # If we asked for xen support but couldn't deliver, fail
+    AS_IF([test "$enable_xen" = "yes" -a "$hwloc_xen_happy" = "no"],
+	  [AC_MSG_WARN([Specified --enable-xen switch, but could not])
+	   AC_MSG_WARN([find appropriate support])
+	   AC_MSG_ERROR([Cannot continue])])
+    if test "x$hwloc_xen_happy" = "xyes"; then
+      AC_DEFINE([HWLOC_HAVE_XEN], [1], [Define to 1 if you have the `XEN' library.])
+      AC_SUBST([HWLOC_HAVE_XEN], [1])
+      hwloc_components="$hwloc_components xen"
+      hwloc_xen_component_maybeplugin=1
+      hwloc_xen=yes
+    else
+      AC_SUBST([HWLOC_HAVE_XEN], [0])
+    fi
+    # don't add LIBS/CFLAGS/REQUIRES yet, depends on plugins
+
     # X11 support
     AC_PATH_XTRA
 
@@ -1127,6 +1152,10 @@ EOF])
           [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_GL_LIBS"
            HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_GL_CFLAGS"
            HWLOC_REQUIRES="$HWLOC_GL_REQUIRES $HWLOC_REQUIRES"])
+    AS_IF([test "$hwloc_xen_component" = "static"],
+          [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_XEN_LIBS"
+           HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_XEN_CFLAGS"
+           HWLOC_REQUIRES="$HWLOC_XEN_REQUIRES $HWLOC_REQUIRES"])
     AS_IF([test "$hwloc_xml_libxml_component" = "static"],
           [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_LIBXML2_LIBS"
            HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_LIBXML2_CFLAGS"
@@ -1242,6 +1271,7 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_HAVE_X86_32], [test "x$hwloc_x86_32" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_X86_64], [test "x$hwloc_x86_64" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_CPUID], [test "x$hwloc_have_cpuid" = "xyes"])
+        AM_CONDITIONAL([HWLOC_HAVE_XEN], [test "x$hwloc_xen" = "xyes"])
 
         AM_CONDITIONAL([HWLOC_HAVE_PLUGINS], [test "x$hwloc_have_plugins" = "xyes"])
         AM_CONDITIONAL([HWLOC_PCI_BUILD_STATIC], [test "x$hwloc_pci_component" = "xstatic"])
@@ -1249,6 +1279,7 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_CUDA_BUILD_STATIC], [test "x$hwloc_cuda_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_NVML_BUILD_STATIC], [test "x$hwloc_nvml_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_GL_BUILD_STATIC], [test "x$hwloc_gl_component" = "xstatic"])
+        AM_CONDITIONAL([HWLOC_XEN_BUILD_STATIC], [test "x$hwloc_xen_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_XML_LIBXML_BUILD_STATIC], [test "x$hwloc_xml_libxml_component" = "xstatic"])
 
         AM_CONDITIONAL([HWLOC_HAVE_CXX], [test "x$hwloc_have_cxx" = "xyes"])
