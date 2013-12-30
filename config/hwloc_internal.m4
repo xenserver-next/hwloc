@@ -83,6 +83,11 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
                   AS_HELP_STRING([--disable-nvml],
                                  [Disable the NVML device discovery]))
 
+    # Xen?
+    AC_ARG_ENABLE([xen],
+                  AS_HELP_STRING([--disable-xen],
+                                 [Disable Xen system discovery from dom0]))
+
     # GL/Display
     AC_ARG_ENABLE([gl],
 		  AS_HELP_STRING([--disable-gl],
