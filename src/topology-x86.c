@@ -1,5 +1,5 @@
 /*
- * Copyright © 2010-2013 Inria.  All rights reserved.
+ * Copyright © 2010-2014 Inria.  All rights reserved.
  * Copyright © 2010-2013 Université Bordeaux 1
  * Copyright © 2010-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -885,7 +885,7 @@ hwloc_x86_discover(struct hwloc_backend *backend)
     return 0;
   } else {
     /* topology is empty, initialize it */
-    hwloc_alloc_obj_cpusets(topology->levels[0][0]);
+    hwloc_alloc_root_sets(topology);
   }
 
 fulldiscovery:
