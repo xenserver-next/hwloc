@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2012 Inria.  All rights reserved.
+ * Copyright © 2009-2014 Inria.  All rights reserved.
  * Copyright © 2009-2011 Université Bordeaux 1
  * Copyright © 2011 Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2011      Oracle and/or its affiliates.  All rights reserved.
@@ -726,7 +726,7 @@ hwloc_look_solaris(struct hwloc_backend *backend)
     /* somebody discovered things */
     return 0;
 
-  hwloc_alloc_obj_cpusets(topology->levels[0][0]);
+  hwloc_alloc_root_sets(topology);
 
 #ifdef HAVE_LIBLGRP
   hwloc_look_lgrp(topology);

@@ -3690,7 +3690,7 @@ hwloc_look_linuxfs(struct hwloc_backend *backend)
 
   hwloc_gather_system_info(topology, data);
 
-  hwloc_alloc_obj_cpusets(topology->levels[0][0]);
+  hwloc_alloc_root_sets(topology);
 
   /* Gather the list of admin-disabled cpus and mems */
   hwloc_find_linux_cpuset_mntpnt(&cgroup_mntpnt, &cpuset_mntpnt, data->root_fd);
