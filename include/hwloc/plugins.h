@@ -311,6 +311,12 @@ HWLOC_DECLSPEC int hwloc_fill_object_sets(hwloc_obj_t obj);
  */
 HWLOC_DECLSPEC int hwloc_alloc_root_sets(struct hwloc_topology *topology);
 
+/** \brief Create a level of \p nb PU objects starting from index 0.
+ *
+ * Used for creating PU objects when there are no holes in the index list.
+ */
+HWLOC_DECLSPEC int hwloc_setup_pu_level(struct hwloc_topology *topology, unsigned nb);
+
 /** \brief Insert a list of PCI devices and bridges in the backend topology.
  *
  * Insert a list of objects (either PCI device or bridges) starting at first_obj
