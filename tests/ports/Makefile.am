@@ -1,4 +1,4 @@
-# Copyright © 2009-2012 Inria.  All rights reserved.
+# Copyright © 2009-2014 Inria.  All rights reserved.
 # Copyright © 2009, 2011-2012 Université Bordeaux 1
 # Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
@@ -20,6 +20,7 @@ check_LTLIBRARIES = \
 	libhwloc-port-osf.la \
 	libhwloc-port-solaris.la \
 	libhwloc-port-windows.la \
+	libhwloc-port-xen.la \
 	libhwloc-port-opencl.la \
 	libhwloc-port-cuda.la \
 	libhwloc-port-nvml.la \
@@ -137,6 +138,13 @@ libhwloc_port_windows_la_CPPFLAGS = $(common_CPPFLAGS) \
 	-I$(HWLOC_top_srcdir)/tests/ports/include/windows \
 	-DHWLOC_WIN_SYS \
 	-DHAVE__SC_LARGE_PAGESIZE -D_SC_LARGE_PAGESIZE=33
+
+nodist_libhwloc_port_xen_la_SOURCES = topology-xen.c
+libhwloc_port_xen_la_SOURCES = \
+	include/xen/xenctrl.h
+libhwloc_port_xen_la_CPPFLAGS = $(common_CPPFLAGS) \
+	-I$(HWLOC_top_srcdir)/tests/ports/include/xen \
+	-DHWLOC_XEN_SYS
 
 nodist_libhwloc_port_opencl_la_SOURCES = topology-opencl.c
 libhwloc_port_opencl_la_SOURCES = \

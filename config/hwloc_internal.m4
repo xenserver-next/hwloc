@@ -1,6 +1,6 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright (c) 2009-2012 Inria.  All rights reserved.
+dnl Copyright (c) 2009-2014 Inria.  All rights reserved.
 dnl Copyright (c) 2009, 2011 Université Bordeaux 1
 dnl Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
@@ -420,6 +420,7 @@ int foo(void) {
 	hwloc_config_prefix[tests/ports/topology-netbsd.c]:hwloc_config_prefix[src/topology-netbsd.c]
 	hwloc_config_prefix[tests/ports/topology-hpux.c]:hwloc_config_prefix[src/topology-hpux.c]
 	hwloc_config_prefix[tests/ports/topology-bgq.c]:hwloc_config_prefix[src/topology-bgq.c]
+	hwloc_config_prefix[tests/ports/topology-xen.c]:hwloc_config_prefix[src/topology-xen.c]
 	hwloc_config_prefix[tests/ports/topology-opencl.c]:hwloc_config_prefix[src/topology-opencl.c]
 	hwloc_config_prefix[tests/ports/topology-cuda.c]:hwloc_config_prefix[src/topology-cuda.c]
 	hwloc_config_prefix[tests/ports/topology-nvml.c]:hwloc_config_prefix[src/topology-nvml.c]
