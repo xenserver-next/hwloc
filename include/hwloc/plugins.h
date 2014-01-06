@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013 Inria.  All rights reserved.
+ * Copyright © 2013-2014 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -304,6 +304,12 @@ hwloc_alloc_setup_object(hwloc_obj_type_t type, signed os_index)
  * Typical case: PCI backend adding a hostbridge parent.
  */
 HWLOC_DECLSPEC int hwloc_fill_object_sets(hwloc_obj_t obj);
+
+/** \brief Allocate object CPU and node sets of the root object.
+ *
+ * Used for initializing the root object sets prior to discovering CPUs and NUMA nodes.
+ */
+HWLOC_DECLSPEC int hwloc_alloc_root_sets(struct hwloc_topology *topology);
 
 /** \brief Insert a list of PCI devices and bridges in the backend topology.
  *

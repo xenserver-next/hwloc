@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013 Inria.  All rights reserved.
+ * Copyright © 2013-2014 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -29,7 +29,7 @@ hwloc_look_bgq(struct hwloc_backend *backend)
 
 #define HWLOC_BGQ_CORES 17 /* spare core ignored for now */
 
-    hwloc_alloc_obj_cpusets(topology->levels[0][0]);
+    hwloc_alloc_root_sets(topology);
     /* mark the 17th core (OS-reserved) as disallowed */
     hwloc_bitmap_clr_range(topology->levels[0][0]->allowed_cpuset, (HWLOC_BGQ_CORES-1)*4, HWLOC_BGQ_CORES*4-1);
 

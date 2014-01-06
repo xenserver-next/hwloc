@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2013 Inria.  All rights reserved.
+ * Copyright © 2009-2014 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux 1
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -2282,8 +2282,9 @@ hwloc_connect_levels(hwloc_topology_t topology)
   return 0;
 }
 
-void hwloc_alloc_obj_cpusets(hwloc_obj_t obj)
+int hwloc_alloc_root_sets(hwloc_topology_t topology)
 {
+  hwloc_obj_t obj = hwloc_get_root_obj(topology);
   obj->cpuset = hwloc_bitmap_alloc_full();
   obj->complete_cpuset = hwloc_bitmap_alloc();
   obj->online_cpuset = hwloc_bitmap_alloc_full();
@@ -2291,6 +2292,7 @@ void hwloc_alloc_obj_cpusets(hwloc_obj_t obj)
   obj->nodeset = hwloc_bitmap_alloc();
   obj->complete_nodeset = hwloc_bitmap_alloc();
   obj->allowed_nodeset = hwloc_bitmap_alloc_full();
+  return 0;
 }
 
 /* Main discovery loop */
