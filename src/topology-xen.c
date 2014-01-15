@@ -84,6 +84,66 @@ free_xen_info(struct hwloc_xen_info *p)
   }
 }
 
+/* A bit like strdup()... */
+static void *memdup(const void *src, size_t sz)
+{
+  void *p = malloc(sz);
+  if (p)
+    memcpy(p, src, sz);
+  return p;
+}
+
+/* Return a (faked up) topology as it would appear from Xen, to test the
+ * translation logic. */
+static struct hwloc_xen_info *
+hwloc_get_xen_fake_info(void)
+{
+  struct hwloc_xen_info *data = alloc_xen_info();
+
+  uint32_t
+    cpu_to_core[]   = { 0, 1, 0, 1 },
+    cpu_to_socket[] = { 0, 0, 1, 1 },
+    cpu_to_node[]   = { 0, 0, 0, 0 };
+
+  uint64_t
+    node_to_memsize[] = { 1U<<30 },
+    node_to_memfree[] = { 1U<<29 };
+
+  uint32_t
+    node_to_node_distance[] = { 10 };
+
+  if (!data)
+    goto out;
+
+#define ARRAY_SIZE(a) (sizeof (a) / sizeof *(a))
+#define MEMDUP(a) memdup(a, sizeof *a)
+
+  data->max_cpu_id = ARRAY_SIZE(cpu_to_core) - 1;
+  data->cpu_to_core   = MEMDUP(cpu_to_core);
+  data->cpu_to_socket = MEMDUP(cpu_to_socket);
+  data->cpu_to_node   = MEMDUP(cpu_to_node);
+
+  if (!data->cpu_to_core || !data->cpu_to_socket || !data->cpu_to_node)
+    goto out;
+
+  data->max_node_id = ARRAY_SIZE(node_to_memsize) - 1;
+  data->node_to_memsize = MEMDUP(node_to_memsize);
+  data->node_to_memfree = MEMDUP(node_to_memfree);
+  data->node_to_node_distance = MEMDUP(node_to_node_distance);
+
+#undef MEMDUP
+#undef ARRAY_SIZE
+
+  if (!data->node_to_memsize || !data->node_to_memfree || !data->node_to_node_distance)
+    goto out;
+
+  return data;
+
+ out:
+  free_xen_info(data);
+  return NULL;
+}
+
 /* Perform hypercalls to query Xen for information, and fill in a
  * hwloc_xen_info structure. */
 static struct hwloc_xen_info *
@@ -176,7 +236,10 @@ hwloc_xen_discover(struct hwloc_backend *backend)
 
   hwloc_debug("Discovering Xen topology\n");
 
+  if (!getenv("HWLOC_XEN_FAKE"))
   data = hwloc_get_xen_info(priv->xch);
+  else
+      data = hwloc_get_xen_fake_info();
   assert(data && "Failed to gather data from Xen\n");
 
   hwloc_debug("Xen topology information\n");
@@ -330,11 +393,13 @@ hwloc_xen_component_instantiate(struct hwloc_disc_component *component,
   priv->logger.vmessage = xenctl_logfn;
 
   /* This will fail if we are not running as root in dom0. */
+  if (!getenv("HWLOC_XEN_FAKE")) {
   priv->xch = xc_interface_open(&priv->logger, &priv->logger, 0);
   if (!priv->xch) {
     hwloc_debug("xc_interface_open() failed. Are you running as root in dom0?"
                 " Disabling xen component.\n");
     goto err;
+  }
   }
 
   backend->private_data = priv;
