@@ -391,4 +391,35 @@ HWLOC_DECLSPEC int hwloc_pci_prepare_bridge(hwloc_obj_t obj, const unsigned char
 
 
 
+/** \defgroup hwlocality_components_x86_cpuid_funcs Components and Plugins: x86 cpuid functions to be used by components
+ * @{
+ */
+
+enum hwloc_x86_cpuid_disc_flag_e {
+  /** \brief x86 cpuid discovery should annotate existing objects with CPU information. \hideinitializer */
+  HWLOC_X86_CPUID_DISC_FLAG_CPUINFO = (1UL<<0),
+  /** \brief x86 cpuid discovery should create cache objects. \hideinitializer */
+  HWLOC_X86_CPUID_DISC_FLAG_CACHES = (1UL<<1)
+};
+
+/** \brief Callback to be used by hwloc_x86_cpuid_discovery() if binding and native cpuid calls cannot work */
+typedef int (*hwloc_x86_cpuid_func_t)(void *private_data, unsigned pu, unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx);
+
+/** \brief Discovery using x86 cpuid.
+ *
+ * \p flags must be a OR'ed set of ::hwloc_x86_cpuid_disc_flag_e,
+ * or \c ~0UL if everything should be created and annotated.
+ *
+ * \p cpuid_data will passed to \p cpuid_func as the \p private_data argument.
+ *
+ * If \p cpuid_func is \c NULL, native binding and cpuid calls will be used.
+ */
+HWLOC_DECLSPEC int hwloc_x86_cpuid_discovery(struct hwloc_topology *topology, unsigned nbprocs, unsigned long flags,
+					     hwloc_x86_cpuid_func_t cpuid_func, void *cpuid_data);
+
+/** @} */
+
+
+
+
 #endif /* HWLOC_PLUGINS_H */
