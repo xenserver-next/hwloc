@@ -491,6 +491,13 @@ extern "C" {
 #define hwloc_pci_find_linkspeed HWLOC_NAME(pci_find_linkspeed)
 #define hwloc_pci_prepare_bridge HWLOC_NAME(pci_prepare_bridge)
 
+#define hwloc_x86_disc_flags_e HWLOC_NAME(x86_disc_flags_e)
+#define HWLOC_X86_DISC_FLAG_CPUINFO HWLOC_NAME_CAPS(X86_DISC_FLAG_CPUINFO)
+#define HWLOC_X86_DISC_FLAG_CACHES HWLOC_NAME_CAPS(X86_DISC_FLAG_CACHES)
+#define HWLOC_X86_DISC_FLAG_ALL HWLOC_NAME_CAPS(X86_DISC_FLAG_ALL)
+#define hwloc_x86_cpuid_func_t HWLOC_NAME(x86_cpuid_func_t)
+#define hwloc_x86_discovery HWLOC_NAME(x86_discovery)
+
 /* hwloc/deprecated.h */
 
 #define hwloc_obj_type_of_string HWLOC_NAME(obj_type_of_string )

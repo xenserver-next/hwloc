@@ -334,6 +334,22 @@ HWLOC_DECLSPEC int hwloc_pci_find_linkspeed(const unsigned char *config, unsigne
  */
 HWLOC_DECLSPEC int hwloc_pci_prepare_bridge(hwloc_obj_t obj, const unsigned char *config);
 
+#define HWLOC_X86_DISC_FLAG_CPUINFO (1UL<<0)
+#define HWLOC_X86_DISC_FLAG_CACHES (1UL<<1)
+#define HWLOC_X86_DISC_FLAG_ALL (~0UL)
+
+/** \brief Callback to be used by hwloc_look_x86() if binding and native cpuid calls cannot work */
+typedef int (*hwloc_x86_cpuid_func_t)(void *private_data, unsigned pu, unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx);
+
+/** \brief Discovery using x86 cpuid.
+ *
+ * \p flags must be a OR'ed set of ::hwloc_x86_disc_flags_e.
+ *
+ * If \p cpuidfunc is \c NULL, native binding and cpuid calls will be used.
+ */
+HWLOC_DECLSPEC int hwloc_x86_discovery(struct hwloc_topology *topology, unsigned nbprocs, unsigned long flags,
+				       hwloc_x86_cpuid_func_t cpuidfunc, void *cpuiddata);
+
 /** \brief Make sure that plugins can lookup core symbols.
  *
  * This is a sanity check to avoid lazy-lookup failures when libhwloc
