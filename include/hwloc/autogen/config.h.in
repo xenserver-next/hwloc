@@ -1,6 +1,6 @@
 /* -*- c -*-
  * Copyright © 2009 CNRS
- * Copyright © 2009-2010 inria.  All rights reserved.
+ * Copyright © 2009-2014 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux 1
  * Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -145,6 +145,9 @@
 
 /* Defined to 1 on Linux */
 #undef HWLOC_LINUX_SYS
+
+/* Defined to 1 if x86 cpuid functions are available */
+#undef HWLOC_HAVE_X86_CPUID
 
 /* Defined to 1 if the CPU_SET macro works */
 #undef HWLOC_HAVE_CPU_SET

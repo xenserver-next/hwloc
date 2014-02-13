@@ -391,6 +391,8 @@ HWLOC_DECLSPEC int hwloc_pci_prepare_bridge(hwloc_obj_t obj, const unsigned char
 
 
 
+#ifdef HWLOC_HAVE_X86_CPUID
+
 /** \defgroup hwlocality_components_x86_cpuid_funcs Components and Plugins: x86 cpuid functions to be used by components
  * @{
  */
@@ -418,6 +420,8 @@ HWLOC_DECLSPEC int hwloc_x86_cpuid_discovery(struct hwloc_topology *topology, un
 					     hwloc_x86_cpuid_func_t cpuid_func, void *cpuid_data);
 
 /** @} */
+
+#endif /* HWLOC_HAVE_X86_CPUID */
 
 
 
