@@ -967,7 +967,7 @@ hwloc_x86_discover(struct hwloc_backend *backend)
 
   if (!topology->levels[0][0]->cpuset) {
     /* topology is empty, initialize it and discover everything */
-    hwloc_alloc_obj_cpusets(topology->levels[0][0]);
+    hwloc_alloc_root_sets(topology);
     alreadypus = 0;
     flags = HWLOC_X86_CPUID_DISC_FLAG_ALL;
   } else {

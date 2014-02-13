@@ -305,6 +305,12 @@ hwloc_alloc_setup_object(hwloc_obj_type_t type, signed os_index)
  */
 HWLOC_DECLSPEC int hwloc_fill_object_sets(hwloc_obj_t obj);
 
+/** \brief Allocate object CPU and node sets of the root object.
+ *
+ * Used for initializing the root object sets prior to discovering CPUs and NUMA nodes.
+ */
+HWLOC_DECLSPEC int hwloc_alloc_root_sets(struct hwloc_topology *topology);
+
 /** \brief Make sure that plugins can lookup core symbols.
  *
  * This is a sanity check to avoid lazy-lookup failures when libhwloc
