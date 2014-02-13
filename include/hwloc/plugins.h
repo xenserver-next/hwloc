@@ -311,6 +311,12 @@ HWLOC_DECLSPEC int hwloc_fill_object_sets(hwloc_obj_t obj);
  */
 HWLOC_DECLSPEC int hwloc_alloc_root_sets(struct hwloc_topology *topology);
 
+/** \brief Create a level of \p nb PU objects starting from index 0.
+ *
+ * Used for creating PU objects when there are no holes in the index list.
+ */
+HWLOC_DECLSPEC int hwloc_setup_pu_level(struct hwloc_topology *topology, unsigned nb);
+
 /** \brief Make sure that plugins can lookup core symbols.
  *
  * This is a sanity check to avoid lazy-lookup failures when libhwloc

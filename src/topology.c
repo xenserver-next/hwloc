@@ -174,29 +174,28 @@ hwloc_fallback_nbprocessors(struct hwloc_topology *topology) {
 }
 
 /*
- * Use the given number of processors and the optional online cpuset if given
- * to set a PU level.
+ * Use the given number of processors to set a PU level.
  */
-void
+int
 hwloc_setup_pu_level(struct hwloc_topology *topology,
 		     unsigned nb_pus)
 {
   struct hwloc_obj *obj;
-  unsigned oscpu,cpu;
+  unsigned oscpu;
 
   hwloc_debug("%s", "\n\n * CPU cpusets *\n\n");
-  for (cpu=0,oscpu=0; cpu<nb_pus; oscpu++)
+  for (oscpu=0; oscpu<nb_pus; oscpu++)
     {
       obj = hwloc_alloc_setup_object(HWLOC_OBJ_PU, oscpu);
       obj->cpuset = hwloc_bitmap_alloc();
       hwloc_bitmap_only(obj->cpuset, oscpu);
 
-      hwloc_debug_2args_bitmap("cpu %u (os %u) has cpuset %s\n",
-		 cpu, oscpu, obj->cpuset);
+      hwloc_debug_1arg_bitmap("OS cpu %u has cpuset %s\n",
+			      oscpu, obj->cpuset);
       hwloc_insert_object_by_cpuset(topology, obj);
-
-      cpu++;
     }
+
+  return 0;
 }
 
 static void

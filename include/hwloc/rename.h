@@ -486,6 +486,7 @@ extern "C" {
 #define hwloc_alloc_setup_object HWLOC_NAME(alloc_setup_object)
 #define hwloc_fill_object_sets HWLOC_NAME(fill_object_sets)
 #define hwloc_alloc_root_sets HWLOC_NAME(alloc_root_sets)
+#define hwloc_setup_pu_level HWLOC_NAME(setup_pu_level)
 
 #define hwloc_insert_pci_device_list HWLOC_NAME(insert_pci_device_list)
 #define hwloc_pci_find_cap HWLOC_NAME(pci_find_cap)
@@ -565,7 +566,6 @@ extern "C" {
 
 #define hwloc_xml_imported_distances_s HWLOC_NAME(xml_imported_distances_s)
 
-#define hwloc_setup_pu_level HWLOC_NAME(setup_pu_level)
 #define hwloc_get_sysctlbyname HWLOC_NAME(get_sysctlbyname)
 #define hwloc_get_sysctl HWLOC_NAME(get_sysctl)
 #define hwloc_fallback_nbprocessors HWLOC_NAME(fallback_nbprocessors)
