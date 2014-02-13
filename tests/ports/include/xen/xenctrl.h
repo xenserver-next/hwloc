@@ -56,4 +56,6 @@ int xc_topologyinfo_bounced(xc_interface *, uint32_t *, uint32_t *, uint32_t *, 
 
 int xc_numainfo_bounced(xc_interface *, uint32_t *, uint64_t *, uint64_t *, uint32_t *);
 
+int xc_xen_cpuid(xc_interface *, uint32_t, uint32_t *, uint32_t *, uint32_t *, uint32_t *);
+
 #endif /* HWLOC_PORT_XEN_XENCTRL_H */
