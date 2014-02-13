@@ -160,6 +160,20 @@ hwloc_get_xen_info(xc_interface *xch)
   return NULL;
 }
 
+/* Ask Xen to execute CPUID on a specific PU on our behalf. */
+static int xen_cpuid_fn(void *_priv, unsigned pu, unsigned *eax, unsigned *ebx,
+                        unsigned *ecx, unsigned *edx)
+{
+  struct hwloc_xen_priv *priv = _priv;
+  int ret = xc_xen_cpuid(priv->xch, pu, eax, ebx, ecx, edx);
+
+  /* Possible failures are -EINVAL for bad PU or -EFAULT for problems moving
+   * hypercall parameters. */
+  assert(!ret && "Something went very wrong with xc_xen_cpuid()\n");
+
+  return 0;
+}
+
 /* Enumerate the full Xen system and fill in appropriate objects into the
  * topology. */
 static int
@@ -287,6 +301,11 @@ hwloc_xen_discover(struct hwloc_backend *backend)
 
   hwloc_debug("All done discovering Xen topology\n\n");
   hwloc_obj_add_info(hwloc_get_root_obj(topology), "Backend", "Xen");
+
+  hwloc_debug("Using CPUID to find cache information\n\n");
+  hwloc_x86_discovery(topology, data->max_cpu_id + 1,
+                      HWLOC_X86_DISC_FLAG_CACHES | HWLOC_X86_DISC_FLAG_CPUINFO,
+                      xen_cpuid_fn, priv);
 
   free_xen_info(data);
 
