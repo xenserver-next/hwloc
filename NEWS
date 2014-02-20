@@ -1,5 +1,5 @@
 Copyright © 2009 CNRS
-Copyright © 2009-2013 Inria.  All rights reserved.
+Copyright © 2009-2014 Inria.  All rights reserved.
 Copyright © 2009-2013 Université Bordeaux 1
 Copyright © 2009-2011 Cisco Systems, Inc.  All rights reserved.
 
@@ -19,6 +19,142 @@ in v0.9.1).
 
   + Add NVIDIA CUDA device internals detection.
 
+
+Version 1.9.0
+-------------
+* API
+  + Add hwloc_obj_type_sscanf() to extend hwloc_obj_type_of_string() with
+    type-specific attributes such as Cache/Group depth and Cache type.
+    hwloc_obj_type_of_string() is moved to hwloc/deprecated.h.
+  + Add hwloc_linux_get_tid_last_cpu_location() for retrieving the
+    last CPU where a Linux thread given by TID ran.
+  + Add hwloc_distrib() to extend the old hwloc_distribute[v]() functions.
+    hwloc_distribute[v]() is moved to hwloc/deprecated.h.
+* Backends
+  + Add CPUVendor, CPUModelNumber and CPUFamilyNumber info attributes for
+    x86, ia64 and Xeon Phi sockets on Linux, to extend the x86-specific
+    support added in v1.8.1. Requested by Ralph Castain.
+  + Add many CPU- and platform-related info attributes on ARM and Power
+    platforms, in the Machine or Socket objects.
+  + Add CUDA info attributes describing the number of multiprocessors and
+    cores and the size of the global, shared and L2 cache memory in CUDA
+    OS devices.
+  + The synthetic backend now accepts extended types such as L2Cache, L1i or
+    Group3. lstopo also exports synthetic strings using these extended types.
+* Tools
+  + Add -e or --get-last-cpu-location to hwloc-ps to report where
+    processes/threads run instead of where they are bound.
+  + hwloc-ps reports locations as likely-more-useful objects such as Cores
+    or Sockets instead of Caches when possible.
+  + Add -e as a synonym to --get-last-cpu-location in hwloc-bind.
+  + Add --reverse to hwloc-distrib to distribute using last objects first
+    and singlify into last bits first. Thanks to Jirka Hladky for the
+    suggestion.
+  + lstopo does not overwrite output files by default anymore.
+    Pass -f or --force to enforce it.
+
+
+Version 1.8.1
+-------------
+* Fix the cpuid code on Windows 64bits so that the x86 backend gets
+  enabled as expected and can populate CPU information.
+  Thanks to Robin Scher for reporting the problem.
+* Add CPUVendor/CPUModelNumber/CPUFamilyNumber attributes when running
+  on x86 architecture. Thanks to Ralph Castain for the suggestion.
+* Work around buggy BIOS reporting duplicate NUMA nodes on Linux.
+  Thanks to Jeff Becker for reporting the problem and testing the patch.
+* Add a name to the lstopo graphical window. Thanks to Michael Prokop
+  for reporting the issue.
+
+
+Version 1.8.0
+-------------
+* New components
+  + Add the "linuxpci" component that always works on Linux even when
+    libpciaccess and libpci aren't available (and even with a modified
+    file-system root). By default the old "pci" component runs first
+    because "linuxpci" lacks device names (obj->name is always NULL).
+* API
+  + Add the topology difference API in hwloc/diff.h for manipulating
+    many similar topologies.
+  + Add hwloc_topology_dup() for duplicating an entire topology.
+  + hwloc.h and hwloc/helper.h have been reorganized to clarify the
+    documentation sections. The actual inline code has moved out of hwloc.h
+    into the new hwloc/inlines.h.
+  + Deprecated functions are now in hwloc/deprecated.h, and not in the
+    official documentation anymore.
+* Tools
+  + Add hwloc-diff and hwloc-patch tools together with the new diff API.
+  + Add hwloc-compress-dir to (de)compress an entire directory of XML files
+    using hwloc-diff and hwloc-patch.
+  + Object colors in the graphical output of lstopo may be changed by adding
+    a "lstopoStyle" info attribute. See CUSTOM COLORS in the lstopo(1) manpage
+    for details. Thanks to Jirka Hladky for discussing the idea.
+  + hwloc-gather-topology may now gather I/O-related files on Linux when
+    --io is given. Only the linuxpci component supports discovering I/O
+    objects from these extended tarballs.
+  + hwloc-annotate now supports --ri to remove/replace info attributes with
+    a given name.
+  + hwloc-info supports "root" and "all" special locations for dumping
+    information about the root object.
+  + lstopo now supports --append-legend to append custom lines of text
+    to the legend in the graphical output. Thanks to Jirka Hladky for
+    discussing the idea.
+  + hwloc-calc and friends have a more robust parsing of locations given
+    on the command-line and they report useful error messages about it.
+  + Add --whole-system to hwloc-bind, hwloc-calc, hwloc-distances and
+    hwloc-distrib, and add --restrict to hwloc-bind for uniformity among
+    tools.
+* Misc
+  + Calling hwloc_topology_load() or hwloc_topology_set_*() on an already
+    loaded topology now returns an error (deprecated since release 1.6.1).
+  + Fix the initialisation of cpusets and nodesets in Group objects added
+    when inserting PCI hostbridges.
+  + Never merge Group objects that were added explicitly by the user with
+    hwloc_custom_insert_group_object_by_parent().
+  + Add a sanity check during dynamic plugin loading to prevent some
+    crashes when hwloc is dynamically loaded by another plugin mechanisms.
+  + Add --with-hwloc-plugins-path to specify the install/load directories
+    of plugins.
+  + Add the MICSerialNumber info attribute to the root object when running
+    hwloc inside a Xeon Phi to match the same attribute in the MIC OS device
+    when running in the host.
+
+
+Version 1.7.2
+-------------
+* Do not create invalid block OS devices on very old Linux kernel such
+  as RHEL4 2.6.9.
+* Fix PCI subvendor/device IDs.
+* Fix the management of Misc objects inserted by parent.
+  Thanks to Jirka Hladky for reporting the problem.
+* Add a Port<n>State into attribute to OpenFabrics OS devices.
+* Add a MICSerialNumber info attribute to Xeon PHI/MIC OS devices.
+* Improve verbose error messages when failing to load from XML.
+
+
+Version 1.7.1
+-------------
+* Fix a failed assertion in the distance grouping code when loading a XML
+  file that already contains some groups.
+  Thanks to Laercio Lima Pilla for reporting the problem.
+* Remove unexpected Group objects when loading XML topologies with I/O
+  objects and NUMA distances.
+  Thanks to Elena Elkina for reporting the problem and testing patches.
+* Fix PCI link speed discovery when using libpciaccess.
+* Fix invalid libpciaccess virtual function device/vendor IDs when using
+  SR-IOV PCI devices on Linux.
+* Fix GL component build with old NVCtrl releases.
+  Thanks to Jirka Hladky for reporting the problem.
+* Fix embedding breakage caused by libltdl.
+  Thanks to Pavan Balaji for reporting the problem.
+* Always use the system-wide libltdl instead of shipping one inside hwloc.
+* Document issues when enabling plugins while embedding hwloc in another
+  project, in the documentation section Embedding hwloc in Other Software.
+* Add a FAQ entry "How to get useful topology information on NetBSD?"
+  in the documentation.
+* Somes fixes in the renaming code for embedding.
+* Miscellaneous minor build fixes.
 
 
 Version 1.7.0
@@ -244,7 +380,7 @@ Version 1.5.0
     - Packagers splitting lstopo and lstopo-no-graphics into different
       packages are advised to use the alternatives system so that lstopo
       points to the best available binary.
-  + Instruction caches are enabled in lstopo by default. User --no-icaches
+  + Instruction caches are enabled in lstopo by default. Use --no-icaches
     to disable them.
   + Add -t/--threads to show threads in hwloc-ps.
 * Removal of obsolete components
@@ -312,7 +448,7 @@ Version 1.4.1
 * Fix helpers converting from Linux libnuma to hwloc (hwloc/linux-libnuma.h)
   in case of out-of-order NUMA node ids.
 * Fix some overzealous assertions in the distance grouping code.
-* Workaround BIOS reporting empty I/O locality in cuda and openfabrics
+* Workaround BIOS reporting empty I/O locality in CUDA and OpenFabrics
   helpers on Linux. Thanks to Albert Solernou for reporting the problem.
 * Install a valgrind suppressions file hwloc-valgrind.supp (see the FAQ).
 * Fix memory binding documentation. Thanks to Karl Napf for reporting the

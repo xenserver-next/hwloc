@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2013 Inria.  All rights reserved.
+ * Copyright © 2009-2014 Inria.  All rights reserved.
  * Copyright © 2009-2012 Université Bordeaux 1
  * Copyright © 2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -83,66 +83,6 @@ hwloc_calc_get_obj_inside_cpuset_by_depth(hwloc_topology_t topology, hwloc_const
     }
     return NULL;
   }
-}
-
-/* extended version of hwloc_obj_type_of_string()
- *
- * matches L2, L3Cache and Group4, and return the corresponding depth attribute if depthattrp isn't NULL.
- * only looks at the beginning of the string to allow truncated type names.
- */
-static __hwloc_inline int
-hwloc_obj_type_sscanf(const char *string, hwloc_obj_type_t *typep, int *depthattrp, hwloc_obj_cache_type_t *cachetypeattrp)
-{
-  hwloc_obj_type_t type = (hwloc_obj_type_t) -1;
-  int depthattr = -1;
-  hwloc_obj_cache_type_t cachetypeattr = (hwloc_obj_cache_type_t) -1; /* unspecified */
-
-  /* types without depthattr */
-  if (!hwloc_strncasecmp(string, "system", 2)) {
-    type = HWLOC_OBJ_SYSTEM;
-  } else if (!hwloc_strncasecmp(string, "machine", 2)) {
-    type = HWLOC_OBJ_MACHINE;
-  } else if (!hwloc_strncasecmp(string, "node", 1)) {
-    type = HWLOC_OBJ_NODE;
-  } else if (!hwloc_strncasecmp(string, "socket", 2)) {
-    type = HWLOC_OBJ_SOCKET;
-  } else if (!hwloc_strncasecmp(string, "core", 2)) {
-    type = HWLOC_OBJ_CORE;
-  } else if (!hwloc_strncasecmp(string, "pu", 2)) {
-    type = HWLOC_OBJ_PU;
-  } else if (!hwloc_strncasecmp(string, "misc", 2)) {
-    type = HWLOC_OBJ_MISC;
-  } else if (!hwloc_strncasecmp(string, "pci", 2)) {
-    type = HWLOC_OBJ_PCI_DEVICE;
-  } else if (!hwloc_strncasecmp(string, "os", 2)) {
-    type = HWLOC_OBJ_OS_DEVICE;
-
-  /* types with depthattr */
-  } else if (!hwloc_strncasecmp(string, "cache", 2)) {
-    type = HWLOC_OBJ_CACHE;
-  } else if ((string[0] == 'l' || string[0] == 'L') && string[1] >= '0' && string[1] <= '9') {
-    type = HWLOC_OBJ_CACHE;
-    depthattr = atoi(string+1);
-    if (string[2] == 'd')
-      cachetypeattr = HWLOC_OBJ_CACHE_DATA;
-    else if (string[2] == 'i')
-      cachetypeattr = HWLOC_OBJ_CACHE_INSTRUCTION;
-  } else if (!hwloc_strncasecmp(string, "group", 1)) {
-    int length;
-    type = HWLOC_OBJ_GROUP;
-    length = strcspn(string, "0123456789");
-    if (string[length] != '\0')
-      depthattr = atoi(string+length);
-  } else
-    return -1;
-
-  *typep = type;
-  if (depthattrp)
-    *depthattrp = depthattr;
-  if (cachetypeattrp)
-    *cachetypeattrp = cachetypeattr;
-
-  return 0;
 }
 
 static __hwloc_inline int
@@ -229,7 +169,7 @@ hwloc_calc_parse_depth_prefix(hwloc_topology_t topology, unsigned topodepth,
   typestring[typelen] = '\0';
 
   /* try to match a type name */
-  err = hwloc_obj_type_sscanf(typestring, &type, &depthattr, &cachetypeattr);
+  err = hwloc_obj_type_sscanf(typestring, &type, &depthattr, &cachetypeattr, sizeof(cachetypeattr));
   if (!err) {
     *typep = type;
     return hwloc_calc_depth_of_type(topology, type, depthattr, cachetypeattr, verbose);
@@ -252,15 +192,29 @@ hwloc_calc_parse_depth_prefix(hwloc_topology_t topology, unsigned topodepth,
 }
 
 static __hwloc_inline int
-hwloc_calc_parse_range(const char *string,
+hwloc_calc_parse_range(const char *_string,
 		       int *firstp, int *amountp, int *stepp, int *wrapp,
 		       const char **dotp)
 {
-  const char *dash, *dot, *colon;
-  int first, amount, step, wrap;
+  char string[65];
+  size_t len;
+  char *dot, *end, *end2;
+  long first, last, amount;
+  int wrap;
 
-  dot = strchr(string, '.');
+  dot = strchr(_string, '.');
   *dotp = dot;
+  if (dot) {
+    len = dot - _string;
+  } else {
+    len = strlen(_string);
+  }
+  if (len >= sizeof(string)) {
+    fprintf(stderr, "invalid range `%s', too long\n", string);
+    return -1;
+  }
+  memcpy(string, _string, len);
+  string[len] = '\0';
 
   if (!isdigit(*string)) {
     if (!strncmp(string, "all", 3)) {
@@ -281,32 +235,49 @@ hwloc_calc_parse_range(const char *string,
       *stepp = 2;
       *wrapp = 0;
       return 0;
-    } else
+    } else {
+      fprintf(stderr, "unrecognized range keyword `%s'\n", string);
       return -1;
+    }
   }
 
-  first = atoi(string);
+  first = strtol(string, &end, 10);
   amount = 1;
-  step = 1;
   wrap = 0;
 
-  dash = strchr(string, '-');
-  if (dash && (dash < dot || !dot)) {
-    if (*(dash+1) == '\0')
+  if (*end == '-') {
+    last = strtol(end+1, &end2, 10);
+    if (*end2) {
+      fprintf(stderr, "invalid character at `%s' after range at `%s'\n", end2, string);
+      return -1;
+    } else if (end2 == end+1) {
+      /* X- */
       amount = -1;
-    else
-      amount = atoi(dash+1)-first+1;
-  } else {
-    colon = strchr(string, ':');
-    if (colon && (colon < dot || !dot)) {
-      amount = atoi(colon+1);
-      wrap = 1;
+    } else {
+      /* X-Y */
+      amount = last-first+1;
     }
+
+  } else if (*end == ':') {
+    /* X:Y */
+    wrap = 1;
+    amount = strtol(end+1, &end2, 10);
+    if (*end2) {
+      fprintf(stderr, "invalid character at `%s' after range at `%s'\n", end2, string);
+      return -1;
+    } else if (end2 == end+1) {
+      fprintf(stderr, "missing width at `%s' in range at `%s'\n", end2, string);
+      return -1;
+    }
+
+  } else if (*end) {
+    fprintf(stderr, "invalid character at `%s' after index at `%s'\n", end, string);
+    return -1;
   }
 
   *firstp = first;
   *amountp = amount;
-  *stepp = step;
+  *stepp = 1;
   *wrapp = wrap;
   return 0;
 }

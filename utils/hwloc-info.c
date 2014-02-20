@@ -303,7 +303,7 @@ main (int argc, char *argv[])
 	  usage (callname, stderr);
 	  exit(EXIT_FAILURE);
 	}
-	err = hwloc_obj_type_sscanf(argv[1], &show_ancestor_type, &show_ancestor_attrdepth, &show_ancestor_attrcachetype);
+	err = hwloc_obj_type_sscanf(argv[1], &show_ancestor_type, &show_ancestor_attrdepth, &show_ancestor_attrcachetype, sizeof(show_ancestor_attrcachetype));
         if (err < 0) {
           fprintf(stderr, "unrecognized --ancestor type %s\n", argv[1]);
           usage(callname, stderr);
@@ -412,12 +412,16 @@ main (int argc, char *argv[])
   else {
     current_obj = 0;
     while (argc >= 1) {
-      /* try to match a type/depth followed by a special character */
-      typelen = strspn(argv[0], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
-      if (typelen && (argv[0][typelen] == ':' || argv[0][typelen] == '=')) {
-	err = hwloc_calc_process_type_arg(topology, topodepth, argv[0], typelen, logical,
-					  hwloc_calc_process_arg_info_cb, NULL,
-					  verbose_mode);
+      if (!strcmp(argv[0], "all") || !strcmp(argv[0], "root")) {
+	hwloc_calc_process_arg_info_cb(NULL, hwloc_get_root_obj(topology), verbose_mode);
+      } else {
+	/* try to match a type/depth followed by a special character */
+	typelen = strspn(argv[0], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+	if (typelen && (argv[0][typelen] == ':' || argv[0][typelen] == '=')) {
+	  err = hwloc_calc_process_type_arg(topology, topodepth, argv[0], typelen, logical,
+					    hwloc_calc_process_arg_info_cb, NULL,
+					    verbose_mode);
+	}
       }
       argc--; argv++;
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 #
-# Copyright (c) 2010-2011 Cisco Systems, Inc.  All rights reserved.
-# Copyright (c) 2011 inria.  All rights reserved.
+# Copyright (c) 2010-2013 Cisco Systems, Inc.  All rights reserved.
+# Copyright (c) 2011-2014 Inria.  All rights reserved.
 # $COPYRIGHT$
 #
 
@@ -19,8 +19,7 @@
 # More details:
 #
 # This is a simple script to traverse the tree looking for added and
-# changed files (via "svn st ." or "hg st .", depending on what meta
-# directory is found in this tree).  Note that the search starts in
+# changed files (via "git status").  Note that the search starts in
 # the current directory -- not the top-level directory.
 #
 # All added and changed files are examined.  If the special "See
@@ -56,6 +55,8 @@ my @tokens;
 push(@tokens, "See COPYING in top-level directory");
 push(@tokens, "\\\$COPYRIGHT\\\$");
 
+my $commit = $ARGV[0];
+
 # Override the defaults if some values are set in the environment
 $my_search_name = $ENV{HWLOC_COPYRIGHT_SEARCH_NAME}
     if (defined($ENV{HWLOC_COPYRIGHT_SEARCH_NAME}));
@@ -83,15 +84,15 @@ chdir($start);
 print "==> Top-level hwloc dir: $top\n";
 print "==> Current directory: $start\n";
 
-# Are we hg or svn?  If we're both hg and svn, assume svn.
 my $cmd;
-$cmd = "svn st ."
-    if (-d "$top/.svn");
-$cmd = "hg st ."
-    if (-d "$top/.hg" && ! -d "$top/.svn");
-$cmd = "git status . | sed -n -e 's/^\#[ 	]*modified:[ 	]*/M /p' -e 's/^\#[ 	]* new file:[ 	]*/A /p'"
-    if (-d "$top/.git" && ! -d "$top/.svn");
-die "Can't find SVN, HG or GIT meta dirs" 
+if (-d "$top/.git") {
+    if ($commit) {
+	$cmd = "LANG=C git show --stat --pretty=format: $commit | sed -n -r -e 's/^[ 	]*([^ ].*[^ ])[ 	]*\\|[ 	]*[0-9]+[ 	]*\\+.*/\\1/p'"
+    } else {
+	$cmd = "LANG=C git status . | sed -n -r -e 's/^\#?[ 	]*(modified|new file)[ 	]*:[ 	]+(.+)/\\2/p'"
+    }
+}
+die "Can't find git meta dir"
     if (!defined($cmd));
 
 # Run the command, parsing the output.  Make a list of files that are
@@ -101,12 +102,7 @@ open(CMD, "$cmd|") || die "Can't run command";
 my @files;
 while (<CMD>) {
     chomp;
-    if ($_ =~ /^M/ || $_ =~ /^A/) {
-        my ($state, $filename, $extra) = split(/\s+/, $_);
-        $filename = $extra
-            if ($filename eq "+");
-        push(@files, $filename);
-    }
+    push (@files, $_);
 }
 close(CMD);
 
@@ -201,7 +197,7 @@ foreach my $f (@files) {
     my $newf = "$f.new-copyright";
     unlink($newf);
     open(FILE, ">$newf") || die "Can't open file: $newf";
-    print FILE join(//, @lines);
+    print FILE join("", @lines);
     close(FILE);
 
     # Now replace the old one

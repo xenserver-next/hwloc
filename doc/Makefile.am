@@ -1,5 +1,5 @@
-# Copyright © 2009-2013 Inria.  All rights reserved.
-# Copyright © 2009-2012 Université Bordeaux 1
+# Copyright © 2009-2014 Inria.  All rights reserved.
+# Copyright © 2009-2013 Université Bordeaux 1
 # Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
 # See COPYING in top-level directory.
 
@@ -23,9 +23,6 @@ DOX_TAG = $(DOX_DIR)/$(PACKAGE).tag
 # from tarballs.  Developers will need to build the docs the first
 # time they build after a checkout (or if something in the docs
 # changes, etc.).
-#
-# Note that by listing directories in EXTRA_DIST, we pick up the whole
-# tree (e.g., everything in the man and latex directories).
 #
 
 # images already available in repository
@@ -54,6 +51,10 @@ EXTRA_DIST = \
         $(PREBUILT_IMAGES) \
         $(BUILT_IMAGES)
 
+
+
+if HWLOC_BUILD_DOXYGEN
+
 #
 # Files where the doxygen inputs live (i.e., dependencies).  Make the
 # generated tagfile depend on these files, which will force them to be
@@ -66,6 +67,7 @@ dox_inputs = $(DOX_CONFIG) \
        $(HWLOC_top_srcdir)/include/hwloc.h \
        $(HWLOC_top_srcdir)/include/hwloc/helper.h \
        $(HWLOC_top_srcdir)/include/hwloc/bitmap.h \
+       $(HWLOC_top_srcdir)/include/hwloc/diff.h \
        $(HWLOC_top_srcdir)/include/hwloc/plugins.h \
        $(HWLOC_top_srcdir)/include/hwloc/glibc-sched.h \
        $(HWLOC_top_srcdir)/include/hwloc/linux.h \
@@ -89,7 +91,6 @@ dox_inputs = $(DOX_CONFIG) \
 # building standalone.
 #
 
-if HWLOC_BUILD_DOXYGEN
 BUILT_SOURCES = $(BUILT_IMAGES)
 
 images/diagram.png: $(srcdir)/images/diagram.fig
@@ -107,7 +108,6 @@ images/diagram.eps: $(srcdir)/images/diagram.fig
 	    exit 1; \
 	fi
 	$(FIG2DEV) -L eps $< $@
-endif
 
 #
 # Rules for running doxygen.  It depends on the built images and the
@@ -116,11 +116,19 @@ endif
 # of nested structurre/union declarations.
 #
 
-if HWLOC_BUILD_DOXYGEN
-$(DOX_TAG): $(BUILT_SOURCES) $(dox_inputs) $(PREBUILT_IMAGES)
-	rm -fr $(DOX_DIR)
-	$(DOXYGEN) $(DOX_CONFIG)
-	-$(SED_I) -e 's/__hwloc_restrict/restrict/g' \
+#
+# Note that we want to use our own doxygen.css file; not the one that
+# doxygen installs in the HTML directory.  So manually copy it over.
+# Be a little clever: only copy the doxygen.css file over if it exists
+# in DOX_HTML_DIR (which is in the build tree).  If the html tree
+# doesn't exist in the build tree, then we're using an html tree in
+# the source tree, and we don't need to copy over the doxygen.css
+# because we didn't build the html tree (e.g., the html tree came
+# pre-bundled in a tarball).
+#
+
+RENAME_SED = \
+	$(SED_I) -e 's/__hwloc_restrict/restrict/g' \
 	          -e 's/\\_\\-\\_\\-hwloc\\_\\-restrict/restrict/g' \
 	          -e 's/__hwloc_attribute_unused//g' \
 	          -e 's/\\_\\-\\_\\-hwloc\\_\\-attribute\\_\\-unused//g' \
@@ -135,7 +143,12 @@ $(DOX_TAG): $(BUILT_SOURCES) $(dox_inputs) $(PREBUILT_IMAGES)
 	          -e 's/HWLOC_DECLSPEC//g' \
 	          -e 's/HWLOC\\_\\-DECLSPEC//g' \
 	          -e 's/__hwloc_inline/inline/g' \
-	          -e 's/\\_\\-\\_\\-hwloc\\_\\-inline/inline/g' \
+	          -e 's/\\_\\-\\_\\-hwloc\\_\\-inline/inline/g'
+
+$(DOX_TAG): $(BUILT_SOURCES) $(dox_inputs) $(PREBUILT_IMAGES)
+	rm -fr $(DOX_DIR)
+	$(DOXYGEN) $(DOX_CONFIG)
+	-$(RENAME_SED) \
 		$(DOX_DIR)/html/*.html $(DOX_DIR)/latex/*.tex $(DOX_DIR)/man/man3/*.3
 	@echo "Work-around spurious leading _ in doxygen filenames..."
 	-(cd $(DOX_DIR)/man/man3 ; \
@@ -147,13 +160,17 @@ $(DOX_TAG): $(BUILT_SOURCES) $(dox_inputs) $(PREBUILT_IMAGES)
 	@mv $(DOX_MAN_DIR)/man3/hwloc* $(DOX_MAN_DIR)/man3/HWLOC* $(DOX_DIR)/man.tmp/
 	@rm -rf $(DOX_MAN_DIR)/man3
 	@mv $(DOX_DIR)/man.tmp $(DOX_MAN_DIR)/man3
-endif
+	@echo "Copying custom doxygen.css..."
+	if test -d $(DOX_HTML_DIR) -a -f $(DOX_HTML_DIR)/doxygen.css; then \
+	    cp -f $(srcdir)/doxygen.css $(DOX_HTML_DIR); \
+	fi
+
+www-doc-sed:
+	-$(RENAME_SED) www.open-mpi.org/html/*.php
 
 #
 # Rules for building the PDF
 #
-
-if HWLOC_BUILD_DOXYGEN
 
 # The Doxygen config is set to generate a4 latex -- no transformation
 # is necessary.
@@ -194,25 +211,20 @@ $(DOX_LETTERPDF): $(DOX_TAG)
 	   fi; \
 	done; \
 	mv letter-refman.pdf $(DOCDIR)/$(DOX_LETTERPDF)
-endif
 
-#
-# Note that we want to use our own doxygen.css file; not the one that
-# doxygen installs in the HTML directory.  So manually copy it over.
-# Be a little clever: only copy the doxygen.css file over if it exists
-# in DOX_HTML_DIR (which is in the build tree).  If the html tree
-# doesn't exist in the build tree, then we're using an html tree in
-# the source tree, and we don't need to copy over the doxygen.css
-# because we didn't build the html tree (e.g., the html tree came
-# pre-bundled in a tarball).
-#
+doc: $(DOX_TAG)
 
-if HWLOC_BUILD_DOXYGEN
-all-local: $(DOX_TAG)
-	if test -d $(DOX_HTML_DIR) -a -f $(DOX_HTML_DIR)/doxygen.css; then \
-	    cp -f $(srcdir)/doxygen.css $(DOX_HTML_DIR); \
-	fi
-endif
+else !HWLOC_BUILD_DOXYGEN
+
+# When we don't have doxygen, nothing to do
+doc:
+
+endif !HWLOC_BUILD_DOXYGEN
+# there are also a bunch of doxygen-build-dependencies later in this file
+
+
+
+if HWLOC_INSTALL_DOXYGEN
 
 #
 # Un/install the generated PDF and man pages (just like BUILD_DOXYGEN,
@@ -220,17 +232,13 @@ endif
 # standalone mode).
 #
 
-if HWLOC_INSTALL_DOXYGEN
-dist_pdf_DATA = $(DOX_A4PDF) $(DOX_LETTERPDF)
-endif
+pdf_DATA = $(DOX_A4PDF) $(DOX_LETTERPDF)
 
 #
 # Install the HWLOC_* and hwloc_* man pages.  It would be great to
 # figure out how to not have to list every installable man page here
 # in the Makefile.am...  :-(
 #
-
-if HWLOC_INSTALL_DOXYGEN
 
 # We have so many man pages that if we put them all in man3_MANS, we
 # exceed the maximum command line length on some systems (during "make
@@ -249,14 +257,9 @@ man3_MANS = \
         $(DOX_MAN_DIR)/man3/HWLOC_API_VERSION.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_api_version.3
 
-man3_topologydir = $(man3dir)
-man3_topology_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_topology.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_t.3
-
-man3_setsdir = $(man3dir)
-man3_sets_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_sets.3 \
+man3_object_setsdir = $(man3dir)
+man3_object_sets_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_object_sets.3 \
         $(DOX_MAN_DIR)/man3/hwloc_bitmap_t.3 \
         $(DOX_MAN_DIR)/man3/hwloc_const_bitmap_t.3 \
         $(DOX_MAN_DIR)/man3/hwloc_cpuset_t.3 \
@@ -264,9 +267,9 @@ man3_sets_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_nodeset_t.3 \
         $(DOX_MAN_DIR)/man3/hwloc_const_nodeset_t.3
 
-man3_typesdir = $(man3dir)
-man3_types_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_types.3 \
+man3_object_typesdir = $(man3dir)
+man3_object_types_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_object_types.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_OBJ_BRIDGE.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_OBJ_CACHE.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_OBJ_CORE.3 \
@@ -321,6 +324,7 @@ man3_objects_DATA = \
 man3_creationdir = $(man3dir)
 man3_creation_DATA = \
         $(DOX_MAN_DIR)/man3/hwlocality_creation.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_t.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_init.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_load.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_destroy.3 \
@@ -340,6 +344,7 @@ man3_configuration_DATA = \
         $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_WHOLE_ACCELERATORS.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_FLAG_ICACHES.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_flags_e.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_get_flags.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_set_flags.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_set_pid.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_set_fsroot.3 \
@@ -348,37 +353,16 @@ man3_configuration_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_topology_set_xmlbuffer.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_set_custom.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_set_distance_matrix.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_is_thissystem.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_discovery_support.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_cpubind_support.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_membind_support.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_support.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_support.3
 
-man3_xmlexportdir = $(man3dir)
-man3_xmlexport_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_xmlexport.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_export_xml.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_export_xmlbuffer.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_free_xmlbuffer.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_userdata_export_callback.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_export_obj_userdata.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_export_obj_userdata_base64.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_set_userdata_import_callback.3
-
-man3_tinkerdir = $(man3dir)
-man3_tinker_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_tinker.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_misc_object_by_cpuset.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_misc_object_by_parent.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_DISTANCES.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_IO.3 \
-        $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_MISC.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_restrict_flags_e.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_restrict.3
-
-man3_informationdir = $(man3dir)
-man3_information_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_information.3 \
+man3_levelsdir = $(man3dir)
+man3_levels_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_levels.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_depth.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_type_depth.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_type_depth_e.3 \
@@ -387,26 +371,24 @@ man3_information_DATA = \
         $(DOX_MAN_DIR)/man3/HWLOC_TYPE_DEPTH_BRIDGE.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_TYPE_DEPTH_PCI_DEVICE.3 \
         $(DOX_MAN_DIR)/man3/HWLOC_TYPE_DEPTH_OS_DEVICE.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_type_or_above_depth.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_type_or_below_depth.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_depth_type.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_nbobjs_by_depth.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_nbobjs_by_type.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_is_thissystem.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_get_flags.3
-
-man3_traversaldir = $(man3dir)
-man3_traversal_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_traversal.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_root_obj.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_obj_by_depth.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_obj_by_type.3
+        $(DOX_MAN_DIR)/man3/hwloc_get_obj_by_type.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_next_obj_by_depth.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_next_obj_by_type.3
 
-man3_conversiondir = $(man3dir)
-man3_conversion_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_conversion.3 \
+man3_object_stringsdir = $(man3dir)
+man3_object_strings_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_object_strings.3 \
         $(DOX_MAN_DIR)/man3/hwloc_obj_type_string.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_obj_type_of_string.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_obj_type_sscanf.3 \
         $(DOX_MAN_DIR)/man3/hwloc_obj_type_snprintf.3 \
         $(DOX_MAN_DIR)/man3/hwloc_obj_attr_snprintf.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_obj_snprintf.3 \
         $(DOX_MAN_DIR)/man3/hwloc_obj_cpuset_snprintf.3 \
         $(DOX_MAN_DIR)/man3/hwloc_obj_get_info_by_name.3 \
         $(DOX_MAN_DIR)/man3/hwloc_obj_add_info.3
@@ -460,13 +442,38 @@ man3_membinding_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_alloc.3 \
         $(DOX_MAN_DIR)/man3/hwloc_alloc_membind.3 \
         $(DOX_MAN_DIR)/man3/hwloc_alloc_membind_nodeset.3  \
+        $(DOX_MAN_DIR)/man3/hwloc_alloc_membind_policy.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_alloc_membind_policy_nodeset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_free.3
+
+man3_tinkerdir = $(man3dir)
+man3_tinker_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_tinker.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_misc_object_by_cpuset.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_insert_misc_object_by_parent.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_DISTANCES.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_IO.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_RESTRICT_FLAG_ADAPT_MISC.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_restrict_flags_e.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_restrict.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_dup.3
 
 man3_customdir = $(man3dir)
 man3_custom_DATA = \
         $(DOX_MAN_DIR)/man3/hwlocality_custom.3 \
         $(DOX_MAN_DIR)/man3/hwloc_custom_insert_topology.3 \
         $(DOX_MAN_DIR)/man3/hwloc_custom_insert_group_object_by_parent.3
+
+man3_xmlexportdir = $(man3dir)
+man3_xmlexport_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_xmlexport.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_export_xml.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_export_xmlbuffer.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_free_xmlbuffer.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_userdata_export_callback.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_export_obj_userdata.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_export_obj_userdata_base64.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_set_userdata_import_callback.3
 
 man3_bitmapdir = $(man3dir)
 man3_bitmap_DATA = \
@@ -519,25 +526,6 @@ man3_bitmap_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_bitmap_xor.3 \
         $(DOX_MAN_DIR)/man3/hwloc_bitmap_zero.3
 
-man3_helper_typesdir = $(man3dir)
-man3_helper_types_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_helper_types.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_type_or_above_depth.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_type_or_below_depth.3
-
-man3_helper_traversal_basicdir = $(man3dir)
-man3_helper_traversal_basic_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_helper_traversal_basic.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_root_obj.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_ancestor_obj_by_depth.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_ancestor_obj_by_type.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_next_obj_by_depth.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_next_obj_by_type.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_pu_obj_by_os_index.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_next_child.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_common_ancestor_obj.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_obj_is_in_subtree.3
-
 man3_helper_find_insidedir = $(man3dir)
 man3_helper_find_inside_DATA = \
         $(DOX_MAN_DIR)/man3/hwlocality_helper_find_inside.3 \
@@ -555,13 +543,17 @@ man3_helper_find_coveringdir = $(man3dir)
 man3_helper_find_covering_DATA = \
         $(DOX_MAN_DIR)/man3/hwlocality_helper_find_covering.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_child_covering_cpuset.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_get_obj_covering_cpuset.3
-
-man3_helper_find_coveringsdir = $(man3dir)
-man3_helper_find_coverings_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_helper_find_coverings.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_obj_covering_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_next_obj_covering_cpuset_by_depth.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_next_obj_covering_cpuset_by_type.3
+
+man3_helper_ancestorsdir = $(man3dir)
+man3_helper_ancestors_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_helper_ancestors.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_ancestor_obj_by_depth.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_ancestor_obj_by_type.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_common_ancestor_obj.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_obj_is_in_subtree.3
 
 man3_helper_find_cachedir = $(man3dir)
 man3_helper_find_cache_DATA = \
@@ -570,32 +562,29 @@ man3_helper_find_cache_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_get_cache_covering_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_shared_cache_covering_obj.3
 
-man3_helper_traversaldir = $(man3dir)
-man3_helper_traversal_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_helper_traversal.3 \
+man3_helper_find_miscdir = $(man3dir)
+man3_helper_find_misc_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_helper_find_misc.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_pu_obj_by_os_index.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_get_next_child.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_closest_objs.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_obj_below_array_by_type.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_obj_below_by_type.3
 
-man3_helper_bindingdir = $(man3dir)
-man3_helper_binding_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_helper_binding.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_distribute.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_distributev.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_alloc_membind_policy.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_alloc_membind_policy_nodeset.3
+man3_helper_distributedir = $(man3dir)
+man3_helper_distribute_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_helper_distribute.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_distrib_flags_e.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_DISTRIB_FLAG_REVERSE.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_distrib.3
 
-man3_helper_cpusetdir = $(man3dir)
-man3_helper_cpuset_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_helper_cpuset.3 \
+man3_helper_topology_setsdir = $(man3dir)
+man3_helper_topology_sets_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_helper_topology_sets.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_allowed_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_complete_nodeset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_online_cpuset.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_topology_get_topology_cpuset.3
-
-man3_helper_nodesetdir = $(man3dir)
-man3_helper_nodeset_DATA = \
-        $(DOX_MAN_DIR)/man3/hwlocality_helper_nodeset.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_get_topology_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_allowed_nodeset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_complete_cpuset.3 \
         $(DOX_MAN_DIR)/man3/hwloc_topology_get_topology_nodeset.3
@@ -627,6 +616,28 @@ man3_helper_advanced_io_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_get_next_bridge.3 \
         $(DOX_MAN_DIR)/man3/hwloc_bridge_covers_pcibus.3 \
         $(DOX_MAN_DIR)/man3/hwloc_get_hostbridge_by_pcibus.3
+
+man3_diffdir = $(man3dir)
+man3_diff_DATA = \
+        $(DOX_MAN_DIR)/man3/hwlocality_diff.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_obj_attr_type_e.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_DIFF_OBJ_ATTR_SIZE.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_DIFF_OBJ_ATTR_NAME.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_DIFF_OBJ_ATTR_INFO.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_obj_attr_u.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_type_e.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_DIFF_OBJ_ATTR.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_DIFF_TOO_COMPLEX.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_u.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_build.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_apply_flags_e.3 \
+        $(DOX_MAN_DIR)/man3/HWLOC_TOPOLOGY_DIFF_APPLY_REVERSE.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_apply.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_destroy.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_load_xml.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_export_xml.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_load_xmlbuffer.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_topology_diff_export_xmlbuffer.3
 
 man3_cudadir = $(man3dir)
 man3_cuda_DATA = \
@@ -666,9 +677,10 @@ man3_glibc_sched_DATA = \
 man3_linuxdir = $(man3dir)
 man3_linux_DATA = \
         $(DOX_MAN_DIR)/man3/hwlocality_linux.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_linux_get_tid_cpubind.3 \
         $(DOX_MAN_DIR)/man3/hwloc_linux_parse_cpumap_file.3 \
-        $(DOX_MAN_DIR)/man3/hwloc_linux_set_tid_cpubind.3
+        $(DOX_MAN_DIR)/man3/hwloc_linux_set_tid_cpubind.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_linux_get_tid_cpubind.3 \
+        $(DOX_MAN_DIR)/man3/hwloc_linux_get_tid_last_cpu_location.3
 
 man3_linux_libnumadir = $(man3dir)
 man3_linux_libnuma_DATA = \
@@ -697,7 +709,10 @@ man3_openfabrics_DATA = \
         $(DOX_MAN_DIR)/man3/hwloc_ibv_get_device_osdev_by_name.3
 
 # end of manpages(3) if HWLOC_BUILD_DOXYGEN
-endif
+
+endif HWLOC_INSTALL_DOXYGEN
+
+
 
 if HWLOC_BUILD_DOXYGEN
 
@@ -711,34 +726,30 @@ if HWLOC_BUILD_DOXYGEN
 # The list below should match the list of _DATA lines above
 
 $(man3_MANS): $(DOX_TAG)
-$(man3_topology_DATA): $(DOX_TAG)
-$(man3_sets_DATA): $(DOX_TAG)
-$(man3_types_DATA): $(DOX_TAG)
+$(man3_object_sets_DATA): $(DOX_TAG)
+$(man3_object_types_DATA): $(DOX_TAG)
 $(man3_objects_DATA): $(DOX_TAG)
 $(man3_creation_DATA): $(DOX_TAG)
 $(man3_configuration_DATA): $(DOX_TAG)
-$(man3_xmlexport_DATA): $(DOX_TAG)
-$(man3_tinker_DATA): $(DOX_TAG)
-$(man3_information_DATA): $(DOX_TAG)
-$(man3_traversal_DATA): $(DOX_TAG)
-$(man3_conversion_DATA): $(DOX_TAG)
+$(man3_levels_DATA): $(DOX_TAG)
+$(man3_object_strings_DATA): $(DOX_TAG)
 $(man3_cpubinding_DATA): $(DOX_TAG)
 $(man3_membinding_DATA): $(DOX_TAG)
+$(man3_tinker_DATA): $(DOX_TAG)
 $(man3_custom_DATA): $(DOX_TAG)
+$(man3_xmlexport_DATA): $(DOX_TAG)
 $(man3_bitmap_DATA): $(DOX_TAG)
-$(man3_helper_types_DATA): $(DOX_TAG)
-$(man3_helper_traversal_basic_DATA): $(DOX_TAG)
 $(man3_helper_find_inside_DATA): $(DOX_TAG)
 $(man3_helper_find_covering_DATA): $(DOX_TAG)
-$(man3_helper_find_coverings_DATA): $(DOX_TAG)
+$(man3_helper_ancestors_DATA): $(DOX_TAG)
 $(man3_helper_find_cache_DATA): $(DOX_TAG)
-$(man3_helper_traversal_DATA): $(DOX_TAG)
-$(man3_helper_binding_DATA): $(DOX_TAG)
-$(man3_helper_cpuset_DATA): $(DOX_TAG)
-$(man3_helper_nodeset_DATA): $(DOX_TAG)
+$(man3_helper_find_misc_DATA): $(DOX_TAG)
+$(man3_helper_distribute_DATA): $(DOX_TAG)
+$(man3_helper_topology_sets_DATA): $(DOX_TAG)
 $(man3_helper_nodeset_convert_DATA): $(DOX_TAG)
 $(man3_helper_distances_DATA): $(DOX_TAG)
 $(man3_helper_advanced_io_DATA): $(DOX_TAG)
+$(man3_diff_DATA): $(DOX_TAG)
 $(man3_cuda_DATA): $(DOX_TAG)
 $(man3_glibc_sched_DATA): $(DOX_TAG)
 $(man3_linux_DATA): $(DOX_TAG)
@@ -755,7 +766,10 @@ $(DOX_MAN_DIR): $(DOX_TAG)
 # built at the same time during a parallel build (e.g., "make -j X").
 # So arbitrarily make the A4 PDF dependent upon the Letter PDF.
 $(DOX_A4PDF): $(DOX_TAG) $(DOX_LETTERPDF)
-endif
+
+endif HWLOC_BUILD_DOXYGEN
+
+
 
 #
 # Make sure that the documentation example works
@@ -794,6 +808,8 @@ MAINTAINERCLEANFILES = $(DOX_TAG) \
     $(DOX_LETTERPDF) \
     $(DOX_HTML_README)
 
+if HWLOC_BUILD_README
+
 #
 # Rules for creating the top-level README file.  There does not appear
 # to be an easy way to know if AC_PATH_PROG found something in
@@ -803,28 +819,20 @@ MAINTAINERCLEANFILES = $(DOX_TAG) \
 # Just like BUILD_DOXYGEN, BUILD_README will automatically be false if
 # we're not building standalone.
 #
-
-if HWLOC_BUILD_README
-doc readme: all $(HWLOC_top_srcdir)/README
-$(HWLOC_top_srcdir)/README: $(DOX_HTML_README)
-	LC_ALL=C $(HWLOC_W3_GENERATOR) $(DOX_HTML_README) | $(SED) -n -e 's/^   //' -e '/^Introduction$$/,$$p' > $@
+readme: $(HWLOC_top_srcdir)/README
+$(HWLOC_top_srcdir)/README: $(DOX_TAG)
+	sed -n -f $(srcdir)/README.sed $(DOX_HTML_DIR)/index.html > $(DOX_HTML_README)
+	LC_ALL=C $(HWLOC_W3_GENERATOR) $(DOX_HTML_README) \
+	 | $(SED) -n -e 's/^   //' -e '/^Introduction$$/,$$p' \
+	 | $(SED) -e '/^--*-$$/,$$ d' \
+	 > $@
 	rm -f $(DOX_HTML_README)
-$(DOX_HTML_README): $(DOX_HTML_DIR)
-	rm -f $@
-	sed -n -f $(srcdir)/README.sed $(DOX_HTML_DIR)/index.html > $@
-else
-doc readme: no-build-readme
-$(HWLOC_top_srcdir)/README: no-build-readme
 
-no-build-readme:
-	@echo "ERROR: You do not have the 'w3m' or 'lynx' executables to build the README, or do not have the 'doxygen' executable to build the docs."
-	@echo "ERROR: Cannot continue."
-	@exit 1
+else
+
+# When we don't have what's needed to build the README, nothing to do
+readme: doc
+
 endif
 
-#DOCUPLOADHOST=sync.bordeaux.inria.fr
-#DOCUPLOADOPTS=
-#doc-upload: @DX_DOCDIR@/html
-#	echo FIXME
-#	false
-#	rsync -avz --delete --chmod=ug+rwX,o+rX $(DOCUPLOADOPTS) @DX_DOCDIR@/html/ $(DOCUPLOADHOST):/web/runtime/libtopology/doc/
+all-local: doc readme

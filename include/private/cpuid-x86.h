@@ -1,17 +1,18 @@
 /*
  * Copyright © 2010-2012 Université Bordeaux 1
  * Copyright © 2010 Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2014 Inria.  All rights reserved.
  *
  * See COPYING in top-level directory.
  */
 
 /* Internals for x86's cpuid.  */
 
-#ifndef HWLOC_PRIVATE_CPUID_H
-#define HWLOC_PRIVATE_CPUID_H
+#ifndef HWLOC_PRIVATE_CPUID_X86_H
+#define HWLOC_PRIVATE_CPUID_X86_H
 
 #ifdef HWLOC_X86_32_ARCH
-static __hwloc_inline int hwloc_have_cpuid(void)
+static __hwloc_inline int hwloc_have_x86_cpuid(void)
 {
   int ret;
   unsigned tmp, tmp2;
@@ -46,15 +47,15 @@ static __hwloc_inline int hwloc_have_cpuid(void)
 }
 #endif /* HWLOC_X86_32_ARCH */
 #ifdef HWLOC_X86_64_ARCH
-static __hwloc_inline int hwloc_have_cpuid(void) { return 1; }
+static __hwloc_inline int hwloc_have_x86_cpuid(void) { return 1; }
 #endif /* HWLOC_X86_64_ARCH */
 
-static __hwloc_inline void hwloc_cpuid(unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
+static __hwloc_inline void hwloc_x86_cpuid(unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
 {
   /* Note: gcc might want to use bx or the stack for %1 addressing, so we can't
    * use them :/ */
 #ifdef HWLOC_X86_64_ARCH
-  unsigned long sav_rbx;
+  hwloc_uint64_t sav_rbx;
   asm(
   "mov %%rbx,%2\n\t"
   "cpuid\n\t"
@@ -76,4 +77,4 @@ static __hwloc_inline void hwloc_cpuid(unsigned *eax, unsigned *ebx, unsigned *e
 #endif
 }
 
-#endif /* HWLOC_PRIVATE_CPUID_H */
+#endif /* HWLOC_PRIVATE_X86_CPUID_H */

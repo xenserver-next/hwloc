@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013 Inria.  All rights reserved.
+ * Copyright © 2013-2014 Inria.  All rights reserved.
  * See COPYING in top-level directory.
  */
 
@@ -12,7 +12,6 @@
 #endif
 #undef HWLOC_HAVE_CUDA_L2CACHESIZE
 #define HWLOC_HAVE_CUDA_L2CACHESIZE 1
-
 
 typedef unsigned cudaError_t;
 

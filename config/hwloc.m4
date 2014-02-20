@@ -1,6 +1,6 @@
 dnl -*- Autoconf -*-
 dnl
-dnl Copyright © 2009-2013 Inria.  All rights reserved.
+dnl Copyright © 2009-2014 Inria.  All rights reserved.
 dnl Copyright (c) 2009-2012 Université Bordeaux 1
 dnl Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
 dnl                         University Research and Technology
@@ -9,7 +9,7 @@ dnl Copyright (c) 2004-2012 The Regents of the University of California.
 dnl                         All rights reserved.
 dnl Copyright (c) 2004-2008 High Performance Computing Center Stuttgart, 
 dnl                         University of Stuttgart.  All rights reserved.
-dnl Copyright © 2006-2011  Cisco Systems, Inc.  All rights reserved.
+dnl Copyright © 2006-2013 Cisco Systems, Inc.  All rights reserved.
 dnl Copyright © 2012  Blue Brain Project, BBP/EPFL. All rights reserved.
 dnl Copyright © 2012       Oracle and/or its affiliates.  All rights reserved.
 dnl See COPYING in top-level directory.
@@ -184,6 +184,11 @@ EOF])
         hwloc_linux=yes
         AC_MSG_RESULT([Linux])
         hwloc_components="$hwloc_components linux"
+	if test x$enable_pci != xno; then
+	  hwloc_components="$hwloc_components linuxpci"
+	  AC_DEFINE(HWLOC_HAVE_LINUXPCI, 1, [Define to 1 if building the Linux PCI component])
+	  hwloc_linuxpci_happy=yes
+	fi				    
         ;;
       *-*-irix*)
         AC_DEFINE(HWLOC_IRIX_SYS, 1, [Define to 1 on Irix])
@@ -439,7 +444,30 @@ EOF])
       #include <sys/param.h>
       #endif
     ])
-    AC_CHECK_FUNCS([sysctl sysctlbyname])
+
+    AC_CHECK_DECLS([strtoull], [], [], [AC_INCLUDES_DEFAULT])
+
+    # Do a full link test instead of just using AC_CHECK_FUNCS, which
+    # just checks to see if the symbol exists or not.  For example,
+    # the prototype of sysctl uses u_int, which on some platforms
+    # (such as FreeBSD) is only defined under __BSD_VISIBLE, __USE_BSD
+    # or other similar definitions.  So while the symbols "sysctl" and
+    # "sysctlbyname" might still be available in libc (which autoconf
+    # checks for), they might not be actually usable.
+    AC_TRY_LINK([
+               #include <stdio.h>
+               #include <sys/types.h>
+               #include <sys/sysctl.h>
+               ],
+                [return sysctl(NULL,0,NULL,NULL,NULL,0);],
+                AC_DEFINE([HAVE_SYSCTL],[1],[Define to '1' if sysctl is present and usable]))
+    AC_TRY_LINK([
+               #include <stdio.h>
+               #include <sys/types.h>
+               #include <sys/sysctl.h>
+               ],
+                [return sysctlbyname(NULL,NULL,NULL,NULL,0);],
+                AC_DEFINE([HAVE_SYSCTLBYNAME],[1],[Define to '1' if sysctlbyname is present and usable]))
 
     case ${target} in
       *-*-mingw*|*-*-cygwin*)
@@ -890,15 +918,39 @@ EOF])
     fi
     # don't add LIBS/CFLAGS/REQUIRES yet, depends on plugins
 
+    # X11 support
+    AC_PATH_XTRA
+
+    CPPFLAGS_save=$CPPFLAGS
+    LIBS_save=$LIBS
+
+    CPPFLAGS="$CPPFLAGS $X_CFLAGS"
+    LIBS="$LIBS $X_PRE_LIBS $X_LIBS $X_EXTRA_LIBS"
+    AC_CHECK_HEADERS([X11/Xlib.h],
+        [AC_CHECK_LIB([X11], [XOpenDisplay],
+            [
+             # the GL backend just needs XOpenDisplay
+             hwloc_enable_X11=yes
+             # lstopo needs more
+             AC_CHECK_HEADERS([X11/Xutil.h],
+                [AC_CHECK_HEADERS([X11/keysym.h],
+                    [AC_DEFINE([HWLOC_HAVE_X11_KEYSYM], [1], [Define to 1 if X11 headers including Xutil.h and keysym.h are available.])])
+                     AC_SUBST([HWLOC_X11_LIBS], ["-lX11"])
+                ])
+            ])
+         ])
+    CPPFLAGS=$CPPFLAGS_save
+    LIBS=$LIBS_save
+
     # GL Support 
     hwloc_gl_happy=no
     if test "x$enable_gl" != "xno"; then
-    	hwloc_gl_happy=yes								
+	hwloc_gl_happy=yes
 
-        AC_CHECK_HEADERS([X11/Xlib.h], [
-          AC_CHECK_LIB([X11], [XOpenDisplay], [:], [hwloc_gl_happy=no])
-        ], [hwloc_gl_happy=no])
-       
+	AS_IF([test "$hwloc_enable_X11" != "yes"],
+              [AC_MSG_WARN([X11 not found; GL disabled])
+               hwloc_gl_happy=no])
+
         AC_CHECK_HEADERS([NVCtrl/NVCtrl.h], [
           AC_CHECK_LIB([XNVCtrl], [XNVCTRLQueryTargetAttribute], [:], [hwloc_gl_happy=no], [-lXext])
         ], [hwloc_gl_happy=no])
@@ -943,27 +995,42 @@ EOF])
     fi
     # don't add LIBS/CFLAGS/REQUIRES yet, depends on plugins
 
-    # Try to compile the cpuid inlines
-    AC_MSG_CHECKING([for cpuid])
+    # Try to compile the x86 cpuid inlines
+    AC_MSG_CHECKING([for x86 cpuid])
     old_CPPFLAGS="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS -I$HWLOC_top_srcdir/include"
+    # We need hwloc_uint64_t but we can't use hwloc/autogen/config.h before configure ends.
+    # So pass #include/#define manually here for now.
+    CPUID_CHECK_HEADERS=
+    CPUID_CHECK_DEFINE=
+    if test "x$hwloc_windows" = xyes; then
+      X86_CPUID_CHECK_HEADERS="#include <windows.h>"
+      X86_CPUID_CHECK_DEFINE="#define hwloc_uint64_t DWORDLONG"
+    else
+      X86_CPUID_CHECK_DEFINE="#define hwloc_uint64_t uint64_t"
+      if test "x$ac_cv_header_stdint_h" = xyes; then
+        X86_CPUID_CHECK_HEADERS="#include <stdint.h>"
+      fi
+    fi
     AC_LINK_IFELSE([AC_LANG_PROGRAM([[
         #include <stdio.h>
+        $X86_CPUID_CHECK_HEADERS
+        $X86_CPUID_CHECK_DEFINE
         #define __hwloc_inline
-        #include <private/cpuid.h>
+        #include <private/cpuid-x86.h>
       ]], [[
-        if (hwloc_have_cpuid()) {
+        if (hwloc_have_x86_cpuid()) {
           unsigned eax = 0, ebx, ecx = 0, edx;
-          hwloc_cpuid(&eax, &ebx, &ecx, &edx);
-          printf("highest cpuid %x\n", eax);
+          hwloc_x86_cpuid(&eax, &ebx, &ecx, &edx);
+          printf("highest x86 cpuid %x\n", eax);
           return 0;
         }
       ]])],
       [AC_MSG_RESULT([yes])
-       AC_DEFINE(HWLOC_HAVE_CPUID, 1, [Define to 1 if you have cpuid])
-       hwloc_have_cpuid=yes],
+       AC_DEFINE(HWLOC_HAVE_X86_CPUID, 1, [Define to 1 if you have x86 cpuid])
+       hwloc_have_x86_cpuid=yes],
       [AC_MSG_RESULT([no])])
-    if test "x$hwloc_have_cpuid" = xyes; then
+    if test "x$hwloc_have_x86_cpuid" = xyes; then
       hwloc_components="$hwloc_components x86"
     fi
     CPPFLAGS="$old_CPPFLAGS"
@@ -975,7 +1042,7 @@ EOF])
       [hwloc_pthread_mutex_happy=yes
        HWLOC_LIBS_PRIVATE="$HWLOC_LIBS_PRIVATE -lpthread"
       ],
-      [AC_MSG_CHECKING([fot pthread_mutex_lock with -lpthread])
+      [AC_MSG_CHECKING([for pthread_mutex_lock with -lpthread])
        # Try again with explicit -lpthread, but don't use AC_CHECK_FUNC to avoid the cache
        tmp_save_LIBS=$LIBS
        LIBS="$LIBS -lpthread"
@@ -1002,6 +1069,12 @@ EOF])
     AC_MSG_CHECKING([if plugin support is enabled])
     # Plugins (even core support) are totally disabled by default
     AS_IF([test "x$enable_plugins" = "x"], [enable_plugins=no])
+    AS_IF([test "x$enable_plugins" != "xno"], [hwloc_have_plugins=yes], [hwloc_have_plugins=no])
+    AC_MSG_RESULT([$hwloc_have_plugins])
+    AS_IF([test "x$hwloc_have_plugins" = "xyes"],
+          [AC_DEFINE([HWLOC_HAVE_PLUGINS], 1, [Define to 1 if the hwloc library should support dynamically-loaded plugins])])
+
+    # Some sanity checks about plugins
     # libltdl doesn't work on AIX as of 2.4.2
     AS_IF([test "x$enable_plugins" = "xyes" -a "x$hwloc_aix" = "xyes"],
       [AC_MSG_WARN([libltdl does not work on AIX, plugins support cannot be enabled.])
@@ -1011,10 +1084,27 @@ EOF])
       [AC_MSG_WARN([Plugins not supported on non-native Windows build, plugins support cannot be enabled.])
        AC_MSG_ERROR([Cannot continue])])
 
-    AS_IF([test "x$enable_plugins" != "xno"], [hwloc_have_plugins=yes], [hwloc_have_plugins=no])
-    AC_MSG_RESULT([$hwloc_have_plugins])
-    AS_IF([test "x$hwloc_have_plugins" = "xyes"],
-          [AC_DEFINE([HWLOC_HAVE_PLUGINS], 1, [Define to 1 if the hwloc library should support dynamically-loaded plugins])])
+    # If we want plugins, look for ltdl.h and libltdl
+    if test "x$hwloc_have_plugins" = xyes; then
+      AC_CHECK_HEADER([ltdl.h], [],
+	[AC_MSG_WARN([Plugin support requested, but could not find ltdl.h])
+	 AC_MSG_ERROR([Cannot continue])])
+      AC_CHECK_LIB([ltdl], [lt_dlopenext],
+	[HWLOC_LIBS="$HWLOC_LIBS -lltdl"],
+	[AC_MSG_WARN([Plugin support requested, but could not find libltdl])
+	 AC_MSG_ERROR([Cannot continue])])
+      # Add libltdl static-build dependencies to hwloc.pc
+      HWLOC_CHECK_LTDL_DEPS
+    fi
+
+    AC_ARG_WITH([hwloc-plugins-path],
+		AC_HELP_STRING([--with-hwloc-plugins-path=dir:...],
+                               [Colon-separated list of plugin directories. Default: "$prefix/lib/hwloc". Plugins will be installed in the first directory. They will be loaded from all of them, in order.]),
+		[HWLOC_PLUGINS_PATH="$with_hwloc_plugins_path"],
+		[HWLOC_PLUGINS_PATH="\$(libdir)/hwloc"])
+    AC_SUBST(HWLOC_PLUGINS_PATH)
+    HWLOC_PLUGINS_DIR=`echo "$HWLOC_PLUGINS_PATH" | cut -d: -f1`
+    AC_SUBST(HWLOC_PLUGINS_DIR)
 
     # Static components output file
     hwloc_static_components_dir=${HWLOC_top_builddir}/src
@@ -1068,7 +1158,6 @@ EOF])
     AC_SUBST(HWLOC_CFLAGS)
     HWLOC_CPPFLAGS='-I$(HWLOC_top_builddir)/include -I$(HWLOC_top_srcdir)/include'
     AC_SUBST(HWLOC_CPPFLAGS)
-    HWLOC_LDFLAGS='-L$(HWLOC_top_builddir)/src'
     AC_SUBST(HWLOC_LDFLAGS)
     AC_SUBST(HWLOC_LIBS)
     AC_SUBST(HWLOC_LIBS_PRIVATE)
@@ -1171,7 +1260,7 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
 
         AM_CONDITIONAL([HWLOC_HAVE_X86_32], [test "x$hwloc_x86_32" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_X86_64], [test "x$hwloc_x86_64" = "xyes"])
-        AM_CONDITIONAL([HWLOC_HAVE_CPUID], [test "x$hwloc_have_cpuid" = "xyes"])
+        AM_CONDITIONAL([HWLOC_HAVE_X86_CPUID], [test "x$hwloc_have_x86_cpuid" = "xyes"])
 
         AM_CONDITIONAL([HWLOC_HAVE_PLUGINS], [test "x$hwloc_have_plugins" = "xyes"])
         AM_CONDITIONAL([HWLOC_PCI_BUILD_STATIC], [test "x$hwloc_pci_component" = "xstatic"])
@@ -1221,7 +1310,10 @@ dnl number of arguments (10). Success means the compiler couldn't really check.
 AC_DEFUN([_HWLOC_CHECK_DECL], [
   AC_MSG_CHECKING([whether function $1 is declared])
   AC_REQUIRE([AC_PROG_CC])
-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([AC_INCLUDES_DEFAULT([$4])],[$1(1,2,3,4,5,6,7,8,9,10);])],
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+       [AC_INCLUDES_DEFAULT([$4])
+       $1(int,long,int,long,int,long,int,long,int,long);],
+       [$1(1,2,3,4,5,6,7,8,9,10);])],
     [AC_MSG_RESULT([no])
      $3],
     [AC_MSG_RESULT([yes])
@@ -1241,3 +1333,72 @@ AC_DEFUN([_HWLOC_CHECK_DECLS], [
     [Define to 1 if you have the declaration of `$1', and to 0 if you don't])
 ])
 
+#-----------------------------------------------------------------------
+
+dnl HWLOC_CHECK_LTDL_DEPS
+dnl
+dnl Add ltdl dependencies to HWLOC_LIBS_PRIVATE
+AC_DEFUN([HWLOC_CHECK_LTDL_DEPS], [
+  # save variables that we'll modify below
+  save_lt_cv_dlopen="$lt_cv_dlopen"
+  save_lt_cv_dlopen_libs="$lt_cv_dlopen_libs"
+  save_lt_cv_dlopen_self="$lt_cv_dlopen_self"
+  ###########################################################
+  # code stolen from LT_SYS_DLOPEN_SELF in libtool.m4
+  case $host_os in
+  beos*)
+    lt_cv_dlopen="load_add_on"
+    lt_cv_dlopen_libs=
+    lt_cv_dlopen_self=yes
+    ;;
+
+  mingw* | pw32* | cegcc*)
+    lt_cv_dlopen="LoadLibrary"
+    lt_cv_dlopen_libs=
+    ;;
+
+  cygwin*)
+    lt_cv_dlopen="dlopen"
+    lt_cv_dlopen_libs=
+    ;;
+
+  darwin*)
+  # if libdl is installed we need to link against it
+    AC_CHECK_LIB([dl], [dlopen],
+                [lt_cv_dlopen="dlopen" lt_cv_dlopen_libs="-ldl"],[
+    lt_cv_dlopen="dyld"
+    lt_cv_dlopen_libs=
+    lt_cv_dlopen_self=yes
+    ])
+    ;;
+
+  *)
+    AC_CHECK_FUNC([shl_load],
+          [lt_cv_dlopen="shl_load"],
+      [AC_CHECK_LIB([dld], [shl_load],
+            [lt_cv_dlopen="shl_load" lt_cv_dlopen_libs="-ldld"],
+        [AC_CHECK_FUNC([dlopen],
+              [lt_cv_dlopen="dlopen"],
+          [AC_CHECK_LIB([dl], [dlopen],
+                [lt_cv_dlopen="dlopen" lt_cv_dlopen_libs="-ldl"],
+            [AC_CHECK_LIB([svld], [dlopen],
+                  [lt_cv_dlopen="dlopen" lt_cv_dlopen_libs="-lsvld"],
+              [AC_CHECK_LIB([dld], [dld_link],
+                    [lt_cv_dlopen="dld_link" lt_cv_dlopen_libs="-ldld"])
+              ])
+            ])
+          ])
+        ])
+      ])
+    ;;
+  esac
+  # end of code stolen from LT_SYS_DLOPEN_SELF in libtool.m4
+  ###########################################################
+
+  HWLOC_LIBS_PRIVATE="$HWLOC_LIBS_PRIVATE $lt_cv_dlopen_libs"
+
+  # restore modified variable in case the actual libtool code uses them
+  lt_cv_dlopen="$save_lt_cv_dlopen"
+  lt_cv_dlopen_libs="$save_lt_cv_dlopen_libs"
+  lt_cv_dlopen_self="$save_lt_cv_dlopen_self"
+])

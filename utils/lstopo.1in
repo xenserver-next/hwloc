@@ -1,5 +1,5 @@
 .\" -*- nroff -*-
-.\" Copyright © 2009-2013 Inria.  All rights reserved.
+.\" Copyright © 2009-2014 Inria.  All rights reserved.
 .\" Copyright © 2009-2010 Université of Bordeaux
 .\" Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
 .\" See COPYING in top-level directory.
@@ -62,6 +62,9 @@ about specific objects.
 .TP
 \fB\-s\fR \fB\-\-silent\fR
 Reduce the amount of details to show.
+.TP
+\fB\s\fR \fB\-\-force\fR
+If the destination file already exists, overwrite it.
 .TP
 \fB\-l\fR \fB\-\-logical\fR
 Display hwloc logical indexes instead of physical/OS indexes (default for console output).
@@ -175,6 +178,12 @@ applies to the corresponding containers.
 .TP
 \fB\-\-no\-legend\fR
 Remove the text legend at the bottom.
+.TP
+\fB\-\-append\-legend\fB <line>
+Append the line of text to the bottom of the legend in graphical mode.
+If the line is too long, it will be truncated in the output.
+If adding multiple lines, each line should be given separately by
+passing this option multiple times.
 .TP
 \fB\-\-version\fR
 Report version and exit.
@@ -341,6 +350,38 @@ do not support colors at all.
 The console mode displays the above characteristics by appending text
 to each PU line if verbose messages are enabled.
 .
+.SH CUSTOM COLORS
+The color of each object in the graphical output may be enforced by
+specifying a "lstopoStyle" info attribute in that object.
+Its value should be a semi-colon separated list of "<attribute>=#rrggbb"
+where rr, gg and bb are the RGB components of a color,
+each between 0 and 255, in hexadecimal (00 to ff).
+.
+<attribute> may be
+.TP
+\fBBackground\fR
+Sets the background color of the main object box.
+.TP
+\fBBackground2\fR
+Sets the background color of the additional box for the object,
+for instance the memory box inside a NUMA node box.
+.TP
+\fBText\fR
+Sets the color of the text showing the object name, type, index, etc.
+.TP
+\fBText2\fB
+Sets the color of the additional text near the object,
+for instance the link speed behind a PCI bridge.
+.PP
+The "lstopoStyle" info may be added to a temporarily-saved XML topologies
+with hwloc-annotate, or with hwloc_obj_add_info().
+.
+For instance, to display all core objects in blue (with white names):
+
+    lstopo save.xml
+    hwloc-annotate save.xml save.xml core:all info lstopoStyle "Background=#0000ff;Text=#ffffff"
+    lstopo -i save.xml
+.
 .\" **************************
 .\"    Layout Section
 .\" **************************
@@ -350,6 +391,8 @@ to try to achieve a 4/3 ratio between width and height. However,
 in the particular case of NUMA nodes, the layout is always a flat
 rectangle, to avoid letting the user believe any particular NUMA
 topology (lstopo is not able to render that yet).
+.
+The layout of a level may be changed with \-\-vert and \-\-horiz.
 .
 .\" **************************
 .\"    Examples Section
@@ -423,11 +466,16 @@ processor units:
 To count the number of logical processors in the system
 
    lstopo --only pu | wc -l
+
+To append the kernel release and version to the graphical legend:
+
+   lstopo --append-legend "Kernel release: $(uname -r)" --append-legend "Kernel version: $(uname -v)"
+
 .\" **************************
 .\"    See also section
 .\" **************************
 .SH SEE ALSO
 .
 .ft R
-hwloc(7), hwloc-info(1), hwloc-bind(1), hwloc-ps(1), hwloc-gather-topology(1)
+hwloc(7), hwloc-info(1), hwloc-bind(1), hwloc-annotate(1), hwloc-ps(1), hwloc-gather-topology(1)
 .sp

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2013 Inria.  All rights reserved.
+ * Copyright © 2009-2014 Inria.  All rights reserved.
  * Copyright © 2009-2011 Université Bordeaux 1
  * Copyright © 2009-2010 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -45,6 +45,7 @@ void usage(const char *callname __hwloc_attribute_unused, FILE *where)
   fprintf(where, "  --single                  Singlify the output to a single CPU\n");
   fprintf(where, "Input topology options:\n");
   fprintf(where, "  --restrict <cpuset>       Restrict the topology to processors listed in <cpuset>\n");
+  fprintf(where, "  --whole-system            Do not consider administration limitations\n");
   hwloc_utils_input_format_usage(where, 10);
   fprintf(where, "Miscellaneous options:\n");
   fprintf(where, "  -q --quiet                Hide non-fatal error messages\n");
@@ -160,9 +161,9 @@ hwloc_calc_output(hwloc_topology_t topology, const char *sep, hwloc_bitmap_t set
 
 static int hwloc_calc_type_depth(const char *string, hwloc_obj_type_t *typep, int *depthp)
 {
-  hwloc_obj_type_t type = hwloc_obj_type_of_string(string);
+  hwloc_obj_type_t type = (hwloc_obj_type_t) -1; /* in case we match a depth */
   int depth = -1;
-  if (type == (hwloc_obj_type_t) -1) {
+  if (hwloc_obj_type_sscanf(string, &type, NULL, NULL, 0) < 0) {
     char *endptr;
     depth = strtoul(string, &endptr, 0);
     if (*endptr)
@@ -234,6 +235,11 @@ int main(int argc, char *argv[])
       if (!strcmp(argv[0], "-q") || !strcmp(argv[0], "--quiet")) {
         verbose--;
         goto next;
+      }
+      if (!strcmp (argv[0], "--whole-system")) {
+	flags |= HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM;
+	input_changed = 1;
+	goto next;
       }
       if (!strcmp(argv[0], "--help")) {
 	usage(callname, stdout);
@@ -394,14 +400,17 @@ int main(int argc, char *argv[])
       return EXIT_FAILURE;
     }
 
-    if (input_changed && input) {
-      /* only update the input when actually using it */
+    if (input_changed) {
+      /* flags or input was changed */
       hwloc_topology_destroy(topology);
       hwloc_topology_init(&topology);
       hwloc_topology_set_flags(topology, flags);
-      err = hwloc_utils_enable_input_format(topology, input, input_format, verbose, callname);
-      if (err)
-	return err;
+      if (input) {
+	/* only update the input when actually using it */
+	err = hwloc_utils_enable_input_format(topology, input, input_format, verbose, callname);
+	if (err)
+	  return err;
+      }
       hwloc_topology_load(topology);
       depth = hwloc_topology_get_depth(topology);
       input_changed = 0;
@@ -436,14 +445,17 @@ int main(int argc, char *argv[])
     size_t len = HWLOC_CALC_LINE_LEN;
     char * line = malloc(len);
 
-    if (input_changed && input) {
-      /* only update the input when actually using it */
+    if (input_changed) {
+      /* flags or input was changed */
       hwloc_topology_destroy(topology);
       hwloc_topology_init(&topology);
       hwloc_topology_set_flags(topology, flags);
-      err = hwloc_utils_enable_input_format(topology, input, input_format, verbose, callname);
-      if (err)
-        return err;
+      if (input) {
+	/* only update the input when actually using it */
+	err = hwloc_utils_enable_input_format(topology, input, input_format, verbose, callname);
+	if (err)
+	  return err;
+      }
       hwloc_topology_load(topology);
       depth = hwloc_topology_get_depth(topology);
       input_changed = 0;
