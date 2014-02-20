@@ -823,7 +823,7 @@ group_draw(hwloc_topology_t topology, struct draw_methods *methods, int logical,
   }
 #endif
 
-  if (level->attr->group.tight)
+  if (hwloc_obj_get_info_by_name(level, "lstopoTight"))
     separator = 0;
 
   if (network_level(level))

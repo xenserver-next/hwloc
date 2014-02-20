@@ -179,7 +179,7 @@ hwloc_cuda_backend_notify_new_object(struct hwloc_backend *backend, struct hwloc
       for (i = 0; i < (unsigned) prop.multiProcessorCount; i++) {
         hwloc_obj_t shared = hwloc_alloc_setup_object(HWLOC_OBJ_NODE, -1);
         hwloc_obj_t group = hwloc_alloc_setup_object(HWLOC_OBJ_GROUP, -1);
-        group->attr->group.tight = 1;
+        hwloc_obj_add_info(group, "lstopoTight", "1");
 
         shared->name = strdup("Shared");
         shared->memory.total_memory = shared->memory.local_memory = prop.sharedMemPerBlock;
