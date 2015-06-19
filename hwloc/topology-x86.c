@@ -620,6 +620,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
   unsigned next_group_depth = topology->next_group_depth;
   hwloc_obj_t pu = hwloc_get_next_obj_by_type(topology,HWLOC_OBJ_PU ,NULL);
   hwloc_obj_t* puList = malloc(nbprocs * sizeof(hwloc_obj_t));
+  //TODO anotate on an object toAnnotate instead of object
 
   if (!pu || pu->type != HWLOC_OBJ_PU)//add PU if not already added
     hwloc_setup_pu_level(topology, data->nbprocs);//CHAOS only fist child, right brother and father initialised?
@@ -679,7 +680,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
         unsigned coreid = infos[infoId].coreid;
         if (coreid != (unsigned) -1) {
           core_cpuset = hwloc_bitmap_alloc();
-          for (j = infoId; j < nbprocs; j++)  //there can be multiple pu by core
+          for (j = 0; j < nbprocs; j++)  //there can be multiple pu by core
             if (infos[j].packageid == packageid && infos[j].coreid == coreid) 
               hwloc_bitmap_set(core_cpuset, j);
 
@@ -792,6 +793,46 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
     )
     free(caches);
 
+    unsigned hasFoundNuma = 0;
+    nextParentIfExist(HWLOC_OBJ_NUMANODE,
+      hasFoundNuma = 1;
+      ,,
+      doNext = 0;
+    )
+    
+  /* Look for package */
+    nextParentIfExist(HWLOC_OBJ_PACKAGE,
+    ,
+      {
+        hwloc_bitmap_t package_cpuset;
+        hwloc_obj_t package;
+        unsigned packageid = infos[infoId].packageid;
+        package_cpuset = hwloc_bitmap_alloc();
+
+        for (j = 0; j < nbprocs; j++) {
+          if (infos[j].packageid == packageid) {
+            hwloc_bitmap_set(package_cpuset, j);
+          }
+        }
+        package = hwloc_alloc_setup_object(HWLOC_OBJ_PACKAGE, packageid);
+        package->cpuset = package_cpuset;
+
+        hwloc_x86_add_cpuinfos(package, &infos[infoId], 0);
+
+        hwloc_debug_1arg_bitmap("os package %u has cpuset %s\n",
+            packageid, package_cpuset);
+        hwloc_insert_object_by_cpuset(topology, package);
+        fatherAdded = 1;
+      }
+    ,
+      {
+        if (infos[infoId].packageid == object->os_index || object->os_index == (unsigned) -1)  
+          hwloc_x86_add_cpuinfos(object, &infos[infoId], 1);//XXX do not use object ?
+        doNext = 0;
+      }
+    )
+
+
 /*        case HWLOC_OBJ_PACKAGE:*/
 /*          { */
 /*            // Annotate packages previously-existing package */
@@ -807,33 +848,6 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
   }
 
 
-  /* Look for packages */
-  if (fulldiscovery) {
-    hwloc_bitmap_t packages_cpuset = hwloc_bitmap_dup(complete_cpuset);
-    hwloc_bitmap_t package_cpuset;
-    hwloc_obj_t package;
-
-    while ((i = hwloc_bitmap_first(packages_cpuset)) != (unsigned) -1) {
-      unsigned packageid = infos[i].packageid;
-
-      package_cpuset = hwloc_bitmap_alloc();
-      for (j = i; j < nbprocs; j++) {
-        if (infos[j].packageid == packageid) {
-          hwloc_bitmap_set(package_cpuset, j);
-          hwloc_bitmap_clr(packages_cpuset, j);
-        }
-      }
-      package = hwloc_alloc_setup_object(HWLOC_OBJ_PACKAGE, packageid);
-      package->cpuset = package_cpuset;
-
-      hwloc_x86_add_cpuinfos(package, &infos[i], 0);
-
-      hwloc_debug_1arg_bitmap("os package %u has cpuset %s\n",
-          packageid, package_cpuset);
-      hwloc_insert_object_by_cpuset(topology, package);
-    }
-    hwloc_bitmap_free(packages_cpuset);
-  }
 
   /* If there was no package, annotate the Machine instead */
   if ((!hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_PACKAGE)) && infos[0].cpumodel[0]) {//the only place where we need nbpackage. And package would have already been added by x86-topo
