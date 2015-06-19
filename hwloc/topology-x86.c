@@ -588,7 +588,12 @@ hwloc_x86_add_cpuinfos(hwloc_obj_t obj, struct procinfo *info, int nodup)
 
 #define nextParentIfExist(TYPE,THEN,ELSE,FINALISE) {\
   int fatherAdded = 1;\
-  while(fatherAdded){\
+  int doNext = 1;\
+  while(doNext){\
+    if(object->parent->type == HWLOC_OBJ_GROUP){\
+      object = object->parent;\
+      continue;\
+    }\
     if(object->parent->type == TYPE){\
       object = object->parent;\
       THEN\
@@ -599,9 +604,7 @@ hwloc_x86_add_cpuinfos(hwloc_obj_t obj, struct procinfo *info, int nodup)
       if(fatherAdded)\
         object = object->parent;\
     }\
-    if(fatherAdded){\
-      FINALISE\
-    }\
+    FINALISE\
   }\
 }
 
@@ -612,7 +615,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
   struct hwloc_x86_backend_data_s *data = backend->private_data;
   unsigned nbprocs = data->nbprocs;
   hwloc_bitmap_t complete_cpuset = hwloc_bitmap_alloc();
-  unsigned i, j, l, level, type;
+  unsigned i, j, level, type;
   int one = -1;
   unsigned next_group_depth = topology->next_group_depth;
   hwloc_obj_t pu = hwloc_get_next_obj_by_type(topology,HWLOC_OBJ_PU ,NULL);
@@ -659,10 +662,16 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
     hwloc_obj_t object = puList[i];
     if(!object)
       continue;
-    infoId= object->os_index;
+    infoId= puList[i]->os_index;
+
+
+
     /* Look for cores not discovered*/
-    nextParentIfExist(HWLOC_OBJ_CORE,,
-      if (object->type != HWLOC_OBJ_CORE){// If there is already one core to the pu we stop.
+
+    nextParentIfExist(HWLOC_OBJ_CORE,
+      doNext = 0;
+    ,
+      {
         hwloc_bitmap_t core_cpuset;
         hwloc_obj_t core;
 
@@ -680,64 +689,121 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
               coreid, core_cpuset);
           hwloc_insert_object_by_cpuset(topology, core);
           fatherAdded = 1;
+          doNext = 0;
         }
       }
     ,)
 
 
-/*      //CACHES*/
-/*      int numCaches = infos[infoId].numcaches;*/
-/*      struct cacheinfo **caches = malloc(numCaches*sizeof(struct cacheinfo*));*/
-/*      int i;*/
-/*      for(i = 0 ;i<numCaches;i++){*/
-/*        caches[i] = &(infos[infoId].cache[i]);*/
-/*      }*/
 
+    /* Look for caches */
 
-/*     */
-/*      for(object = pu;object!=NULL;object = object->parent) {*/
-/*        switch(object->type){*/
-/*        // Annotate packages previously-existing cache */
-/*        case HWLOC_OBJ_CACHE:*/
-/*          {*/
-/*            if (hwloc_obj_get_info_by_name(object,"inclusiveness"))*/
-/*              break;*/
-/*            unsigned char type = 0;*/
-/*            switch(object->attr->cache.type){*/
-/*              case HWLOC_OBJ_CACHE_DATA : type = 1;*/
-/*                break;*/
-/*              case HWLOC_OBJ_CACHE_INSTRUCTION : type = 2;*/
-/*                break;*/
-/*              case HWLOC_OBJ_CACHE_UNIFIED : type = 3;*/
-/*                break;*/
-/*            }*/
-/*            int cacheId =-1; */
-/*            for(i=0;i<numCaches;i++)*/
-/*              if(caches[i]->level == object->attr->cache.depth){ // the level is exact, not always the type. If at the level there is a cache with the good type we return it. Else we return a random cache of the level. */
-/*                cacheId = i;*/
-/*                if(caches[i]->type == type)*/
-/*                  break;*/
-/*              }*/
-/*            hwloc_obj_add_info(object,"inclusiveness",caches[cacheId]->inclusiveness?"true":"false");*/
+    struct cacheinfo **caches = malloc(infos[infoId].numcaches*sizeof(struct cacheinfo*));
+    hwloc_obj_t cache;
+    for(j = 0 ;j<infos[infoId].numcaches;j++){
+      caches[j] = &(infos[infoId].cache[j]);
+    }
 
-/*          }*/
-/*          break;*/
+    unsigned nextCacheNotFound = 0;
+
+    nextParentIfExist(HWLOC_OBJ_CACHE,
+      cache = object;
+    ,
+      if(infos[infoId].numcaches == 0){
+          fatherAdded = 0;
+          doNext = 0;
+      }
+      else
+      {
+        hwloc_bitmap_t cache_cpuset;
+        unsigned packageid = infos[infoId].packageid;
+        unsigned cacheid = infos[infoId].apicid / caches[nextCacheNotFound]->nbthreads_sharing;/* Now look for others PU sharing this cache */
+        cache_cpuset = hwloc_bitmap_alloc();
+        level = caches[nextCacheNotFound]->level;
+        type = caches[nextCacheNotFound]->type;
+
+        for (j = 0; j < nbprocs; j++) {
+          unsigned l2;
+          for (l2 = 0; l2 < infos[j].numcaches; l2++) {
+            if (infos[j].cache[l2].level == level && infos[j].cache[l2].type == type)
+              break;
+          }
+          if (l2 == infos[j].numcaches) {
+            /* no cache level of that type in j */
+            continue;
+          }
+          if (infos[j].packageid == packageid && infos[j].apicid / infos[j].cache[l2].nbthreads_sharing == cacheid) {
+            hwloc_bitmap_set(cache_cpuset, j);
+          }
+        }
+        cache = hwloc_alloc_setup_object(HWLOC_OBJ_CACHE, cacheid);
+        cache->attr->cache.depth = level;
+        cache->attr->cache.size = caches[nextCacheNotFound]->size;
+        cache->attr->cache.linesize = caches[nextCacheNotFound]->linesize;
+        cache->attr->cache.associativity = caches[nextCacheNotFound]->ways;
+        switch (caches[nextCacheNotFound]->type) {
+          case 1:
+            cache->attr->cache.type = HWLOC_OBJ_CACHE_DATA;
+            break;
+          case 2:
+            cache->attr->cache.type = HWLOC_OBJ_CACHE_INSTRUCTION;
+            break;
+          case 3:
+            cache->attr->cache.type = HWLOC_OBJ_CACHE_UNIFIED;
+            break;
+        }
+        hwloc_obj_add_info(cache,"inclusiveness",caches[nextCacheNotFound]->inclusiveness?"true":"false"); // 
+        cache->cpuset = cache_cpuset;
+        hwloc_debug_2args_bitmap("os L%u cache %u has cpuset %s\n",
+            level, cacheid, cache_cpuset);
+        hwloc_insert_object_by_cpuset(topology, cache);
+        if(object->parent->type == HWLOC_OBJ_CACHE)
+          fatherAdded = 1; // it's possible that the cache was already added and fused with another one or it's not a top
+      }
+    ,
+      {// anotate cache found/created (add inclusiveness)
+       // and remove it from cache not seens
+        unsigned char type = 0;
+        unsigned cacheId = -1;
+        switch(cache->attr->cache.type){
+          case HWLOC_OBJ_CACHE_DATA : type = 1;
+            break;
+          case HWLOC_OBJ_CACHE_INSTRUCTION : type = 2;
+            break;
+          case HWLOC_OBJ_CACHE_UNIFIED : type = 3;
+            break;
+        }
+        for(j=nextCacheNotFound;j<infos[infoId].numcaches;j++)
+          if(caches[j]->level == cache->attr->cache.depth){ // the level is exact, not always the type. If at the level there is a cache with the good type we return it. Else we return a random cache of the level. 
+            cacheId = j;
+            if(caches[j]->type == type)
+              break;
+          }
+        if (cacheId != (unsigned)-1){
+          struct cacheinfo * tmpCache = caches[nextCacheNotFound];
+          caches[nextCacheNotFound] = caches[cacheId];
+          caches[cacheId] = tmpCache;
+          if (!hwloc_obj_get_info_by_name(cache,"inclusiveness")) 
+            hwloc_obj_add_info(cache,"inclusiveness",caches[nextCacheNotFound]->inclusiveness?"true":"false");
+        }
+        nextCacheNotFound++;
+        doNext = nextCacheNotFound<infos[infoId].numcaches;
+      }
+    )
+    free(caches);
+
 /*        case HWLOC_OBJ_PACKAGE:*/
 /*          { */
 /*            // Annotate packages previously-existing package */
 /*            // FIXME: ideally, we should check all bits in case x86 and the native backend disagree. */
 /*               */
 /*            //We already know the pakage from topology-linux. We only check if the package detected by x86 doesn't disagree*/
-/*            if (infos[i].packageid == object->os_index || object->os_index == (unsigned) -1) { */
+/*            if (infos[infoId].packageid == object->os_index || object->os_index == (unsigned) -1) { */
 /*              hwloc_x86_add_cpuinfos(object, &infos[infoId], 1);*/
 /*            }*/
 /*          }*/
-/*        break;*/
-/*        default:*/
-/*        break;*/
-/*        }*/
-/*      }*/
-/*      free(caches);*/
+
+
   }
 
 
@@ -880,86 +946,6 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
         hwloc_bitmap_free(unknowns_cpuset);
       }
     }
-  }
-
-  /* Look for caches */
-  /* First find max level */
-  level = 0;
-  for (i = 0; i < nbprocs; i++)
-    for (j = 0; j < infos[i].numcaches; j++)
-      if (infos[i].cache[j].level > level)
-        level = infos[i].cache[j].level;
-
-  /* Look for known types */
-  if (fulldiscovery) while (level > 0) {
-    for (type = 1; type <= 3; type++) {
-      /* Look for caches of that type at level level */
-      {
-        hwloc_bitmap_t caches_cpuset = hwloc_bitmap_dup(complete_cpuset);
-        hwloc_bitmap_t cache_cpuset;
-        hwloc_obj_t cache;
-
-        while ((i = hwloc_bitmap_first(caches_cpuset)) != (unsigned) -1) {
-          unsigned packageid = infos[i].packageid;
-
-          for (l = 0; l < infos[i].numcaches; l++) {
-            if (infos[i].cache[l].level == level && infos[i].cache[l].type == type)
-              break;
-          }
-          if (l == infos[i].numcaches) {
-            /* no cache Llevel of that type in i */
-            hwloc_bitmap_clr(caches_cpuset, i);
-            continue;
-          }
-
-          /* Found a matching cache, now look for others sharing it */
-          {
-            unsigned cacheid = infos[i].apicid / infos[i].cache[l].nbthreads_sharing;
-
-            cache_cpuset = hwloc_bitmap_alloc();
-            for (j = i; j < nbprocs; j++) {
-              unsigned l2;
-              for (l2 = 0; l2 < infos[j].numcaches; l2++) {
-                if (infos[j].cache[l2].level == level && infos[j].cache[l2].type == type)
-                  break;
-              }
-              if (l2 == infos[j].numcaches) {
-                /* no cache Llevel of that type in j */
-                hwloc_bitmap_clr(caches_cpuset, j);
-                continue;
-              }
-              if (infos[j].packageid == packageid && infos[j].apicid / infos[j].cache[l2].nbthreads_sharing == cacheid) {
-                hwloc_bitmap_set(cache_cpuset, j);
-                hwloc_bitmap_clr(caches_cpuset, j);
-              }
-            }
-            cache = hwloc_alloc_setup_object(HWLOC_OBJ_CACHE, cacheid);
-            cache->attr->cache.depth = level;
-            cache->attr->cache.size = infos[i].cache[l].size;
-            cache->attr->cache.linesize = infos[i].cache[l].linesize;
-            cache->attr->cache.associativity = infos[i].cache[l].ways;
-            switch (infos[i].cache[l].type) {
-              case 1:
-                cache->attr->cache.type = HWLOC_OBJ_CACHE_DATA;
-                break;
-              case 2:
-                cache->attr->cache.type = HWLOC_OBJ_CACHE_INSTRUCTION;
-                break;
-              case 3:
-                cache->attr->cache.type = HWLOC_OBJ_CACHE_UNIFIED;
-                break;
-            }
-            hwloc_obj_add_info(cache,"inclusiveness",infos[i].cache[l].inclusiveness?"true":"false");
-            cache->cpuset = cache_cpuset;
-            hwloc_debug_2args_bitmap("os L%u cache %u has cpuset %s\n",
-                level, cacheid, cache_cpuset);
-            hwloc_insert_object_by_cpuset(topology, cache);
-          }
-        }
-        hwloc_bitmap_free(caches_cpuset);
-      }
-    }
-    level--;
   }
 
   for (i = 0; i < nbprocs; i++) {
