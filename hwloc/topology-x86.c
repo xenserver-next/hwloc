@@ -611,13 +611,13 @@ hwloc_x86_add_cpuinfos(hwloc_obj_t obj, struct procinfo *info, int nodup)
 }
 
 /* Analyse information stored in infos, and build/annotate topology levels accordingly */
-static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int fulldiscovery)
+static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
 {
   struct hwloc_topology *topology = backend->topology;
   struct hwloc_x86_backend_data_s *data = backend->private_data;
   unsigned nbprocs = data->nbprocs;
   hwloc_bitmap_t complete_cpuset = hwloc_bitmap_alloc();
-  unsigned i, j, level, type, fatherAdded, doNext;
+  unsigned i, j, level;
   int one = -1;
   unsigned next_group_depth = topology->next_group_depth;
   hwloc_obj_t pu = hwloc_get_next_obj_by_type(topology,HWLOC_OBJ_PU ,NULL);
@@ -639,7 +639,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
     return;
   }
 
-  /* Ideally, when fulldiscovery=0, we could add any object that doesn't exist yet.
+  /* Ideally, we could add any object that doesn't exist yet.
    * But what if the x86 and the native backends disagree because one is buggy? Which one to trust?
    * Only annotate existing objects for now.
    */
@@ -661,9 +661,9 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
  /*Anotate previously existing objects and adding missing*/
 
   for(i=0;i<nbprocs;i++){//iterate over pu
-  
-    unsigned infoId;
+    unsigned type, fatherAdded, doNext ,numberFound, infoId;
     hwloc_obj_t object = puList[i];
+
     if(!object)
       continue;
     infoId= puList[i]->os_index;
@@ -707,7 +707,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
       caches[j] = &(infos[infoId].cache[j]);
     }
 
-    unsigned nextCacheNotFound = 0;
+    numberFound = 0;
 
     nextParentIfExist(HWLOC_OBJ_CACHE,
       toAnotate = object;
@@ -720,10 +720,10 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
       {
         hwloc_bitmap_t cache_cpuset;
         unsigned packageid = infos[infoId].packageid;
-        unsigned cacheid = infos[infoId].apicid / caches[nextCacheNotFound]->nbthreads_sharing;/* Now look for others PU sharing this cache */
+        unsigned cacheid = infos[infoId].apicid / caches[numberFound]->nbthreads_sharing;/* Now look for others PU sharing this cache */
         cache_cpuset = hwloc_bitmap_alloc();
-        level = caches[nextCacheNotFound]->level;
-        type = caches[nextCacheNotFound]->type;
+        level = caches[numberFound]->level;//numberFound : number of cache found
+        type = caches[numberFound]->type;
 
         for (j = 0; j < nbprocs; j++) {
           unsigned l2;
@@ -741,10 +741,10 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
         }
         toAnotate = hwloc_alloc_setup_object(HWLOC_OBJ_CACHE, cacheid);
         toAnotate->attr->cache.depth = level;
-        toAnotate->attr->cache.size = caches[nextCacheNotFound]->size;
-        toAnotate->attr->cache.linesize = caches[nextCacheNotFound]->linesize;
-        toAnotate->attr->cache.associativity = caches[nextCacheNotFound]->ways;
-        switch (caches[nextCacheNotFound]->type) {
+        toAnotate->attr->cache.size = caches[numberFound]->size;
+        toAnotate->attr->cache.linesize = caches[numberFound]->linesize;
+        toAnotate->attr->cache.associativity = caches[numberFound]->ways;
+        switch (caches[numberFound]->type) {
           case 1:
             toAnotate->attr->cache.type = HWLOC_OBJ_CACHE_DATA;
             break;
@@ -755,7 +755,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
             toAnotate->attr->cache.type = HWLOC_OBJ_CACHE_UNIFIED;
             break;
         }
-        hwloc_obj_add_info(toAnotate,"inclusiveness",caches[nextCacheNotFound]->inclusiveness?"true":"false"); // 
+        hwloc_obj_add_info(toAnotate,"inclusiveness",caches[numberFound]->inclusiveness?"true":"false"); // 
         toAnotate->cpuset = cache_cpuset;
         hwloc_debug_2args_bitmap("os L%u cache %u has cpuset %s\n",
             level, cacheid, cache_cpuset);
@@ -776,29 +776,30 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
           case HWLOC_OBJ_CACHE_UNIFIED : type = 3;
             break;
         }
-        for(j=nextCacheNotFound;j<infos[infoId].numcaches;j++)
+        for(j=numberFound;j<infos[infoId].numcaches;j++)
           if(caches[j]->level == toAnotate->attr->cache.depth){ // the level is exact, not always the type. If at the level there is a cache with the good type we return it. Else we return a random cache of the level. 
             cacheId = j;
             if(caches[j]->type == type)
               break;
           }
         if (cacheId != (unsigned)-1){
-          struct cacheinfo * tmpCache = caches[nextCacheNotFound];
-          caches[nextCacheNotFound] = caches[cacheId];
+          struct cacheinfo * tmpCache = caches[numberFound];
+          caches[numberFound] = caches[cacheId];
           caches[cacheId] = tmpCache;
           if (!hwloc_obj_get_info_by_name(toAnotate,"inclusiveness")) 
-            hwloc_obj_add_info(toAnotate,"inclusiveness",caches[nextCacheNotFound]->inclusiveness?"true":"false");
+            hwloc_obj_add_info(toAnotate,"inclusiveness",caches[numberFound]->inclusiveness?"true":"false");
         }
-        nextCacheNotFound++;
-        doNext = nextCacheNotFound<infos[infoId].numcaches;
+        numberFound++;
+        doNext = numberFound<infos[infoId].numcaches;
       }
     )
     free(caches);
 
-    unsigned hasFoundNuma = 0;
+    numberFound = 0; // number of numa node fond
+
     nextParentIfExist(HWLOC_OBJ_NUMANODE,
-      hasFoundNuma = 1;
-      ,,
+      numberFound = 1;
+    ,,
       doNext = 0;
     )
     
@@ -830,12 +831,12 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
     ,
       {
         if (infos[infoId].packageid == toAnotate->os_index || object->os_index == (unsigned) -1)  
-          hwloc_x86_add_cpuinfos(toAnotate, &infos[infoId], 1);//XXX do not use object ?
+          hwloc_x86_add_cpuinfos(toAnotate, &infos[infoId], 1);
         doNext = 0;
       }
     )
 
-    if(!hasFoundNuma){ /* Look for Numa nodes inside packages */
+    if(0 == numberFound){ /* Look for Numa nodes if not already found*/
       nextParentIfExist(HWLOC_OBJ_NUMANODE,        
         ,
           if (infos[infoId].nodeid != (unsigned) -1) {
@@ -861,7 +862,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
               fatherAdded = 1;
           }
         ,
-        hasFoundNuma = 1;
+        numberFound = 1;
         doNext = 0;
       )
     }
@@ -877,7 +878,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, int
   }
 
   /* Look for Compute units inside packages */ ///TODO put a end (and remove full disco)
-  if (fulldiscovery) {
+  {
     hwloc_bitmap_t units_cpuset = hwloc_bitmap_dup(complete_cpuset);
     hwloc_bitmap_t unit_cpuset;
     hwloc_obj_t unit;
@@ -1004,8 +1005,8 @@ look_procs(struct hwloc_backend *backend, struct procinfo *infos, int fulldiscov
 
   if (!data->apicid_unique)
     fulldiscovery = 0;
-  summarize(backend, infos, fulldiscovery);
-  return fulldiscovery; /* success, but objects added only if fulldiscovery */
+  summarize(backend, infos);
+  return fulldiscovery; /* success*/
 }
 
 #if defined HWLOC_FREEBSD_SYS && defined HAVE_CPUSET_SETID
@@ -1164,7 +1165,7 @@ int hwloc_look_x86(struct hwloc_backend *backend, int fulldiscovery)
   if (nbprocs == 1) {
     /* only one processor, no need to bind */
     look_proc(backend, &infos[0], highest_cpuid, highest_ext_cpuid, features, cpuid_type, src_cpuiddump);
-    summarize(backend, infos, fulldiscovery);
+    summarize(backend, infos);
     ret = fulldiscovery;
   }
 
