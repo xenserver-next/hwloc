@@ -586,6 +586,21 @@ hwloc_x86_add_cpuinfos(hwloc_obj_t obj, struct procinfo *info, int nodup)
   hwloc_obj_add_info_nodup(obj, "CPUStepping", number, nodup);
 }
 
+/*
+  nextParentIfExist is used to iterate over parents of object and check if the parent is of type TYPE.
+
+  If the parent is of type TYPE, THEN is called.
+
+  Else ELSE is called. If ELSE add a object that is the new father of object  fatherAdded should be set at 1.
+
+  If a father of the right type was found or added (as a father), object will be the father before THEN or after ELSE.
+
+  toAnotate should be used to create object in the ELSE. It can be used in FINALISE to anotate the object found/created (if the object is found toAnotate is already set to the object, else if it was used to create it is also set to the object created).
+
+  It will iterate until doNext is set at 0.
+
+  HWLOC_OBJ_GROUP are ignored.
+*/
 #define nextParentIfExist(TYPE,THEN,ELSE,FINALISE) {\
   fatherAdded = 1;\
   doNext = 1;\
@@ -626,7 +641,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
   //TODO anotate on an object toAnnotate instead of object
 
   if (!pu || pu->type != HWLOC_OBJ_PU)//add PU if not already added
-    hwloc_setup_pu_level(topology, data->nbprocs);//CHAOS only fist child, right brother and father initialised?
+    hwloc_setup_pu_level(topology, data->nbprocs);//CHAOSc : only fist child, right brother and father initialised
 
   for (i = 0; i < nbprocs; i++)
     if (infos[i].present) {
@@ -660,7 +675,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
 
  /*Anotate previously existing objects and adding missing*/
 
-  for(i=0;i<nbprocs;i++){//iterate over pu
+  for(i=0;i<nbprocs;i++){//iterate over pu. For each object will be added/anotate from core to package
     unsigned type, fatherAdded, doNext ,numberFound, infoId;
     hwloc_obj_t object = puList[i];
 
@@ -670,11 +685,11 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
 
 
 
-    /* Look for cores not discovered*/
+    /* Look for cores*/
 
     nextParentIfExist(HWLOC_OBJ_CORE,
     ,
-      {
+      {//adding core if missing
         hwloc_bitmap_t core_cpuset;
         hwloc_obj_t core;
 
@@ -695,7 +710,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
         }
       }
     ,
-      doNext = 0;
+      doNext = 0;//only one
     )
 
 
@@ -706,7 +721,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
     for(j = 0 ;j<infos[infoId].numcaches;j++){
       caches[j] = &(infos[infoId].cache[j]);
     }
-
+    //we will modify caches : before index numberFound the cache were seen or added.
     numberFound = 0;
 
     nextParentIfExist(HWLOC_OBJ_CACHE,
@@ -720,11 +735,11 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
       {
         hwloc_bitmap_t cache_cpuset;
         unsigned packageid = infos[infoId].packageid;
-        unsigned cacheid = infos[infoId].apicid / caches[numberFound]->nbthreads_sharing;/* Now look for others PU sharing this cache */
+        unsigned cacheid = infos[infoId].apicid / caches[numberFound]->nbthreads_sharing;
         cache_cpuset = hwloc_bitmap_alloc();
         level = caches[numberFound]->level;//numberFound : number of cache found
         type = caches[numberFound]->type;
-
+        /* Now look for others PU sharing this cache */
         for (j = 0; j < nbprocs; j++) {
           unsigned l2;
           for (l2 = 0; l2 < infos[j].numcaches; l2++) {
@@ -755,13 +770,13 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
             toAnotate->attr->cache.type = HWLOC_OBJ_CACHE_UNIFIED;
             break;
         }
-        hwloc_obj_add_info(toAnotate,"inclusiveness",caches[numberFound]->inclusiveness?"true":"false"); // 
+        hwloc_obj_add_info(toAnotate,"inclusiveness",caches[numberFound]->inclusiveness?"true":"false"); 
         toAnotate->cpuset = cache_cpuset;
         hwloc_debug_2args_bitmap("os L%u cache %u has cpuset %s\n",
             level, cacheid, cache_cpuset);
         hwloc_insert_object_by_cpuset(topology, toAnotate);
         if(object->parent->type == HWLOC_OBJ_CACHE)
-          fatherAdded = 1; // it's possible that the cache was already added and fused with another one or it's not a top
+          fatherAdded = 1; // it's possible that the cache was already added and fused with another one or his level is less than one already seen. 
       }
     ,
       {// anotate cache found/created (add inclusiveness)
@@ -777,7 +792,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
             break;
         }
         for(j=numberFound;j<infos[infoId].numcaches;j++)
-          if(caches[j]->level == toAnotate->attr->cache.depth){ // the level is exact, not always the type. If at the level there is a cache with the good type we return it. Else we return a random cache of the level. 
+          if(caches[j]->level == toAnotate->attr->cache.depth){ // the level is exact, not always the type. If at the level there is a cache with the good type we return it. Else we return a cache of the level. 
             cacheId = j;
             if(caches[j]->type == type)
               break;
@@ -795,12 +810,12 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
     )
     free(caches);
 
-    numberFound = 0; // number of numa node fond
+    numberFound = 0; // number of numa node fond : we can found numa before or after package. If not found before we check again after then add it if still not found.
 
     nextParentIfExist(HWLOC_OBJ_NUMANODE,
       numberFound = 1;
     ,,
-      doNext = 0;
+      doNext = 0;//at most one
     )
     
   /* Look for package */
@@ -819,8 +834,6 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
         toAnotate = hwloc_alloc_setup_object(HWLOC_OBJ_PACKAGE, packageid);
         toAnotate->cpuset = package_cpuset;
 
-        hwloc_x86_add_cpuinfos(toAnotate, &infos[infoId], 0);
-
         hwloc_debug_1arg_bitmap("os package %u has cpuset %s\n",
             packageid, package_cpuset);
         hwloc_insert_object_by_cpuset(topology, toAnotate);
@@ -832,11 +845,11 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
       {
         if (infos[infoId].packageid == toAnotate->os_index || object->os_index == (unsigned) -1)  
           hwloc_x86_add_cpuinfos(toAnotate, &infos[infoId], 1);
-        doNext = 0;
+        doNext = 0;//only one
       }
     )
 
-    if(0 == numberFound){ /* Look for Numa nodes if not already found*/
+    if(0 == numberFound){ /* Look for Numa nodes if not already found as a son of package*/
       nextParentIfExist(HWLOC_OBJ_NUMANODE,        
         ,
           if (infos[infoId].nodeid != (unsigned) -1) {
@@ -845,12 +858,10 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
             unsigned packageid = infos[infoId].packageid;
             unsigned nodeid = infos[infoId].nodeid;
             node_cpuset = hwloc_bitmap_alloc();
-            for (j = 0; j < nbprocs; j++) {
-              printf("%d %d \n",j,nbprocs);
-              if (infos[j].packageid == packageid && infos[j].nodeid == nodeid) {
+            for (j = 0; j < nbprocs; j++) 
+              if (infos[j].packageid == packageid && infos[j].nodeid == nodeid) 
                 hwloc_bitmap_set(node_cpuset, j);
-              }
-            }
+
             toAnotate = hwloc_alloc_setup_object(HWLOC_OBJ_NUMANODE, nodeid);
             toAnotate->cpuset = node_cpuset;
             toAnotate->nodeset = hwloc_bitmap_alloc();
@@ -858,12 +869,12 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
             hwloc_debug_1arg_bitmap("os node %u has cpuset %s\n",
                 nodeid, node_cpuset);
             hwloc_insert_object_by_cpuset(topology, toAnotate);
-            if(object->parent->type == HWLOC_OBJ_NUMANODE)
+            numberFound = 1;
+            if(object->parent->type == HWLOC_OBJ_NUMANODE)// could have been added as a son of the package instead of his father.
               fatherAdded = 1;
           }
         ,
-        numberFound = 1;
-        doNext = 0;
+        doNext = 0;//only one
       )
     }
 
