@@ -291,8 +291,7 @@ static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpu
             infos->tlbs[infos->numtlbs-1].entriesnumber2MB = 0;
             infos->tlbs[infos->numtlbs-1].entriesnumber4MB = 0;
             infos->tlbs[infos->numtlbs-1].entriesnumber1GB = 0;
-            //TODO Instruction TLB: 4 KByte pages, 4-way set associative, 32 entries
-          }// TODO 4KB,2MB,4MB,1GB
+          }
         break;// is there a difference between Data TLB, DTLB, Data TLB0, Data TLB1 ?
                   //type  4KB  2MB  4MB  1GB associativity
         TLBcase(0x02, 0,   0,   0,   2,   0,   0) //Instruction TLB: 4 MByte pages, fully associative, 2 entries
@@ -334,7 +333,62 @@ static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpu
         break;
       }
   }
-  
+}
+
+  static struct tlbinfo get_tlb_from_amd_register(unsigned regist, unsigned type, int is4KB){
+  struct tlbinfo toReturn;
+  if(type == 1 || type == 4)
+    regist=regist>>16;
+  toReturn.type = type;
+  toReturn.associativity = (regist >> 8) & 0xF;
+  toReturn.entriesnumber4KB = is4KB ? regist & 0xF : 0;
+  toReturn.entriesnumber2MB = is4KB ? 0 : regist & 0xF;
+  toReturn.entriesnumber4MB = toReturn.entriesnumber2MB / 2;
+  toReturn.entriesnumber1GB = 0;
+  return toReturn;
+}
+
+static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuiddump,int support2ndLevel){
+  unsigned ebx,ecx,edx,eax = 0X80000005; // TODO add max id chech and add to code.
+  cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
+  infos->numtlbs=0;//maximum of 8 // it's 7 in average : no need to allocate the exact number. 
+  infos->tlbs = malloc(8 * sizeof(struct tlbinfo));
+
+  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,0,1);// instruction TLB 4 KB pages
+  if(infos->tlbs[infos->numtlbs].associativity)
+    infos->numtlbs++;
+
+  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,0,0);// instruction TLB 2/4 MB pages
+  if(infos->tlbs[infos->numtlbs].associativity)
+    infos->numtlbs++;
+
+  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,1,1);// data TLB 4 KB pages
+  if(infos->tlbs[infos->numtlbs].associativity)
+    infos->numtlbs++;
+
+  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,1,0);// data TLB 2/4 MB pages
+  if(infos->tlbs[infos->numtlbs].associativity)
+    infos->numtlbs++;
+  if(support2ndLevel){
+    eax = 0X80000006;
+    cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
+
+    infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,3,1);// L2 instruction TLB 4 KB pages
+    if(infos->tlbs[infos->numtlbs].associativity)
+      infos->numtlbs++;
+
+  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,3,0);// L2 instruction TLB 2/4 MB pages
+    if(infos->tlbs[infos->numtlbs].associativity)
+      infos->numtlbs++;
+
+    infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,4,1);// L2 data TLB 4 KB pages
+    if(infos->tlbs[infos->numtlbs].associativity)
+      infos->numtlbs++;
+
+    infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,4,0);// L2 data TLB 2/4 MB pages
+    if(infos->tlbs[infos->numtlbs].associativity)
+      infos->numtlbs++;
+  }
 }
 
 /* Fetch information from the processor itself thanks to cpuid and store it in
@@ -441,6 +495,15 @@ static void look_proc(struct hwloc_backend *backend, struct procinfo *infos, uns
     infos->coreid = infos->logprocid / infos->max_nbthreads;
     hwloc_debug("this is thread %u of core %u\n", infos->threadid, infos->coreid);
   }
+
+  /*
+  * Get TLB informations
+  */
+  if (cpuid_type != intel  && highest_ext_cpuid >= 0x80000005) 
+    get_fill_amd_tlb(infos, src_cpuiddump,highest_ext_cpuid >= 0x80000006);
+  else
+    if (cpuid_type != amd && highest_cpuid >= 0x02)
+      get_fill_intel_tlb(infos, src_cpuiddump);
 
   infos->numcaches = 0;
   infos->cache = NULL;
@@ -568,8 +631,6 @@ static void look_proc(struct hwloc_backend *backend, struct procinfo *infos, uns
         hwloc_debug("this is thread %u of core %u\n", infos->threadid, infos->coreid);
       }
     }
-    if (cpuid_type != amd && highest_cpuid >= 0x02)
-      get_fill_intel_tlb(infos, src_cpuiddump);
 
     cache = infos->cache = malloc(infos->numcaches * sizeof(*infos->cache));
 
@@ -656,7 +717,6 @@ static void look_proc(struct hwloc_backend *backend, struct procinfo *infos, uns
       hwloc_debug("this is thread %u of core %u\n", infos->threadid, infos->coreid);
     }
   }
-  get_fill_intel_tlb(infos, src_cpuiddump);
   if (hwloc_bitmap_isset(data->apicid_set, infos->apicid))
     data->apicid_unique = 0;
   else
@@ -724,8 +784,14 @@ static int anotateCore(struct hwloc_backend *backend, struct procinfo *infos, hw
         case 1:
           length += snprintf(property + length,128-length,"data");
         break;
-        default:
-          length += snprintf(property + length,128-length,"shared %d level",infos->tlbs[i].type);
+        case 2:
+          length += snprintf(property + length,128-length,"shared L2");
+        break;
+        case 3:
+          length += snprintf(property + length,128-length,"instruction L2");
+        break;
+        case 4:
+          length += snprintf(property + length,128-length,"instruction L2");
         break;
       }
 
