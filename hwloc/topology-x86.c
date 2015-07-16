@@ -256,20 +256,60 @@ static void fill_amd_cache(struct procinfo *infos, unsigned level, int type, uns
 //TYPE : 0 : Instruction TLB, 1 : data TLB, x>=2 : Shared x-Level TLB
 //PAGESIZE : string
 //ASSOCIATIVITY : 0 Fully associative, 1 Direct mapped,  x>=2 : x-way associative
-#define TLBcase(VALUE,TYPE,ENTRIESNUMBER4KB,ENTRIESNUMBER2MB,ENTRIESNUMBER4MB,ENTRIESNUMBER1GB,ASSOCIATIVITY) case VALUE:\
-    infos->numtlbs++;\
-    infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));\
-    infos->tlbs[infos->numtlbs-1].type = TYPE;\
-    infos->tlbs[infos->numtlbs-1].associativity = ASSOCIATIVITY;\
-    infos->tlbs[infos->numtlbs-1].entriesnumber4KB = ENTRIESNUMBER4KB;\
-    infos->tlbs[infos->numtlbs-1].entriesnumber2MB = ENTRIESNUMBER2MB;\
-    infos->tlbs[infos->numtlbs-1].entriesnumber4MB = ENTRIESNUMBER4MB;\
-    infos->tlbs[infos->numtlbs-1].entriesnumber1GB = ENTRIESNUMBER1GB;\
-  break;
+
+static void initialiseTLB(struct tlbinfo* intelTLBEnum, unsigned id,unsigned type,  unsigned entriesnumber4KB, unsigned entriesnumber2MB, unsigned entriesnumber4MB, unsigned entriesnumber1GB, unsigned associativity){
+  intelTLBEnum[id].type = type;
+  intelTLBEnum[id].associativity = associativity;
+  intelTLBEnum[id].entriesnumber4KB = entriesnumber4KB;
+  intelTLBEnum[id].entriesnumber2MB = entriesnumber2MB;
+  intelTLBEnum[id].entriesnumber4MB = entriesnumber4MB;
+  intelTLBEnum[id].entriesnumber1GB = entriesnumber1GB;
+}
 
 static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpuiddump){//if highest_ext_cpuid >= 0x02
   unsigned i,j;
   unsigned registers[4];
+  static struct tlbinfo intelTLBEnum[0x100];//0x1 is a special case. It will then be used as an entry to know if the array is itialised
+  if (intelTLBEnum[0x1].type != (unsigned)-1){ // initialise tlbinfo only once
+    intelTLBEnum[0x1].type = (unsigned)-1;
+    initialiseTLB(intelTLBEnum,0x02, 0,   0,   0,   2,   0,   0); //Instruction TLB: 4 MByte pages, fully associative, 2 entries
+    initialiseTLB(intelTLBEnum,0x03, 1,  64,   0,   0,   0,   4); //Data TLB: 4 KByte pages, 4-way set associative, 64 entries
+    initialiseTLB(intelTLBEnum,0x04, 1,   0,   0,   8,   0,   4); //Data TLB: 4 MByte pages, 4-way set associative, 8 entries
+    initialiseTLB(intelTLBEnum,0x05, 1,   0,   0,  32,   0,   4); //Data TLB1: 4 MByte pages, 4-way set associative, 32 entries
+    initialiseTLB(intelTLBEnum,0x0B, 0,   0,   0,   4,   0,   4); //Instruction TLB: 4 MByte pages, 4-way set associative, 4 entries
+    initialiseTLB(intelTLBEnum,0x4F, 0,  32,   0,   0,   0,   1); //Instruction TLB: 4 KByte pages, 32 entries
+    initialiseTLB(intelTLBEnum,0x50, 0,  64,  64,  64,   0,   1); //Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 64 entries
+    initialiseTLB(intelTLBEnum,0x51, 0, 128, 128, 128,   0,   1); //Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 128 entries
+    initialiseTLB(intelTLBEnum,0x52, 0, 256, 256, 256,   0,   1); //Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 256 entries
+    initialiseTLB(intelTLBEnum,0x55, 0,   0,   7,   7,   0,   0); //Instruction TLB: 2-MByte or 4-MByte pages, fully associative, 7 entries
+    initialiseTLB(intelTLBEnum,0x56, 1,   0,   0,  16,   0,   4); //Data TLB0: 4 MByte pages, 4-way set associative, 16 entries
+    initialiseTLB(intelTLBEnum,0x57, 1,  16,   0,   0,   0,   4); //Data TLB0: 4 KByte pages, 4-way associative, 16 entries
+    initialiseTLB(intelTLBEnum,0x59, 1,  16,   0,   0,   0,   0); //Data TLB0: 4 KByte pages, fully associative, 16 entries
+    initialiseTLB(intelTLBEnum,0x5A, 1,   0,  32,  32,   0,   4); //Data TLB0: 2-MByte or 4 MByte pages, 4-way set associative, 32 entries
+    initialiseTLB(intelTLBEnum,0x5B, 1,  64,   0,  64,   0,   1); //Data TLB: 4 KByte and 4 MByte pages, 64 entries
+    initialiseTLB(intelTLBEnum,0x5C, 1, 128,   0, 128,   0,   1); //Data TLB: 4 KByte and 4 MByte pages,128 entries
+    initialiseTLB(intelTLBEnum,0x5D, 1, 256,   0, 256,   0,   1); //Data TLB: 4 KByte and 4 MByte pages,256 entries
+    initialiseTLB(intelTLBEnum,0x61, 0,  48,   0,   0,   0,   0); //Instruction TLB: 4 KByte pages, fully associative, 48 entries
+    initialiseTLB(intelTLBEnum,0x63, 1,   0,   0,   0,   4,   4); //Data TLB: 1 GByte pages, 4-way set associative, 4 entries
+    initialiseTLB(intelTLBEnum,0x76, 0,   0,   8,   8,   0,   0); //Instruction TLB: 2M/4M pages, fully associative, 8 entries
+    initialiseTLB(intelTLBEnum,0xA0, 1,  32,   0,   0,   0,   0); //DTLB: 4k pages, fully associative, 32 entries
+    initialiseTLB(intelTLBEnum,0xB0, 0, 128,   0,   0,   0,   4); //Instruction TLB: 4 KByte pages, 4-way set associative, 128 entries
+    initialiseTLB(intelTLBEnum,0xB1, 0,   0,   8,   4,   0,   4); //Instruction TLB: 2M pages, 4-way, 8 entries or 4M pages, 4-way, 4 entries
+    initialiseTLB(intelTLBEnum,0xB2, 0,  64,   0,   0,   0,   4); //Instruction TLB: 4KByte pages, 4-way set associative, 64 entries
+    initialiseTLB(intelTLBEnum,0xB3, 1, 128,   0,   0,   0,   4); //Data TLB: 4 KByte pages, 4-way set associative, 128 entries
+    initialiseTLB(intelTLBEnum,0xB4, 1, 256,   0,   0,   0,   4); //Data TLB1: 4 KByte pages, 4-way associative, 256 entries
+    initialiseTLB(intelTLBEnum,0xB5, 0,  64,   0,   0,   0,   8); //Instruction TLB: 4KByte pages, 8-way set associative, 64 entries
+    initialiseTLB(intelTLBEnum,0xB6, 0, 128,   0,   0,   0,   8); //Instruction TLB: 4KByte pages, 8-way set associative, 128 entries
+    initialiseTLB(intelTLBEnum,0xBA, 1,  64,   0,   0,   0,   4); //Data TLB1: 4 KByte pages, 4-way associative, 64 entries
+    initialiseTLB(intelTLBEnum,0xC0, 1,   8,   0,   8,   0,   4); //Data TLB: 4 KByte and 4 MByte pages, 4-way associative, 8 entries
+    initialiseTLB(intelTLBEnum,0xC1, 2,1024,1024,   0,   0,   8); //Shared 2nd-Level TLB: 4 KByte/2MByte pages, 8-way associative, 1024 entries
+    initialiseTLB(intelTLBEnum,0xC2, 1,  16,  16,   0,   0,   4); //DTLB: 4 KByte/2 MByte pages, 4-way associative, 16 entries
+    initialiseTLB(intelTLBEnum,0xC3, 2,1536,1536,   0,  16,   6); //Shared 2nd-Level TLB: 4 KByte /2 MByte pages, 6-way associative, 1536 entries. Also 1GBbyte pages, 4-way, 16 entries.
+    initialiseTLB(intelTLBEnum,0xCA, 2, 512,   0,   0,   0,   4); //Shared 2nd-Level TLB: 4 KByte pages, 4-way associative, 512 entries
+
+
+  }  
+
   infos->tlbs = NULL;
   infos->numtlbs = 0;
   registers[0] = 0x02; 
@@ -278,117 +318,131 @@ static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpu
     if (registers[i]>>31){
       continue; //The most significant bit indicates whether the register contains valid information (0) or is reserved (1)
     }
-    for(j=0;j<4;j++)
-      switch((registers[i]>>8*j)&0xff){
-        case 0x1:
-        //The least-significant byte in register EAX (register AL) will always return 01H. Software should ignore this value and not interpret it as an informational descriptor
-          if(i!=0 || j!=0){
-            infos->numtlbs++;
-            infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));
-            infos->tlbs[infos->numtlbs-1].type = 0;
-            infos->tlbs[infos->numtlbs-1].associativity = 4;
-            infos->tlbs[infos->numtlbs-1].entriesnumber4KB = 32;
-            infos->tlbs[infos->numtlbs-1].entriesnumber2MB = 0;
-            infos->tlbs[infos->numtlbs-1].entriesnumber4MB = 0;
-            infos->tlbs[infos->numtlbs-1].entriesnumber1GB = 0;
-          }
-        break;// is there a difference between Data TLB, DTLB, Data TLB0, Data TLB1 ?
-                  //type  4KB  2MB  4MB  1GB associativity
-        TLBcase(0x02, 0,   0,   0,   2,   0,   0) //Instruction TLB: 4 MByte pages, fully associative, 2 entries
-        TLBcase(0x03, 1,  64,   0,   0,   0,   4) //Data TLB: 4 KByte pages, 4-way set associative, 64 entries
-        TLBcase(0x04, 1,   0,   0,   8,   0,   4) //Data TLB: 4 MByte pages, 4-way set associative, 8 entries
-        TLBcase(0x05, 1,   0,   0,  32,   0,   4) //Data TLB1: 4 MByte pages, 4-way set associative, 32 entries
-        TLBcase(0x0B, 0,   0,   0,   4,   0,   4) //Instruction TLB: 4 MByte pages, 4-way set associative, 4 entries
-        TLBcase(0x4F, 0,  32,   0,   0,   0,   1) //Instruction TLB: 4 KByte pages, 32 entries
-        TLBcase(0x50, 0,  64,  64,  64,   0,   1) //Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 64 entries
-        TLBcase(0x51, 0, 128, 128, 128,   0,   1) //Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 128 entries
-        TLBcase(0x52, 0, 256, 256, 256,   0,   1) //Instruction TLB: 4 KByte and 2-MByte or 4-MByte pages, 256 entries
-        TLBcase(0x55, 0,   0,   7,   7,   0,   0) //Instruction TLB: 2-MByte or 4-MByte pages, fully associative, 7 entries
-        TLBcase(0x56, 1,   0,   0,  16,   0,   4) //Data TLB0: 4 MByte pages, 4-way set associative, 16 entries
-        TLBcase(0x57, 1,  16,   0,   0,   0,   4) //Data TLB0: 4 KByte pages, 4-way associative, 16 entries
-        TLBcase(0x59, 1,  16,   0,   0,   0,   0) //Data TLB0: 4 KByte pages, fully associative, 16 entries
-        TLBcase(0x5A, 1,   0,  32,  32,   0,   4) //Data TLB0: 2-MByte or 4 MByte pages, 4-way set associative, 32 entries
-        TLBcase(0x5B, 1,  64,   0,  64,   0,   1) //Data TLB: 4 KByte and 4 MByte pages, 64 entries
-        TLBcase(0x5C, 1, 128,   0, 128,   0,   1) //Data TLB: 4 KByte and 4 MByte pages,128 entries
-        TLBcase(0x5D, 1, 256,   0, 256,   0,   1) //Data TLB: 4 KByte and 4 MByte pages,256 entries
-        TLBcase(0x61, 0,  48,   0,   0,   0,   0) //Instruction TLB: 4 KByte pages, fully associative, 48 entries
-        TLBcase(0x63, 1,   0,   0,   0,   4,   4) //Data TLB: 1 GByte pages, 4-way set associative, 4 entries
-        TLBcase(0x76, 0,   0,   8,   8,   0,   0) //Instruction TLB: 2M/4M pages, fully associative, 8 entries
-        TLBcase(0xA0, 1,  32,   0,   0,   0,   0) //DTLB: 4k pages, fully associative, 32 entries
-        TLBcase(0xB0, 0, 128,   0,   0,   0,   4) //Instruction TLB: 4 KByte pages, 4-way set associative, 128 entries
-        TLBcase(0xB1, 0,   0,   8,   4,   0,   4) //Instruction TLB: 2M pages, 4-way, 8 entries or 4M pages, 4-way, 4 entries
-        TLBcase(0xB2, 0,  64,   0,   0,   0,   4) //Instruction TLB: 4KByte pages, 4-way set associative, 64 entries
-        TLBcase(0xB3, 1, 128,   0,   0,   0,   4) //Data TLB: 4 KByte pages, 4-way set associative, 128 entries
-        TLBcase(0xB4, 1, 256,   0,   0,   0,   4) //Data TLB1: 4 KByte pages, 4-way associative, 256 entries
-        TLBcase(0xB5, 0,  64,   0,   0,   0,   8) //Instruction TLB: 4KByte pages, 8-way set associative, 64 entries
-        TLBcase(0xB6, 0, 128,   0,   0,   0,   8) //Instruction TLB: 4KByte pages, 8-way set associative, 128 entries
-        TLBcase(0xBA, 1,  64,   0,   0,   0,   4) //Data TLB1: 4 KByte pages, 4-way associative, 64 entries
-        TLBcase(0xC0, 1,   8,   0,   8,   0,   4) //Data TLB: 4 KByte and 4 MByte pages, 4-way associative, 8 entries
-        TLBcase(0xC1, 2,1024,1024,   0,   0,   8) //Shared 2nd-Level TLB: 4 KByte/2MByte pages, 8-way associative, 1024 entries
-        TLBcase(0xC2, 1,  16,  16,   0,   0,   4) //DTLB: 4 KByte/2 MByte pages, 4-way associative, 16 entries
-        TLBcase(0xC3, 2,1536,1536,   0,  16,   6) //Shared 2nd-Level TLB: 4 KByte /2 MByte pages, 6-way associative, 1536 entries. Also 1GBbyte pages, 4-way, 16 entries.
-        TLBcase(0xCA, 2, 512,   0,   0,   0,   4) //Shared 2nd-Level TLB: 4 KByte pages, 4-way associative, 512 entries
-
-        default:
-        break;
+    for(j=0;j<4;j++){
+      unsigned tlbId = ((registers[i]>>8*j)&0xff);
+      if(tlbId == 0x1){
+        if(i!=0 || j!=0){//The least-significant byte in register EAX (register AL) will always return 01H. Software should ignore this value and not interpret it as an informational descriptor
+          infos->numtlbs++;
+          infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));
+          infos->tlbs[infos->numtlbs-1].type = 0;
+          infos->tlbs[infos->numtlbs-1].associativity = 4;
+          infos->tlbs[infos->numtlbs-1].entriesnumber4KB = 32;
+          infos->tlbs[infos->numtlbs-1].entriesnumber2MB = 0;
+          infos->tlbs[infos->numtlbs-1].entriesnumber4MB = 0;
+          infos->tlbs[infos->numtlbs-1].entriesnumber1GB = 0;
+        }
       }
+      else
+        if(intelTLBEnum[tlbId].entriesnumber4KB != 0 ||intelTLBEnum[tlbId].entriesnumber2MB != 0 || intelTLBEnum[tlbId].entriesnumber4MB != 0 || intelTLBEnum[tlbId].entriesnumber1GB != 0){  //FIXME
+          infos->numtlbs++;
+          infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));
+          infos->tlbs[infos->numtlbs-1] = intelTLBEnum[tlbId];
+        }
+    }
   }
 }
 
-  static struct tlbinfo get_tlb_from_amd_register(unsigned regist, unsigned type, int is4KB){
-  struct tlbinfo toReturn;
+  int add_tlb_from_amd_register(struct tlbinfo * tlbSet,unsigned* numTlb, unsigned regist, unsigned type, int size){
+  int associativity;
   if(type == 1 || type == 4)
     regist=regist>>16;
-  toReturn.type = type;
-  toReturn.associativity = (regist >> 8) & 0xF;
-  toReturn.entriesnumber4KB = is4KB ? regist & 0xF : 0;
-  toReturn.entriesnumber2MB = is4KB ? 0 : regist & 0xF;
-  toReturn.entriesnumber4MB = toReturn.entriesnumber2MB / 2;
-  toReturn.entriesnumber1GB = 0;
-  return toReturn;
+  associativity = (type>=2 || size == 2) ? (regist >> 12) & 0xF : (regist >> 8) & 0xFF;
+  //L1 has 8 bit of entry number and 8 of associativity.
+  //L2 (type>=2) and L1 1GB page syze have 12 bit of entry number and 4 of associativity.
+  if (associativity == 0){
+    return 0;//invalid or disabled TLB
+  }
+  if (type>=2 || size == 2)
+    switch(associativity){ // AM2 L2 TLB / L1 1GB TLB: Associativity is an enum.
+      case 0x1:
+      case 0x2:
+      case 0x4:
+        tlbSet[*numTlb].associativity = associativity;
+      break;
+      case 0x6:
+        tlbSet[*numTlb].associativity = 8;
+      break;
+      case 0x8:
+        tlbSet[*numTlb].associativity = 16;
+      break;
+      case 0xA:
+        tlbSet[*numTlb].associativity = 32;
+      break;
+      case 0xB:
+        tlbSet[*numTlb].associativity = 48;
+      break;
+      case 0xC:
+        tlbSet[*numTlb].associativity = 64;
+      break;
+      case 0xD:
+        tlbSet[*numTlb].associativity = 96;
+      break;
+      case 0xE:
+        tlbSet[*numTlb].associativity = 128;
+      break;
+      case 0xF:
+        tlbSet[*numTlb].associativity = 0;
+      break;
+      default:
+        return 0;// unknow associativity?
+    }
+  else
+    tlbSet[*numTlb].associativity = associativity == 0xFF ? 0 : associativity;
+    // AM2 L1 TLB : FF is fully associative, 1 direct mapped and i i-way associative
+
+  tlbSet[*numTlb].type = type;
+  tlbSet[*numTlb].entriesnumber4KB = (size == 0) ? regist & (type>=2 ? 0xFFF : 0xFF) : 0;
+  tlbSet[*numTlb].entriesnumber2MB = (size == 1) ? regist & (type>=2 ? 0xFFF : 0xFF) : 0;
+  tlbSet[*numTlb].entriesnumber4MB = tlbSet[*numTlb].entriesnumber2MB / 2;
+  tlbSet[*numTlb].entriesnumber1GB = (size == 2) ? regist & 0xFFF : 0;
+  (*numTlb)++;
+  return 1;
 }
 
-static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuiddump,int support2ndLevel){
-  unsigned ebx,ecx,edx,eax = 0X80000005; // TODO add max id chech and add to code.
-  cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
-  infos->numtlbs=0;//maximum of 8 // it's 7 in average : no need to allocate the exact number. 
-  infos->tlbs = malloc(8 * sizeof(struct tlbinfo));
-
-  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,0,1);// instruction TLB 4 KB pages
-  if(infos->tlbs[infos->numtlbs].associativity)
-    infos->numtlbs++;
-
-  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,0,0);// instruction TLB 2/4 MB pages
-  if(infos->tlbs[infos->numtlbs].associativity)
-    infos->numtlbs++;
-
-  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,1,1);// data TLB 4 KB pages
-  if(infos->tlbs[infos->numtlbs].associativity)
-    infos->numtlbs++;
-
-  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,1,0);// data TLB 2/4 MB pages
-  if(infos->tlbs[infos->numtlbs].associativity)
-    infos->numtlbs++;
-  if(support2ndLevel){
-    eax = 0X80000006;
+static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuiddump, unsigned highest_ext_cpuid){
+  unsigned ebx,ecx,edx,eax;
+  unsigned foundIL2TLB = 0;
+  infos->numtlbs=0;//maximum of 12
+  if(highest_ext_cpuid >= (eax = 0x80000005)){//get L1 TLB info
     cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
+    infos->tlbs = malloc(12 * sizeof(struct tlbinfo));
+    printf("TLBL1 : %x\t%x\n",eax,ebx);
 
-    infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,3,1);// L2 instruction TLB 4 KB pages
-    if(infos->tlbs[infos->numtlbs].associativity)
-      infos->numtlbs++;
-
-  infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,3,0);// L2 instruction TLB 2/4 MB pages
-    if(infos->tlbs[infos->numtlbs].associativity)
-      infos->numtlbs++;
-
-    infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(ebx,4,1);// L2 data TLB 4 KB pages
-    if(infos->tlbs[infos->numtlbs].associativity)
-      infos->numtlbs++;
-
-    infos->tlbs[infos->numtlbs] = get_tlb_from_amd_register(eax,4,0);// L2 data TLB 2/4 MB pages
-    if(infos->tlbs[infos->numtlbs].associativity)
-      infos->numtlbs++;
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,0,0);// instruction TLB 4 KB pages
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,0,1);// instruction TLB 2/4 MB pages
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,1,0);// data TLB 4 KB pages
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,1,1);// data TLB 2/4 MB pages
   }
+  if(highest_ext_cpuid >= (eax = 0x80000006)){//get L2 TLB info
+    cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
+    printf("TLBL2 : %x\t%x\n",eax,ebx);
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,3,0);// L2 instruction TLB 4 KB pages
+    foundIL2TLB += add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,3,1);// L2 instruction TLB 2/4 MB pages
+
+
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,4,0);// L2 data TLB 4 KB pages 
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,4,1);// L2 data TLB 2/4 MB pages 
+  }
+  if(highest_ext_cpuid >= (eax = 0x80000019)){//get 1GB L1/2 TLB info
+    cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
+    printf("TLB1GB : %x\t%x\n",eax,ebx);
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,0,2);// instruction TLB 1 GB pages
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,1,2);// data TLB 1 GB pages 
+
+    foundIL2TLB += add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,3,2);// L2 instruction TLB 1 GB pages
+    add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,4,2);// L2 data TLB 1 GB pages 
+  }
+  //error 658 CPUID Incorrectly Reports Large Page Support in L2 Instruction TLB
+  printf("familly number : %d\n",infos->cpufamilynumber);
+  if(!foundIL2TLB && infos->cpufamilynumber== 15) {
+    infos->tlbs[infos->numtlbs].type = 3;
+    infos->tlbs[infos->numtlbs].associativity = 8;
+    infos->tlbs[infos->numtlbs].entriesnumber4KB = 0;
+    infos->tlbs[infos->numtlbs].entriesnumber2MB = 1024;
+    infos->tlbs[infos->numtlbs].entriesnumber4MB = 512;
+    infos->tlbs[infos->numtlbs].entriesnumber1GB = 6;
+  }
+
 }
 
 /* Fetch information from the processor itself thanks to cpuid and store it in
@@ -499,8 +553,9 @@ static void look_proc(struct hwloc_backend *backend, struct procinfo *infos, uns
   /*
   * Get TLB informations
   */
+  infos->numtlbs=0;
   if (cpuid_type != intel  && highest_ext_cpuid >= 0x80000005) 
-    get_fill_amd_tlb(infos, src_cpuiddump,highest_ext_cpuid >= 0x80000006);
+    get_fill_amd_tlb(infos, src_cpuiddump,highest_ext_cpuid);
   else
     if (cpuid_type != amd && highest_cpuid >= 0x02)
       get_fill_intel_tlb(infos, src_cpuiddump);
@@ -791,7 +846,7 @@ static int anotateCore(struct hwloc_backend *backend, struct procinfo *infos, hw
           length += snprintf(property + length,128-length,"instruction L2");
         break;
         case 4:
-          length += snprintf(property + length,128-length,"instruction L2");
+          length += snprintf(property + length,128-length,"data L2");
         break;
       }
 
