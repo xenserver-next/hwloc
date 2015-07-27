@@ -1055,7 +1055,7 @@ static void iterateOverParent(struct hwloc_backend *backend,
       if((*object)->parent && (*object)->parent == toAnotate)
         *object = (*object)->parent;
     }
-  }while(anotate && anotate(backend,infos,toAnotate,infoId,data));
+  }while(toAnotate && anotate && anotate(backend,infos,toAnotate,infoId,data));
 }
 
 /* Analyse information stored in infos, and build/annotate topology levels accordingly */
@@ -1114,6 +1114,10 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
       continue;
     infoId= puList[i]->os_index;
 
+    if(!infos[infoId].present){
+      object->allowed_nodeset = 0x0;//TODO what if the x86 an linux backend disagree?
+      continue;
+    }
 
 
     /* Look for cores*/
