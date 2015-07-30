@@ -342,7 +342,7 @@ static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpu
   }
 }
 
-  int add_tlb_from_amd_register(struct tlbinfo * tlbSet,unsigned* numTlb, unsigned regist, unsigned type, int size){
+static int add_tlb_from_amd_register(struct tlbinfo * tlbSet,unsigned* numTlb, unsigned regist, unsigned type, int size){
   int associativity;
   if(type == 1 || type == 4)
     regist=regist>>16;
@@ -1031,6 +1031,26 @@ static int anotatePackage(struct hwloc_backend *backend, struct procinfo *infos,
   return 0;//only one
 }
 
+static void hwloc_x86_setup_pu_level(struct hwloc_topology *topology, struct procinfo *infos, unsigned nb_pus)
+{
+  struct hwloc_obj *obj;
+  unsigned oscpu,cpu;
+
+  hwloc_debug("%s", "\n\n * CPU cpusets *\n\n");
+  for (cpu=0,oscpu=0; oscpu<nb_pus; oscpu++)
+    if(infos[oscpu].present){//do not add inactive proceesor only detected by x86 backend
+      obj = hwloc_alloc_setup_object(HWLOC_OBJ_PU, oscpu);
+      obj->cpuset = hwloc_bitmap_alloc();
+      hwloc_bitmap_only(obj->cpuset, oscpu);
+
+      hwloc_debug_2args_bitmap("cpu %u (os %u) has cpuset %s\n",
+		 cpu, oscpu, obj->cpuset);
+      hwloc_insert_object_by_cpuset(topology, obj);
+
+      cpu++;
+    }
+}
+
 static void iterateOverParent(struct hwloc_backend *backend,
  struct procinfo *infos,
  hwloc_obj_t* object,
@@ -1069,10 +1089,10 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
   int one = -1;
   unsigned next_group_depth = topology->next_group_depth;
   hwloc_obj_t pu = hwloc_get_next_obj_by_type(topology,HWLOC_OBJ_PU ,NULL);
-  hwloc_obj_t* puList = malloc(nbprocs * sizeof(hwloc_obj_t));
+  hwloc_obj_t* puList = malloc((nbprocs+1) * sizeof(hwloc_obj_t)); // puList end by NULL
 
   if (!pu || pu->type != HWLOC_OBJ_PU)//add PU if not already added
-    hwloc_setup_pu_level(topology, data->nbprocs);//only fist child, right brother and father initialised
+    hwloc_x86_setup_pu_level(topology, infos, data->nbprocs);//only fist child, right brother and father initialised
 
   for (i = 0; i < nbprocs; i++)
     if (infos[i].present) {
@@ -1091,12 +1111,12 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
    */
 
   // We need to copy the pu list. If we added it and we add the fathers (the cores) it will fall in further chaos. And it will worsen for each level added.
-  for(pu = hwloc_get_next_obj_by_type(topology,HWLOC_OBJ_PU ,NULL),i=0;//return machine if PU just initialised
-   i<nbprocs;
+  for(pu = hwloc_get_next_obj_by_type(topology,HWLOC_OBJ_PU ,NULL),i=0;;//return machine if PU just initialised
    pu = pu->next_sibling ? pu->next_sibling : pu->next_cousin,i++){
     if(pu == NULL){
-      puList[i] = NULL;
-      continue;
+      puList[i] = NULL; // puList end by NULL 
+                      //the number of pu in puList can be <= puNumber if only x86 backend is called with some pu restricted by cpuset or inactive
+      break;
     }
     while(pu->type != HWLOC_OBJ_PU && pu->first_child)//when we just created them pu can be the machine...
       pu = pu->first_child;
@@ -1106,7 +1126,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
 
  /*Anotate previously existing objects and add missing*/
 
-  for(i=0;i<nbprocs;i++){//iterate over pu. For each object will be added/anotate from core to package
+  for(i=0;puList[i];i++){//iterate over pu. For each object will be added/anotate from core to package. puList end by NULL
     unsigned numberFound, infoId;
     hwloc_obj_t object = puList[i];
 
@@ -1114,11 +1134,8 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
       continue;
     infoId= puList[i]->os_index;
 
-    if(!infos[infoId].present){
-      object->allowed_nodeset = 0x0;//TODO what if the x86 an linux backend disagree?
+    if(!infos[infoId].present)
       continue;
-    }
-
 
     /* Look for cores*/
 
