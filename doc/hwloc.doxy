@@ -1428,8 +1428,8 @@ hwloc failed to discover any package.
 <dt>PCISlot</dt>
 <dd>The name/number of the physical slot where the PCI device is plugged.
 </dd>
-<dt>Vendor, Model, Revision, SerialNumber</dt>
-<dd>The vendor and model names, and revision and serial numbers of a Block OS device.
+<dt>Vendor, Model, Revision, SerialNumber, Size</dt>
+<dd>The vendor and model names, revision, serial number, and size (in kB) of a Block OS device.
 </dd>
 <dt>LinuxDeviceID</dt>
 <dd>The major/minor device number such as 8:0 on Linux for a Block OS device.
@@ -2823,7 +2823,7 @@ If building with <tt>icc</tt>:
 ./configure CC="icc -mmic" --host=x86_64-k1om-linux --build=x86_64-unknown-linux-gnu
 \endverbatim
 
-If building with the Xeon Phi-specific GCC that comes with the MPSS environment\n
+If building with the Xeon Phi-specific GCC that comes with the MPSS environment,
 for instance <tt>/usr/linux-k1om-4.7/bin/x86_64-k1om-linux-gcc</tt>:
 \verbatim
 export PATH=$PATH:/usr/linux-k1om-4.7/bin/

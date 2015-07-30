@@ -1,7 +1,7 @@
 /*
  * Copyright © 2009 CNRS
  * Copyright © 2009-2015 Inria.  All rights reserved.
- * Copyright © 2009-2013 Université Bordeaux
+ * Copyright © 2009-2013, 2015 Université Bordeaux
  * Copyright © 2009-2014 Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2015 Intel, Inc.  All rights reserved.
  * Copyright © 2010 IBM
@@ -61,8 +61,8 @@ struct hwloc_linux_backend_data_s {
  * Misc Abstraction layers *
  ***************************/
 
-#if !(defined HWLOC_HAVE_SCHED_SETAFFINITY) && (defined HWLOC_HAVE__SYSCALL3)
-/* libc doesn't have support for sched_setaffinity, build system call
+#if !(defined HWLOC_HAVE_SCHED_SETAFFINITY) && (defined HWLOC_HAVE_SYSCALL)
+/* libc doesn't have support for sched_setaffinity, make system call
  * ourselves: */
 #    include <linux/unistd.h>
 #    ifndef __NR_sched_setaffinity
@@ -96,7 +96,7 @@ struct hwloc_linux_backend_data_s {
 #       endif
 #    endif
 #    ifndef sched_setaffinity
-       _syscall3(int, sched_setaffinity, pid_t, pid, unsigned int, lg, const void *, mask)
+#      define sched_setaffinity(pid, lg, mask) syscall(__NR_sched_setaffinity, pid, lg, mask)
 #    endif
 #    ifndef __NR_sched_getaffinity
 #       ifdef __i386__
@@ -129,7 +129,7 @@ struct hwloc_linux_backend_data_s {
 #       endif
 #    endif
 #    ifndef sched_getaffinity
-       _syscall3(int, sched_getaffinity, pid_t, pid, unsigned int, lg, void *, mask)
+#      define sched_getaffinity(pid, lg, mask) (syscall(__NR_sched_getaffinity, pid, lg, mask) < 0 ? -1 : 0)
 #    endif
 #endif
 
@@ -341,7 +341,7 @@ hwloc_linux_set_tid_cpubind(hwloc_topology_t topology __hwloc_attribute_unused, 
 #else /* HWLOC_HAVE_OLD_SCHED_SETAFFINITY */
   return sched_setaffinity(tid, sizeof(linux_set), &linux_set);
 #endif /* HWLOC_HAVE_OLD_SCHED_SETAFFINITY */
-#elif defined(HWLOC_HAVE__SYSCALL3)
+#elif defined(HWLOC_HAVE_SYSCALL)
   unsigned long mask = hwloc_bitmap_to_ulong(hwloc_set);
 
 #ifdef HWLOC_HAVE_OLD_SCHED_SETAFFINITY
@@ -349,10 +349,10 @@ hwloc_linux_set_tid_cpubind(hwloc_topology_t topology __hwloc_attribute_unused, 
 #else /* HWLOC_HAVE_OLD_SCHED_SETAFFINITY */
   return sched_setaffinity(tid, sizeof(mask), (void*) &mask);
 #endif /* HWLOC_HAVE_OLD_SCHED_SETAFFINITY */
-#else /* !_SYSCALL3 */
+#else /* !SYSCALL */
   errno = ENOSYS;
   return -1;
-#endif /* !_SYSCALL3 */
+#endif /* !SYSCALL */
 }
 
 #if defined(HWLOC_HAVE_CPU_SET_S) && !defined(HWLOC_HAVE_OLD_SCHED_SETAFFINITY)
@@ -421,7 +421,7 @@ hwloc_linux_find_kernel_nr_cpus(hwloc_topology_t topology)
     /* start from scratch, the topology isn't ready yet (complete_cpuset is missing (-1) or empty (0))*/
     nr_cpus = 1;
 
-  possible = fopen("/sys/devices/system/cpu/possible", "r");
+  possible = fopen("/sys/devices/system/cpu/possible", "r"); /* binding only supported in real fsroot, no need for data->root_fd */
   if (possible) {
     hwloc_bitmap_t possible_bitmap = hwloc_bitmap_alloc();
     if (hwloc_linux_parse_cpuset_file(possible, possible_bitmap) == 0) {
@@ -503,7 +503,7 @@ hwloc_linux_get_tid_cpubind(hwloc_topology_t topology __hwloc_attribute_unused, 
   for(cpu=0; cpu<CPU_SETSIZE; cpu++)
     if (CPU_ISSET(cpu, &linux_set))
       hwloc_bitmap_set(hwloc_set, cpu);
-#elif defined(HWLOC_HAVE__SYSCALL3)
+#elif defined(HWLOC_HAVE_SYSCALL)
   unsigned long mask;
 
 #ifdef HWLOC_HAVE_OLD_SCHED_SETAFFINITY
@@ -515,10 +515,10 @@ hwloc_linux_get_tid_cpubind(hwloc_topology_t topology __hwloc_attribute_unused, 
     return -1;
 
   hwloc_bitmap_from_ulong(hwloc_set, mask);
-#else /* !_SYSCALL3 */
+#else /* !SYSCALL */
   errno = ENOSYS;
   return -1;
-#endif /* !_SYSCALL3 */
+#endif /* !SYSCALL */
 
   return 0;
 }
@@ -4291,6 +4291,20 @@ hwloc_linux_block_class_fillinfos(struct hwloc_backend *backend,
   unsigned major_id, minor_id;
   char *tmp;
 
+  snprintf(path, sizeof(path), "%s/size", osdevpath);
+  fd = hwloc_fopen(path, "r", root_fd);
+  if (fd) {
+    char string[20];
+    if (fgets(string, sizeof(string), fd)) {
+      unsigned long long sectors = strtoull(string, NULL, 10);
+      char string[16];
+      /* linux always reports size in 512-byte units, we want kB */
+      snprintf(string, sizeof(string), "%llu", sectors / 2);
+      hwloc_obj_add_info(obj, "Size", string);
+    }
+    fclose(fd);
+  }
+
   snprintf(path, sizeof(path), "%s/dev", osdevpath);
   fd = hwloc_fopen(path, "r", root_fd);
   if (!fd)
@@ -4347,15 +4361,20 @@ hwloc_linux_block_class_fillinfos(struct hwloc_backend *backend,
     if (tmp)
       *tmp = '\0';
     if (!strncmp(line, "E:ID_VENDOR=", strlen("E:ID_VENDOR="))) {
-      strcpy(vendor, line+strlen("E:ID_VENDOR="));
+      strncpy(vendor, line+strlen("E:ID_VENDOR="), sizeof(vendor));
+      vendor[sizeof(vendor)-1] = '\0';
     } else if (!strncmp(line, "E:ID_MODEL=", strlen("E:ID_MODEL="))) {
-      strcpy(model, line+strlen("E:ID_MODEL="));
+      strncpy(model, line+strlen("E:ID_MODEL="), sizeof(model));
+      model[sizeof(model)-1] = '\0';
     } else if (!strncmp(line, "E:ID_REVISION=", strlen("E:ID_REVISION="))) {
-      strcpy(revision, line+strlen("E:ID_REVISION="));
+      strncpy(revision, line+strlen("E:ID_REVISION="), sizeof(revision));
+      revision[sizeof(revision)-1] = '\0';
     } else if (!strncmp(line, "E:ID_SERIAL_SHORT=", strlen("E:ID_SERIAL_SHORT="))) {
-      strcpy(serial, line+strlen("E:ID_SERIAL_SHORT="));
+      strncpy(serial, line+strlen("E:ID_SERIAL_SHORT="), sizeof(serial));
+      serial[sizeof(serial)-1] = '\0';
     } else if (!strncmp(line, "E:ID_TYPE=", strlen("E:ID_TYPE="))) {
-      strcpy(blocktype, line+strlen("E:ID_TYPE="));
+      strncpy(blocktype, line+strlen("E:ID_TYPE="), sizeof(blocktype));
+      blocktype[sizeof(blocktype)-1] = '\0';
     }
   }
   fclose(fd);
@@ -4676,7 +4695,7 @@ hwloc_linux_directlookup_mic_class(struct hwloc_backend *backend,
     /* read the entire class and find the max id of mic%u dirents */
     dir = hwloc_opendir("/sys/devices/virtual/mic", root_fd);
     if (!dir) {
-      dir = opendir("/sys/class/mic");
+      dir = hwloc_opendir("/sys/class/mic", root_fd);
       if (!dir)
 	return 0;
     }

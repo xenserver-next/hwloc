@@ -655,10 +655,10 @@ static int hwloc__object_cpusets_intersect(hwloc_obj_t obj1, hwloc_obj_t obj2)
 static int
 hwloc__xml_import_object(hwloc_topology_t topology,
 			 struct hwloc_xml_backend_data_s *data,
-			 hwloc_obj_t obj,
+			 hwloc_obj_t parent, hwloc_obj_t obj,
 			 hwloc__xml_import_state_t state)
 {
-  hwloc_obj_t parent = obj->parent;
+  int ignored = 0;
 
   /* process attributes */
   while (1) {
@@ -708,7 +708,12 @@ hwloc__xml_import_object(hwloc_topology_t topology,
     data->nbnumanodes++;
   }
 
-  if (parent) {
+  if (0) {
+    /* FIXME may apply some ignore rules here, but don't ignore the root object */
+    ignored = 1;
+  }
+
+  if (parent && !ignored) {
     /* root->parent is NULL, and root is already inserted */
 
     /* warn if inserting out-of-order or if children intersects,
@@ -735,10 +740,10 @@ hwloc__xml_import_object(hwloc_topology_t topology,
       }
     }
 
-    hwloc_insert_object_by_parent(topology, obj->parent /* filled by the caller */, obj);
+    hwloc_insert_object_by_parent(topology, parent, obj);
     /* insert_object_by_parent() doesn't merge during insert, so obj is still valid */
     if (outoforder)
-      hwloc__reorder_children(obj->parent);
+      hwloc__reorder_children(parent);
   }
 
   /* process subnodes */
@@ -755,8 +760,7 @@ hwloc__xml_import_object(hwloc_topology_t topology,
 
     if (!strcmp(tag, "object")) {
       hwloc_obj_t childobj = hwloc_alloc_setup_object(HWLOC_OBJ_TYPE_MAX, -1);
-      childobj->parent = obj; /* store the parent pointer for use in insert() below */
-      ret = hwloc__xml_import_object(topology, data, childobj, &childstate);
+      ret = hwloc__xml_import_object(topology, data, ignored ? parent : obj, childobj, &childstate);
     } else if (!strcmp(tag, "page_type")) {
       ret = hwloc__xml_import_pagetype(topology, obj, &childstate);
     } else if (!strcmp(tag, "info")) {
@@ -773,6 +777,9 @@ hwloc__xml_import_object(hwloc_topology_t topology,
 
     state->global->close_child(&childstate);
   }
+
+  if (ignored)
+    hwloc_free_unlinked_object(obj);
 
   return state->global->close_tag(state);
 
@@ -1008,7 +1015,7 @@ hwloc_look_xml(struct hwloc_backend *backend)
   ret = state.global->find_child(&state, &childstate, &tag);
   if (ret < 0 || !ret || strcmp(tag, "object"))
     goto failed;
-  ret = hwloc__xml_import_object(topology, data, root, &childstate);
+  ret = hwloc__xml_import_object(topology, data, NULL /*  no parent */, root, &childstate);
   if (ret < 0)
     goto failed;
   state.global->close_child(&childstate);
@@ -1102,6 +1109,7 @@ hwloc_topology_diff_load_xml(hwloc_topology_t topology __hwloc_attribute_unused,
   fakedata.msgprefix = strdup(basename);
 
   if (!hwloc_libxml_callbacks && !hwloc_nolibxml_callbacks) {
+    free(fakedata.msgprefix);
     errno = ENOSYS;
     return -1;
   }
@@ -1141,9 +1149,10 @@ hwloc_topology_diff_load_xmlbuffer(hwloc_topology_t topology __hwloc_attribute_u
   int ret;
 
   state.global = &fakedata;
-  fakedata.msgprefix = "xmldiffbuffer";
+  fakedata.msgprefix = strdup("xmldiffbuffer");
 
   if (!hwloc_libxml_callbacks && !hwloc_nolibxml_callbacks) {
+    free(fakedata.msgprefix);
     errno = ENOSYS;
     return -1;
   }
@@ -1165,6 +1174,8 @@ hwloc_topology_diff_load_xmlbuffer(hwloc_topology_t topology __hwloc_attribute_u
   }
 
   hwloc_localeswitch_fini();
+
+  free(fakedata.msgprefix);
   return ret;
 }
 
