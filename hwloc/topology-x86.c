@@ -406,7 +406,6 @@ static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuid
   if(highest_ext_cpuid >= (eax = 0x80000005)){//get L1 TLB info
     cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
     infos->tlbs = malloc(12 * sizeof(struct tlbinfo));
-    printf("TLBL1 : %x\t%x\n",eax,ebx);
 
     add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,0,0);// instruction TLB 4 KB pages
     add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,0,1);// instruction TLB 2/4 MB pages
@@ -415,7 +414,6 @@ static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuid
   }
   if(highest_ext_cpuid >= (eax = 0x80000006)){//get L2 TLB info
     cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
-    printf("TLBL2 : %x\t%x\n",eax,ebx);
     add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,3,0);// L2 instruction TLB 4 KB pages
     foundIL2TLB += add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,3,1);// L2 instruction TLB 2/4 MB pages
 
@@ -425,7 +423,6 @@ static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuid
   }
   if(highest_ext_cpuid >= (eax = 0x80000019)){//get 1GB L1/2 TLB info
     cpuid_or_from_dump(&eax, &ebx, &ecx, &edx, src_cpuiddump);
-    printf("TLB1GB : %x\t%x\n",eax,ebx);
     add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,0,2);// instruction TLB 1 GB pages
     add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,eax,1,2);// data TLB 1 GB pages 
 
@@ -433,7 +430,6 @@ static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuid
     add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,4,2);// L2 data TLB 1 GB pages 
   }
   //error 658 CPUID Incorrectly Reports Large Page Support in L2 Instruction TLB
-  printf("familly number : %d\n",infos->cpufamilynumber);
   if(!foundIL2TLB && infos->cpufamilynumber== 15) {
     infos->tlbs[infos->numtlbs].type = 3;
     infos->tlbs[infos->numtlbs].associativity = 8;
@@ -652,11 +648,24 @@ static void look_proc(struct hwloc_backend *backend, struct procinfo *infos, uns
         fill_amd_cache(infos, 2, 3, ecx); /* L2u */
       if (edx & 0xf000)
         fill_amd_cache(infos, 3, 3, edx); /* L3u */
-      /* FIXME: AMD MagnyCours family 0x10 model 0x9 with 8 cores or more actually
-       * have the L3 split in two halves, and associativity is divided as well (48)
-       */
     }
   }
+      /* AMD MagnyCours family 0x10 model 0x9 with 8 cores or more actually
+       * have the L3 split in two halves, and associativity is divided as well (48)
+       * do cache->nbthreads_sharing/2 and cache->ways/2 (if != -1)
+       */
+  if(cpuid_type == amd && infos->cpufamilynumber==0x10 && infos->cpumodelnumber==0x9)
+    for(cachenum = infos->numcaches - 1; cachenum >= 0 ; cachenum--){
+      cache = &(infos->cache[cachenum]);
+      if(cache->level == 3 && (cache->ways == -1 || (cache->ways % 2 == 0))){
+        if(cache->nbthreads_sharing >= 8){
+          cache->nbthreads_sharing /= 2;
+          if(cache->ways != -1)
+            cache->ways /= 2;
+        }
+        break;
+      }
+    }
 
   /* Get thread/core + cache information from cpuid 0x04
    * (not supported on AMD)
