@@ -10,7 +10,7 @@
         <info name="CPUModelNumber" value="9"/>
         <info name="CPUModel" value="AMD Opteron(tm) Processor 6164 HE"/>
         <info name="CPUStepping" value="1"/>
-        <object type="Cache" os_index="0" cpuset="0x00000fff" complete_cpuset="0x00000fff" allowed_cpuset="0x00000fff" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="10485760" depth="3" cache_linesize="64" cache_associativity="96" cache_type="0">
+        <object type="Cache" os_index="0" cpuset="0x0000003f" complete_cpuset="0x0000003f" allowed_cpuset="0x0000003f" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="5242880" depth="3" cache_linesize="64" cache_associativity="48" cache_type="0">
           <info name="inclusiveness" value="true"/>
           <object type="Cache" os_index="0" cpuset="0x00000001" complete_cpuset="0x00000001" allowed_cpuset="0x00000001" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
@@ -19,6 +19,15 @@
               <object type="Cache" os_index="0" cpuset="0x00000001" complete_cpuset="0x00000001" allowed_cpuset="0x00000001" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="0" cpuset="0x00000001" complete_cpuset="0x00000001" allowed_cpuset="0x00000001" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="0" cpuset="0x00000001" complete_cpuset="0x00000001" allowed_cpuset="0x00000001" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -31,6 +40,15 @@
               <object type="Cache" os_index="1" cpuset="0x00000002" complete_cpuset="0x00000002" allowed_cpuset="0x00000002" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="1" cpuset="0x00000002" complete_cpuset="0x00000002" allowed_cpuset="0x00000002" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="1" cpuset="0x00000002" complete_cpuset="0x00000002" allowed_cpuset="0x00000002" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -43,6 +61,15 @@
               <object type="Cache" os_index="2" cpuset="0x00000004" complete_cpuset="0x00000004" allowed_cpuset="0x00000004" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="2" cpuset="0x00000004" complete_cpuset="0x00000004" allowed_cpuset="0x00000004" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="2" cpuset="0x00000004" complete_cpuset="0x00000004" allowed_cpuset="0x00000004" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -55,6 +82,15 @@
               <object type="Cache" os_index="3" cpuset="0x00000008" complete_cpuset="0x00000008" allowed_cpuset="0x00000008" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="3" cpuset="0x00000008" complete_cpuset="0x00000008" allowed_cpuset="0x00000008" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="3" cpuset="0x00000008" complete_cpuset="0x00000008" allowed_cpuset="0x00000008" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -67,6 +103,15 @@
               <object type="Cache" os_index="4" cpuset="0x00000010" complete_cpuset="0x00000010" allowed_cpuset="0x00000010" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="4" cpuset="0x00000010" complete_cpuset="0x00000010" allowed_cpuset="0x00000010" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="4" cpuset="0x00000010" complete_cpuset="0x00000010" allowed_cpuset="0x00000010" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -79,11 +124,23 @@
               <object type="Cache" os_index="5" cpuset="0x00000020" complete_cpuset="0x00000020" allowed_cpuset="0x00000020" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="5" cpuset="0x00000020" complete_cpuset="0x00000020" allowed_cpuset="0x00000020" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="5" cpuset="0x00000020" complete_cpuset="0x00000020" allowed_cpuset="0x00000020" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
+        </object>
+        <object type="Cache" os_index="1" cpuset="0x00000fc0" complete_cpuset="0x00000fc0" allowed_cpuset="0x00000fc0" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="5242880" depth="3" cache_linesize="64" cache_associativity="48" cache_type="0">
+          <info name="inclusiveness" value="true"/>
           <object type="Cache" os_index="6" cpuset="0x00000040" complete_cpuset="0x00000040" allowed_cpuset="0x00000040" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
             <object type="Cache" os_index="6" cpuset="0x00000040" complete_cpuset="0x00000040" allowed_cpuset="0x00000040" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
@@ -91,6 +148,15 @@
               <object type="Cache" os_index="6" cpuset="0x00000040" complete_cpuset="0x00000040" allowed_cpuset="0x00000040" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="6" cpuset="0x00000040" complete_cpuset="0x00000040" allowed_cpuset="0x00000040" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="6" cpuset="0x00000040" complete_cpuset="0x00000040" allowed_cpuset="0x00000040" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -103,6 +169,15 @@
               <object type="Cache" os_index="7" cpuset="0x00000080" complete_cpuset="0x00000080" allowed_cpuset="0x00000080" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="7" cpuset="0x00000080" complete_cpuset="0x00000080" allowed_cpuset="0x00000080" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="7" cpuset="0x00000080" complete_cpuset="0x00000080" allowed_cpuset="0x00000080" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -115,6 +190,15 @@
               <object type="Cache" os_index="8" cpuset="0x00000100" complete_cpuset="0x00000100" allowed_cpuset="0x00000100" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="8" cpuset="0x00000100" complete_cpuset="0x00000100" allowed_cpuset="0x00000100" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="8" cpuset="0x00000100" complete_cpuset="0x00000100" allowed_cpuset="0x00000100" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -127,6 +211,15 @@
               <object type="Cache" os_index="9" cpuset="0x00000200" complete_cpuset="0x00000200" allowed_cpuset="0x00000200" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="9" cpuset="0x00000200" complete_cpuset="0x00000200" allowed_cpuset="0x00000200" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="9" cpuset="0x00000200" complete_cpuset="0x00000200" allowed_cpuset="0x00000200" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -139,6 +232,15 @@
               <object type="Cache" os_index="10" cpuset="0x00000400" complete_cpuset="0x00000400" allowed_cpuset="0x00000400" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="10" cpuset="0x00000400" complete_cpuset="0x00000400" allowed_cpuset="0x00000400" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="10" cpuset="0x00000400" complete_cpuset="0x00000400" allowed_cpuset="0x00000400" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -151,6 +253,15 @@
               <object type="Cache" os_index="11" cpuset="0x00000800" complete_cpuset="0x00000800" allowed_cpuset="0x00000800" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="11" cpuset="0x00000800" complete_cpuset="0x00000800" allowed_cpuset="0x00000800" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="11" cpuset="0x00000800" complete_cpuset="0x00000800" allowed_cpuset="0x00000800" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
@@ -164,147 +275,258 @@
         <info name="CPUModelNumber" value="9"/>
         <info name="CPUModel" value="AMD Opteron(tm) Processor 6164 HE"/>
         <info name="CPUStepping" value="1"/>
-        <object type="Cache" os_index="1" cpuset="0x00fff000" complete_cpuset="0x00fff000" allowed_cpuset="0x00fff000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="10485760" depth="3" cache_linesize="64" cache_associativity="96" cache_type="0">
+        <object type="Cache" os_index="0" cpuset="0x0003f000" complete_cpuset="0x0003f000" allowed_cpuset="0x0003f000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="5242880" depth="3" cache_linesize="64" cache_associativity="48" cache_type="0">
           <info name="inclusiveness" value="true"/>
-          <object type="Cache" os_index="16" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="0" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="16" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="0" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="16" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="0" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="0" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="12" cpuset="0x00001000" complete_cpuset="0x00001000" allowed_cpuset="0x00001000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="17" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="1" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="17" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="1" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="17" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="1" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="1" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="13" cpuset="0x00002000" complete_cpuset="0x00002000" allowed_cpuset="0x00002000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="18" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="2" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="18" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="2" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="18" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="2" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="2" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="14" cpuset="0x00004000" complete_cpuset="0x00004000" allowed_cpuset="0x00004000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="19" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="3" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="19" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="3" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="19" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="3" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="3" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="15" cpuset="0x00008000" complete_cpuset="0x00008000" allowed_cpuset="0x00008000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="20" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="4" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="20" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="4" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="20" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="4" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="4" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="16" cpuset="0x00010000" complete_cpuset="0x00010000" allowed_cpuset="0x00010000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="21" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="5" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="21" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="5" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="21" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="5" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="5" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="17" cpuset="0x00020000" complete_cpuset="0x00020000" allowed_cpuset="0x00020000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="22" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+        </object>
+        <object type="Cache" os_index="1" cpuset="0x00fc0000" complete_cpuset="0x00fc0000" allowed_cpuset="0x00fc0000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="5242880" depth="3" cache_linesize="64" cache_associativity="48" cache_type="0">
+          <info name="inclusiveness" value="true"/>
+          <object type="Cache" os_index="6" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="22" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="6" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="22" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="6" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="6" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="18" cpuset="0x00040000" complete_cpuset="0x00040000" allowed_cpuset="0x00040000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="23" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="7" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="23" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="7" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="23" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="7" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="7" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="19" cpuset="0x00080000" complete_cpuset="0x00080000" allowed_cpuset="0x00080000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="24" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="8" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="24" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="8" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="24" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="8" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="8" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="20" cpuset="0x00100000" complete_cpuset="0x00100000" allowed_cpuset="0x00100000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="25" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="9" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="25" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="9" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="25" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="9" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="9" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="21" cpuset="0x00200000" complete_cpuset="0x00200000" allowed_cpuset="0x00200000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="26" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="10" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="26" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="10" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="26" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="10" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="10" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="22" cpuset="0x00400000" complete_cpuset="0x00400000" allowed_cpuset="0x00400000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
             </object>
           </object>
-          <object type="Cache" os_index="27" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
+          <object type="Cache" os_index="11" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="524288" depth="2" cache_linesize="64" cache_associativity="16" cache_type="0">
             <info name="inclusiveness" value="true"/>
-            <object type="Cache" os_index="27" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
+            <object type="Cache" os_index="11" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="1">
               <info name="inclusiveness" value="false"/>
-              <object type="Cache" os_index="27" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
+              <object type="Cache" os_index="11" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001" cache_size="65536" depth="1" cache_linesize="64" cache_associativity="2" cache_type="2">
                 <info name="inclusiveness" value="false"/>
                 <object type="Core" os_index="11" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001">
+                  <info name="TLB0" value="instruction, fully associative, 4KB : 32"/>
+                  <info name="TLB1" value="instruction, fully associative, 2MB : 16, 4MB : 8"/>
+                  <info name="TLB2" value="data, fully associative, 4KB : 48"/>
+                  <info name="TLB3" value="data, fully associative, 2MB : 48, 4MB : 24"/>
+                  <info name="TLB4" value="instruction L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB5" value="data L2, 4-way associative, 4KB : 512"/>
+                  <info name="TLB6" value="data L2, 2-way associative, 2MB : 128, 4MB : 64"/>
+                  <info name="TLB7" value="data, fully associative, 1GB : 48"/>
+                  <info name="TLB8" value="data L2, 8-way associative, 1GB : 16"/>
                   <object type="PU" os_index="23" cpuset="0x00800000" complete_cpuset="0x00800000" allowed_cpuset="0x00800000" nodeset="0x00000001" complete_nodeset="0x00000001" allowed_nodeset="0x00000001"/>
                 </object>
               </object>
