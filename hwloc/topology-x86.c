@@ -251,6 +251,19 @@ static void fill_amd_cache(struct procinfo *infos, unsigned level, int type, uns
   cache->size = size;
   cache->sets = 0;
 
+      /*FIX AMD MagnyCours family 0x10 model 0x9 with 8 cores or more actually
+       * have the L3 split in two halves, and associativity is divided as well (48)
+       */
+  if(infos->cpufamilynumber== 0x10 && infos->cpumodelnumber == 0x9 && level == 3
+      && (cache->ways == -1 || (cache->ways % 2 == 0)) && cache->nbthreads_sharing >= 8){
+          if(cache->nbthreads_sharing == 16)
+            cache->nbthreads_sharing = 12; //this model has at most 12 pu by package 
+          cache->nbthreads_sharing /= 2;
+          cache->size /= 2;
+          if(cache->ways != -1)
+            cache->ways /= 2;
+        }
+
   hwloc_debug("cache L%u t%u linesize %u ways %u size %luKB\n", cache->level, cache->nbthreads_sharing, cache->linesize, cache->ways, cache->size >> 10);
 }
 //TYPE : 0 : Instruction TLB, 1 : data TLB, x>=2 : Shared x-Level TLB
@@ -333,7 +346,7 @@ static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpu
         }
       }
       else
-        if(intelTLBEnum[tlbId].entriesnumber4KB != 0 ||intelTLBEnum[tlbId].entriesnumber2MB != 0 || intelTLBEnum[tlbId].entriesnumber4MB != 0 || intelTLBEnum[tlbId].entriesnumber1GB != 0){  //FIXME
+        if(intelTLBEnum[tlbId].entriesnumber4KB != 0 ||intelTLBEnum[tlbId].entriesnumber2MB != 0 || intelTLBEnum[tlbId].entriesnumber4MB != 0 || intelTLBEnum[tlbId].entriesnumber1GB != 0){
           infos->numtlbs++;
           infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));
           infos->tlbs[infos->numtlbs-1] = intelTLBEnum[tlbId];
@@ -650,22 +663,6 @@ static void look_proc(struct hwloc_backend *backend, struct procinfo *infos, uns
         fill_amd_cache(infos, 3, 3, edx); /* L3u */
     }
   }
-      /* AMD MagnyCours family 0x10 model 0x9 with 8 cores or more actually
-       * have the L3 split in two halves, and associativity is divided as well (48)
-       * do cache->nbthreads_sharing/2 and cache->ways/2 (if != -1)
-       */
-  if(cpuid_type == amd && infos->cpufamilynumber==0x10 && infos->cpumodelnumber==0x9)
-    for(cachenum = infos->numcaches - 1; cachenum >= 0 ; cachenum--){
-      cache = &(infos->cache[cachenum]);
-      if(cache->level == 3 && (cache->ways == -1 || (cache->ways % 2 == 0))){
-        if(cache->nbthreads_sharing >= 8){
-          cache->nbthreads_sharing /= 2;
-          if(cache->ways != -1)
-            cache->ways /= 2;
-        }
-        break;
-      }
-    }
 
   /* Get thread/core + cache information from cpuid 0x04
    * (not supported on AMD)
@@ -830,7 +827,7 @@ static hwloc_obj_t addCore(struct hwloc_backend *backend, struct procinfo *infos
   return NULL;
 }
 
-static int anotateCore(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnotate,int infoId,void* unused){// TODO order TLB? (by type then by entry number?)
+static int anotateCore(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnotate,int infoId,void* unused){
   unsigned i;
   (void) unused;
   (void) backend;
@@ -902,7 +899,7 @@ static hwloc_obj_t addCache(struct hwloc_backend *backend, struct procinfo *info
     hwloc_obj_t cacheAdded;
     unsigned j,level, type;
     unsigned packageid = infos[infoId].packageid;
-    unsigned cacheid = infos[infoId].apicid / cacheList->caches[cacheList->numberFound]->nbthreads_sharing;
+    unsigned cacheid = (infos[infoId].apicid % infos[j].max_log_proc) / cacheList->caches[cacheList->numberFound]->nbthreads_sharing;
     unsigned nbprocs = ((struct hwloc_x86_backend_data_s *)backend->private_data)->nbprocs;
     cache_cpuset = hwloc_bitmap_alloc();
     level = cacheList->caches[cacheList->numberFound]->level;//numberFound : number of cache found
@@ -918,7 +915,7 @@ static hwloc_obj_t addCache(struct hwloc_backend *backend, struct procinfo *info
         /* no cache level of that type in j */
         continue;
       }
-      if (infos[j].packageid == packageid && infos[j].apicid / infos[j].cache[l2].nbthreads_sharing == cacheid) {
+      if (infos[j].packageid == packageid && (infos[j].apicid % infos[j].max_log_proc)/ infos[j].cache[l2].nbthreads_sharing == cacheid) {
         hwloc_bitmap_set(cache_cpuset, j);
       }
     }
