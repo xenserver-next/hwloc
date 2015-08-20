@@ -282,9 +282,12 @@ static void initialiseTLB(struct tlbinfo* intelTLBEnum, unsigned id,unsigned typ
 static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpuiddump){//if highest_ext_cpuid >= 0x02
   unsigned i,j;
   unsigned registers[4];
-  static struct tlbinfo intelTLBEnum[0x100];//0x1 is a special case. It will then be used as an entry to know if the array is itialised
-  if (intelTLBEnum[0x1].type != (unsigned)-1){ // initialise tlbinfo only once
-    intelTLBEnum[0x1].type = (unsigned)-1;
+  static struct tlbinfo intelTLBEnum[0x100];
+  if (intelTLBEnum[0x1].associativity == 0){ // initialise tlbinfo only once (it should be 4 if initialised)
+
+    //initialiseTLB(struct tlbinfo* intelTLBEnum, unsigned id,unsigned type,  unsigned entriesnumber4KB, unsigned entriesnumber2MB, unsigned entriesnumber4MB, unsigned entriesnumber1GB, unsigned associativity)
+
+    initialiseTLB(intelTLBEnum,0x01, 0,  32,   0,   0,   0,   4); //Instruction TLB: 4 KByte pages, 4-way set associative, 32 entries
     initialiseTLB(intelTLBEnum,0x02, 0,   0,   0,   2,   0,   0); //Instruction TLB: 4 MByte pages, fully associative, 2 entries
     initialiseTLB(intelTLBEnum,0x03, 1,  64,   0,   0,   0,   4); //Data TLB: 4 KByte pages, 4-way set associative, 64 entries
     initialiseTLB(intelTLBEnum,0x04, 1,   0,   0,   8,   0,   4); //Data TLB: 4 MByte pages, 4-way set associative, 8 entries
@@ -320,37 +323,27 @@ static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpu
     initialiseTLB(intelTLBEnum,0xC3, 2,1536,1536,   0,  16,   6); //Shared 2nd-Level TLB: 4 KByte /2 MByte pages, 6-way associative, 1536 entries. Also 1GBbyte pages, 4-way, 16 entries.
     initialiseTLB(intelTLBEnum,0xCA, 2, 512,   0,   0,   0,   4); //Shared 2nd-Level TLB: 4 KByte pages, 4-way associative, 512 entries
 
-
   }  
 
   infos->tlbs = NULL;
   infos->numtlbs = 0;
   registers[0] = 0x02; 
   cpuid_or_from_dump(&registers[0], &registers[1], &registers[2], &registers[3], src_cpuiddump);
-  for(i=0;i<4;i++){
+  for(i=0;i<4;i++){// i register selection : (0 eax, 1 ebx, 2 ecx, 3 edx)
     if (registers[i]>>31){
       continue; //The most significant bit indicates whether the register contains valid information (0) or is reserved (1)
     }
-    for(j=0;j<4;j++){
+    for(j=0;j<4;j++){// j byte of register selection. There can be an tlb descriptor by byte.
       unsigned tlbId = ((registers[i]>>8*j)&0xff);
-      if(tlbId == 0x1){
-        if(i!=0 || j!=0){//The least-significant byte in register EAX (register AL) will always return 01H. Software should ignore this value and not interpret it as an informational descriptor
-          infos->numtlbs++;
-          infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));
-          infos->tlbs[infos->numtlbs-1].type = 0;
-          infos->tlbs[infos->numtlbs-1].associativity = 4;
-          infos->tlbs[infos->numtlbs-1].entriesnumber4KB = 32;
-          infos->tlbs[infos->numtlbs-1].entriesnumber2MB = 0;
-          infos->tlbs[infos->numtlbs-1].entriesnumber4MB = 0;
-          infos->tlbs[infos->numtlbs-1].entriesnumber1GB = 0;
-        }
+      if(tlbId == 0x1)
+        if(i==0 && j==0)//The least-significant byte in register EAX will always return 0x1. It must be ignored.
+          continue;
+
+      if(intelTLBEnum[tlbId].entriesnumber4KB != 0 ||intelTLBEnum[tlbId].entriesnumber2MB != 0 || intelTLBEnum[tlbId].entriesnumber4MB != 0 || intelTLBEnum[tlbId].entriesnumber1GB != 0){
+        infos->numtlbs++;
+        infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));
+        infos->tlbs[infos->numtlbs-1] = intelTLBEnum[tlbId];
       }
-      else
-        if(intelTLBEnum[tlbId].entriesnumber4KB != 0 ||intelTLBEnum[tlbId].entriesnumber2MB != 0 || intelTLBEnum[tlbId].entriesnumber4MB != 0 || intelTLBEnum[tlbId].entriesnumber1GB != 0){
-          infos->numtlbs++;
-          infos->tlbs = realloc(infos->tlbs,infos->numtlbs * sizeof(struct tlbinfo));
-          infos->tlbs[infos->numtlbs-1] = intelTLBEnum[tlbId];
-        }
     }
   }
 }
@@ -443,13 +436,13 @@ static void get_fill_amd_tlb(struct procinfo *infos, struct cpuiddump *src_cpuid
     add_tlb_from_amd_register(infos->tlbs, &infos->numtlbs,ebx,4,2);// L2 data TLB 1 GB pages 
   }
   //error 658 CPUID Incorrectly Reports Large Page Support in L2 Instruction TLB
-  if(!foundIL2TLB && infos->cpufamilynumber== 15) {
+  if(!foundIL2TLB && infos->cpufamilynumber == 0x15 && infos->cpumodelnumber <= 0xF) {
     infos->tlbs[infos->numtlbs].type = 3;
-    infos->tlbs[infos->numtlbs].associativity = 8;
+    infos->tlbs[infos->numtlbs].associativity = 6;
     infos->tlbs[infos->numtlbs].entriesnumber4KB = 0;
     infos->tlbs[infos->numtlbs].entriesnumber2MB = 1024;
     infos->tlbs[infos->numtlbs].entriesnumber4MB = 512;
-    infos->tlbs[infos->numtlbs].entriesnumber1GB = 6;
+    infos->tlbs[infos->numtlbs].entriesnumber1GB = 1024;
   }
 
 }
@@ -827,15 +820,15 @@ static hwloc_obj_t addCore(struct hwloc_backend *backend, struct procinfo *infos
   return NULL;
 }
 
-static int anotateCore(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnotate,int infoId,void* unused){
+static int annotateCore(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnnotate,int infoId,void* unused){
   unsigned i;
   (void) unused;
   (void) backend;
   (void) infoId;
-  char propertyName[6]; //max of 99 TLB by core.
-  for (i = 0; i < infos->numtlbs ; i++){
+  char propertyName[6]; //max of 100 TLB by core (propertyName = "TLB99\0").
+  for (i = 0; i < infos->numtlbs ; i++){ // 
     sprintf(propertyName,"TLB%d",i);
-    if (!hwloc_obj_get_info_by_name(toAnotate,propertyName)){//FIXME what if two pu with the same core have differents tlb
+    if (!hwloc_obj_get_info_by_name(toAnnotate,propertyName)){
       char property[128];//currently always < 90
       unsigned length = 0;
       switch(infos->tlbs[i].type){
@@ -879,7 +872,10 @@ static int anotateCore(struct hwloc_backend *backend, struct procinfo *infos, hw
       if (infos->tlbs[i].entriesnumber1GB)
         length += snprintf(property + length,128-length,", 1GB : %d",infos->tlbs[i].entriesnumber1GB);
 
-      hwloc_obj_add_info(toAnotate,propertyName,property);
+      if(length >= 128){
+        fprintf(stderr, "buffer too small (annotateCore from topology-x86) tried to put %d in a buffer of size 128\n", lenght);
+      }
+      hwloc_obj_add_info(toAnnotate,propertyName,property);
     }
   }
   return 0;
@@ -943,8 +939,8 @@ static hwloc_obj_t addCache(struct hwloc_backend *backend, struct procinfo *info
   }
 }
 
-static int anotateCache(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnotate,int infoId,void* data){// anotate cache found/created (add inclusiveness)
-       // and remove it from cache not seens
+static int annotateCache(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnnotate,int infoId,void* data){// annotate cache found/created (add inclusiveness)
+       // and remove it from caches not seen
   unsigned j, type = 0, cacheId = -1;
   struct{
       unsigned numberFound;
@@ -952,7 +948,7 @@ static int anotateCache(struct hwloc_backend *backend, struct procinfo *infos, h
   }* cacheList = data;
   (void) backend;
 
-  switch(toAnotate->attr->cache.type){
+  switch(toAnnotate->attr->cache.type){
     case HWLOC_OBJ_CACHE_DATA : type = 1;
       break;
     case HWLOC_OBJ_CACHE_INSTRUCTION : type = 2;
@@ -961,17 +957,19 @@ static int anotateCache(struct hwloc_backend *backend, struct procinfo *infos, h
       break;
   }
   for(j=cacheList->numberFound;j<infos[infoId].numcaches;j++)
-    if(cacheList->caches[j]->level == toAnotate->attr->cache.depth){ // the level is exact, not always the type. If at the level there is a cache with the good type we return it. Else we return a cache of the level. 
+    if(cacheList->caches[j]->level == toAnnotate->attr->cache.depth){ // the level is exact, not always the type. 
+    //If at the level there is a cache with the good type we return it. Else we return a cache of the level. 
       cacheId = j;
       if(cacheList->caches[j]->type == type)
         break;
     }
   if (cacheId != (unsigned)-1){
+   //cache fond. We annotate it and move it in the first part of the list, where are annotated cache.
     struct cacheinfo * tmpCache = cacheList->caches[cacheList->numberFound];
     cacheList->caches[cacheList->numberFound] = cacheList->caches[cacheId];
     cacheList->caches[cacheId] = tmpCache;
-    if (!hwloc_obj_get_info_by_name(toAnotate,"inclusiveness")) 
-      hwloc_obj_add_info(toAnotate,"inclusiveness",cacheList->caches[cacheList->numberFound]->inclusiveness?"true":"false");
+    if (!hwloc_obj_get_info_by_name(toAnnotate,"inclusiveness")) 
+      hwloc_obj_add_info(toAnnotate,"inclusiveness",cacheList->caches[cacheList->numberFound]->inclusiveness?"true":"false");
   }
   cacheList->numberFound++;
   return cacheList->numberFound<infos[infoId].numcaches;
@@ -979,7 +977,8 @@ static int anotateCache(struct hwloc_backend *backend, struct procinfo *infos, h
 
 static void foundNuma(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t found,int infoId,void* data){
   (void)backend;(void)infos;(void)found;(void)infoId;
-  (*(int*)data)++;
+  (*(int*)data)++; //NUMA can be found before or after the package. 
+                   //We nedd to check both before adding one.
 }
 
 static hwloc_obj_t addNuma(struct hwloc_backend *backend, struct procinfo *infos, int infoId, void* unused){
@@ -992,7 +991,7 @@ static hwloc_obj_t addNuma(struct hwloc_backend *backend, struct procinfo *infos
     hwloc_obj_t numa;
     (void) unused;
     node_cpuset = hwloc_bitmap_alloc();
-    for (j = 0; j < nbprocs; j++) 
+    for (j = 0; j < nbprocs; j++)  // Look for others PU sharing this NUMA
       if (infos[j].packageid == packageid && infos[j].nodeid == nodeid) 
         hwloc_bitmap_set(node_cpuset, j);
 
@@ -1016,7 +1015,7 @@ static hwloc_obj_t addPackage(struct hwloc_backend *backend, struct procinfo *in
   (void) unused;
   package_cpuset = hwloc_bitmap_alloc();
 
-  for (j = 0; j < nbprocs; j++) {
+  for (j = 0; j < nbprocs; j++) { // Look for others PU sharing this package
     if (infos[j].packageid == packageid) {
       hwloc_bitmap_set(package_cpuset, j);
     }
@@ -1029,11 +1028,11 @@ static hwloc_obj_t addPackage(struct hwloc_backend *backend, struct procinfo *in
   hwloc_insert_object_by_cpuset(backend->topology, package);
   return package;
 }
-static int anotatePackage(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnotate,int infoId,void* unused){
+static int annotatePackage(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnnotate,int infoId,void* unused){
   (void) unused;
   (void) backend;
-  if (infos[infoId].packageid == toAnotate->os_index || toAnotate->os_index == (unsigned) -1)  
-    hwloc_x86_add_cpuinfos(toAnotate, &infos[infoId], 1);
+  if (infos[infoId].packageid == toAnnotate->os_index || toAnnotate->os_index == (unsigned) -1)  
+    hwloc_x86_add_cpuinfos(toAnnotate, &infos[infoId], 1);
   return 0;//only one
 }
 
@@ -1044,19 +1043,38 @@ static void hwloc_x86_setup_pu_level(struct hwloc_topology *topology, struct pro
 
   hwloc_debug("%s", "\n\n * CPU cpusets *\n\n");
   for (cpu=0,oscpu=0; oscpu<nb_pus; oscpu++)
-    if(infos[oscpu].present){//do not add inactive proceesor only detected by x86 backend
+    if(infos[oscpu].present){//do not add inactive PU only detected by x86 backend
       obj = hwloc_alloc_setup_object(HWLOC_OBJ_PU, oscpu);
       obj->cpuset = hwloc_bitmap_alloc();
       hwloc_bitmap_only(obj->cpuset, oscpu);
 
-      hwloc_debug_2args_bitmap("cpu %u (os %u) has cpuset %s\n",
-		 cpu, oscpu, obj->cpuset);
+      hwloc_debug_2args_bitmap("cpu %u (os %u) has cpuset %s\n", cpu, oscpu, obj->cpuset);
       hwloc_insert_object_by_cpuset(topology, obj);
 
       cpu++;
     }
 }
 
+/* Iterate over the parents of OBJECT. If his (direct) parent is of type TYPE then IFFOUND is called.
+ * Else IFNOTFOUND is called. If IFNOTFOUND add an object of type TYPE then it should also return it.
+ * ANNOTATE is called after with th object foun or added in parameter.It should return true if another iteration is needed
+ * IFFOUND, IFNOTFOUND, ANNOTATE can have NULL as value. They won't be called. 
+ * If IFNOTFOUND has NULL as value or return NULL, ANNOTATE won't be called and the iteration is ended when it should have been called.
+ * If ANNOTATE has NULL as value the iteration is ended when it should have been called.
+ * If IFNOTFOUND add an object that isn't the new father of object the value of object don't change at the next iteration.
+ * If IFNOTFOUND add an object that is the new father of object or IFFOND is called the value of object change to the father at the next iteration.
+ * DATA is a void* given as parameter to IFFOUND IFNOTFOUND ANNOTATE
+ 
+ * The prototype of the function passed as parameter are:
+ 
+ * void IFFOUND(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t parentFound,int infoId,void* data)
+
+ * hwloc_obj_t IFNOTFOUND(struct hwloc_backend *backend, struct procinfo *infos, int infoId,void* data) // if an object is added it should be returned
+
+ * int ANNOTATE(struct hwloc_backend *backend, struct procinfo *infos, hwloc_obj_t toAnnotate,int infoId,void* data) // if it return true, another object of type TYPE will be searched. Used to find cache.
+
+ * infoId is the physical number of the pu from which parentFound/toAnnotate is the parent or for IFNOTFOUND who is missing an parent of type TYPE
+ */
 static void iterateOverParent(struct hwloc_backend *backend,
  struct procinfo *infos,
  hwloc_obj_t* object,
@@ -1065,23 +1083,27 @@ static void iterateOverParent(struct hwloc_backend *backend,
  hwloc_obj_type_t type,
  void (*ifFound)(struct hwloc_backend *, struct procinfo *, hwloc_obj_t, int, void*),
  hwloc_obj_t ifNotFound(struct hwloc_backend *, struct procinfo *, int,void*), 
- int (*anotate)(struct hwloc_backend *, struct procinfo *, hwloc_obj_t, int,void*)){
-  hwloc_obj_t toAnotate;
+ int (*annotate)(struct hwloc_backend *, struct procinfo *, hwloc_obj_t, int,void*)){
+  hwloc_obj_t toAnnotate;
   do{
-    while((*object)->parent->type == HWLOC_OBJ_GROUP){
+    while((*object)->parent->type == HWLOC_OBJ_GROUP){// HWLOC_OBJ_GROUP are ignored.
       *object = (*object)->parent;
     }
     if((*object)->parent->type == type){
       (*object) = (*object)->parent;
-      toAnotate = *object;
+      toAnnotate = *object;
       if(ifFound)
         ifFound(backend,infos,*object,infoId,data);
     }else{
-      toAnotate = ifNotFound ? ifNotFound(backend,infos,infoId,data) : NULL;
-      if((*object)->parent && (*object)->parent == toAnotate)
+      toAnnotate = ifNotFound ? ifNotFound(backend,infos,infoId,data) : NULL;
+      if((*object)->parent && (*object)->parent == toAnnotate)
         *object = (*object)->parent;
+      /* We check if the object added is the new parent.
+      * If it is we continue with it as object in order to not see it twice.
+      * Else it should have been added as a child/grandchild/ect of object. We still have not seen the parent and shouldn't modify our pointer.
+      */ 
     }
-  }while(toAnotate && anotate && anotate(backend,infos,toAnotate,infoId,data));
+  }while(toAnnotate && annotate && annotate(backend,infos,toAnnotate,infoId,data));
 }
 
 /* Analyse information stored in infos, and build/annotate topology levels accordingly */
@@ -1130,14 +1152,12 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
       puList[i] = pu;
   }
 
- /*Anotate previously existing objects and add missing*/
+ /*Annotate previously existing objects and add missing*/
 
-  for(i=0;puList[i];i++){//iterate over pu. For each object will be added/anotate from core to package. puList end by NULL
+  for(i=0;puList[i];i++){//iterate over pu. For each object will be added/annotate from core to package. puList end by NULL
     unsigned numberFound, infoId;
     hwloc_obj_t object = puList[i];
 
-    if(!object)
-      continue;
     infoId= puList[i]->os_index;
 
     if(!infos[infoId].present)
@@ -1145,7 +1165,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
 
     /* Look for cores*/
 
-    iterateOverParent(backend, infos, &object, infoId, NULL, HWLOC_OBJ_CORE, NULL, &addCore, &anotateCore);
+    iterateOverParent(backend, infos, &object, infoId, NULL, HWLOC_OBJ_CORE, NULL, &addCore, &annotateCore);
 
     /* Look for caches */
     {
@@ -1157,11 +1177,11 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
       for(j = 0 ;j<infos[infoId].numcaches;j++){
         cacheList.caches[j] = &(infos[infoId].cache[j]);
       }
-      //we will modify caches : before index numberFound the cache were seen or added.
+      //we will modify cacheList : in cacheList.caches before index cacheList.numberFound the cache were seen or added.
       cacheList.numberFound = 0;
 
 
-      iterateOverParent(backend, infos, &object, infoId, &cacheList, HWLOC_OBJ_CACHE, NULL , &addCache, &anotateCache);
+      iterateOverParent(backend, infos, &object, infoId, &cacheList, HWLOC_OBJ_CACHE, NULL , &addCache, &annotateCache);
       free(cacheList.caches);
     }
 
@@ -1169,7 +1189,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
     iterateOverParent(backend, infos, &object, infoId, &numberFound, HWLOC_OBJ_NUMANODE,  &foundNuma , NULL, NULL);
     
   /* Look for package */
-    iterateOverParent(backend, infos, &object, infoId, NULL, HWLOC_OBJ_PACKAGE, NULL , &addPackage, &anotatePackage);
+    iterateOverParent(backend, infos, &object, infoId, NULL, HWLOC_OBJ_PACKAGE, NULL , &addPackage, &annotatePackage);
 
     if(0 == numberFound)/* Look for Numa nodes if not already found as a son of package*/
       iterateOverParent(backend, infos, &object, infoId, NULL, HWLOC_OBJ_NUMANODE, NULL , &addNuma, NULL);
