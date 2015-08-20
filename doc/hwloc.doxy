@@ -441,7 +441,7 @@ shell$
 Questions should be sent to the devel mailing
 list (http://www.open-mpi.org/community/lists/hwloc.php).
 Bug reports should be reported in the tracker
-(https://git.open-mpi.org/trac/hwloc/).
+(https://github.com/open-mpi/hwloc/issues).
 
 If hwloc discovers an incorrect topology for your machine, the very
 first thing you should check is to ensure that you have the most
@@ -1428,8 +1428,9 @@ hwloc failed to discover any package.
 <dt>PCISlot</dt>
 <dd>The name/number of the physical slot where the PCI device is plugged.
 </dd>
-<dt>Vendor, Model, Revision, SerialNumber, Size</dt>
-<dd>The vendor and model names, revision, serial number, and size (in kB) of a Block OS device.
+<dt>Vendor, Model, Revision, SerialNumber, Size, SectorSize</dt>
+<dd>The vendor and model names, revision, serial number, size (in kB)
+and SectorSize (in bytes) of a Block OS device.
 </dd>
 <dt>LinuxDeviceID</dt>
 <dd>The major/minor device number such as 8:0 on Linux for a Block OS device.
@@ -1498,7 +1499,7 @@ and GID #1 of port #3.
 <dd>A better type name than the usual one.
 This may be used to specify where Groups come from.
 For instance Linux s390 <em>books</em> appear as Groups of type <em>Book</em>.
-Block OS devices may have a Type of "Disk", "Tape", "Removable Media Device"
+Block OS devices may have a Type of "Disk", "NVDIMM", "Tape", "Removable Media Device"
 or "Other".
 The Type attribute value is displayed instead of the default object type name in lstopo.
 </dd>
@@ -1666,14 +1667,13 @@ Note that I/O and Misc objects are not available.
 The root object does not appear in the string.
 A Machine object is used by default, and a System object replaces it
 if a Machine level is specified in the string.
+Therefore the System type cannot be used in the description string as well.
 
 A NUMA level (with a single NUMA node) is automatically added if needed.
 
 Cache level depths are automatically chosen by hwloc (only a L2 first,
 then a L1 under it, then L3 above, then L4 etc.) unless they are specified.
-Memory and cache sizes are also automatically chosen.
-The only way to modifying them is to export to XML and manually modify
-the file.
+Memory and cache sizes are also automatically chosen if needed.
 
 Each item may be followed parentheses containing a list of
 space-separated attributes. For instance:
@@ -2069,8 +2069,7 @@ Each discovery component is defined by a <tt>hwloc_disc_component</tt>
 structure which contains an <tt>instantiate()</tt> callback.
 This function is invoked when this component is actually used by a topology.
 It fills a new <tt>hwloc_backend</tt> structure that usually contains
-<tt>discover()</tt> and/or <tt>notify_new_object()</tt> callbacks taking
-care of the actual topology discovery.
+a <tt>discover()</tt> callback taking care of the actual topology discovery.
 
 \note If two discovery components have the same name, only the highest
 priority one is actually made available.
@@ -2146,11 +2145,12 @@ environment variable (see \ref envvar).
  see \ref iodevices.
  <b>It may be built as a plugin</b>.
 </dd>
-<dt>linuxpci</dt>
+<dt>linuxio (former linuxpci)</dt>
 <dd>
- This component can probe PCI devices on Linux without the help of external
- libraries such as libpciaccess. Its priority is lower than the pci component
- because it misses device names.
+ This component can probe I/O devices on Linux.
+ It discovers PCI devices without the help of external libraries such as libpciaccess.
+ Its priority is lower than the pci component because it misses device names.
+ It also discovers many kinds of Linux-specific OS devices.
 </dd>
 <dt>opencl</dt>
 <dd>

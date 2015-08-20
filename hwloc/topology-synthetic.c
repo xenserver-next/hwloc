@@ -428,7 +428,7 @@ hwloc_backend_synthetic_init(struct hwloc_synthetic_backend_data_s *data,
 	errno = EINVAL;
 	goto error;
       }
-      if (type == HWLOC_OBJ_MISC || type == HWLOC_OBJ_BRIDGE || type == HWLOC_OBJ_PCI_DEVICE || type == HWLOC_OBJ_OS_DEVICE) {
+      if (type == HWLOC_OBJ_SYSTEM || type == HWLOC_OBJ_MISC || type == HWLOC_OBJ_BRIDGE || type == HWLOC_OBJ_PCI_DEVICE || type == HWLOC_OBJ_OS_DEVICE) {
 	if (verbose)
 	  fprintf(stderr, "Synthetic string with disallowed object type at '%s'\n", pos);
 	errno = EINVAL;
@@ -452,6 +452,12 @@ hwloc_backend_synthetic_init(struct hwloc_synthetic_backend_data_s *data,
     if (next_pos == pos) {
       if (verbose)
 	fprintf(stderr,"Synthetic string doesn't have a number of objects at '%s'\n", pos);
+      errno = EINVAL;
+      goto error;
+    }
+    if (!item) {
+      if (verbose)
+	fprintf(stderr,"Synthetic string with disallow 0 number of objects at '%s'\n", pos);
       errno = EINVAL;
       goto error;
     }
@@ -496,6 +502,19 @@ hwloc_backend_synthetic_init(struct hwloc_synthetic_backend_data_s *data,
     hwloc_obj_type_t type;
 
     type = curlevel->type;
+
+    if (i == count-1 && type != HWLOC_OBJ_TYPE_UNKNOWN && type != HWLOC_OBJ_PU) {
+      if (verbose)
+	fprintf(stderr, "Synthetic string cannot use non-PU type for last level\n");
+      errno = EINVAL;
+      return -1;
+    }
+    if (i != count-1 && type == HWLOC_OBJ_PU) {
+      if (verbose)
+	fprintf(stderr, "Synthetic string cannot use PU type for non-last level\n");
+      errno = EINVAL;
+      return -1;
+    }
 
     if (type == HWLOC_OBJ_TYPE_UNKNOWN) {
       if (i == count-1)

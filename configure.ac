@@ -230,15 +230,16 @@ hwloc_probeio_list=
 if test "x$hwloc_pci_happy" = "xyes" -o "x$hwloc_linuxpci_happy" = "xyes"; then
   test "x$hwloc_pci_happy" = "xyes" && hwloc_probepci_list="$hwloc_pci_lib"
   test "x$hwloc_pci_happy$hwloc_linuxpci_happy" = "xyesyes" && hwloc_probepci_list="${hwloc_probepci_list}+"
-  test "x$hwloc_linuxpci_happy" = "xyes" && hwloc_probepci_list="${hwloc_probepci_list}linux"
+  test "x$hwloc_linuxio_happy" = "xyes" && hwloc_probepci_list="${hwloc_probepci_list}linux"
   hwloc_probeio_list="$hwloc_probeio_list PCI($hwloc_probepci_list)"
 fi
+test "x$hwloc_linuxio_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list LinuxIO"
 test "x$hwloc_opencl_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list OpenCL"
 test "x$hwloc_have_cudart" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list CUDA"
 test "x$hwloc_nvml_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list NVML"
 test "x$hwloc_gl_happy" = "xyes" && hwloc_probeio_list="$hwloc_probeio_list GL"
 # if anything but PCI, that anything will be useless
-test "x$hwloc_pci_happy" != "xyes" && test "x$hwloc_linuxpci_happy" != "xyes" \
+test "x$hwloc_pci_happy" != "xyes" && test "x$hwloc_linuxio_happy" != "xyes" \
  && test "x$hwloc_probeio_list" != "x" && hwloc_probeio_list="$hwloc_probeio_list (cannot work without PCI)"
 # if nothing, say "no"
 test "x$hwloc_probeio_list" = "x" && hwloc_probeio_list=" no"

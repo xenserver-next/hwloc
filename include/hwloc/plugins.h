@@ -143,12 +143,7 @@ struct hwloc_backend {
 
   /** \brief Callback used by the PCI backend to retrieve the locality of a PCI object from the OS/cpu backend.
    * May be NULL. */
-  int (*get_obj_cpuset)(struct hwloc_backend *backend, struct hwloc_backend *caller, struct hwloc_obj *obj, hwloc_bitmap_t cpuset);
-
-  /** \brief Callback called by backends to notify this backend that a new object was added.
-   * returns > 0 if it modified the topology tree, 0 otherwise.
-   * May be NULL. */
-  int (*notify_new_object)(struct hwloc_backend *backend, struct hwloc_backend *caller, struct hwloc_obj *obj);
+  int (*get_pci_busid_cpuset)(struct hwloc_backend *backend, struct hwloc_pcidev_attr_s *busid, hwloc_bitmap_t cpuset);
 };
 
 /** \brief Backend flags */
@@ -169,20 +164,9 @@ HWLOC_DECLSPEC int hwloc_backend_enable(struct hwloc_topology *topology, struct 
 /** \brief Used by backends discovery callbacks to request locality information from others.
  *
  * Traverse the list of enabled backends until one has a
- * get_obj_cpuset() method, and call it.
+ * get_pci_busid_cpuset() method, and call it.
  */
-HWLOC_DECLSPEC int hwloc_backends_get_obj_cpuset(struct hwloc_backend *caller, struct hwloc_obj *obj, hwloc_bitmap_t cpuset);
-
-/** \brief Used by backends discovery callbacks to notify other
- * backends of new objects.
- *
- * Traverse the list of enabled backends (all but caller) and invoke
- * their notify_new_object() method to notify them that a new object
- * just got added to the topology.
- *
- * Currently only used for notifying of new PCI device objects.
- */
-HWLOC_DECLSPEC int hwloc_backends_notify_new_object(struct hwloc_backend *caller, struct hwloc_obj *obj);
+HWLOC_DECLSPEC int hwloc_backends_get_pci_busid_cpuset(struct hwloc_topology *topology, struct hwloc_pcidev_attr_s *busid, hwloc_bitmap_t cpuset);
 
 /** @} */
 
@@ -396,16 +380,6 @@ hwloc_plugin_check_namespace(const char *pluginname __hwloc_attribute_unused, co
  * @{
  */
 
-/** \brief Insert a list of PCI devices and bridges in the backend topology.
- *
- * Insert a list of objects (either PCI device or bridges) starting at first_obj
- * (linked by next_sibling in the topology, and ending with NULL).
- * Objects are placed under the right bridges, and the remaining upstream bridges
- * are then inserted in the topology by calling the get_obj_cpuset() callback to
- * find their locality.
- */
-HWLOC_DECLSPEC int hwloc_insert_pci_device_list(struct hwloc_backend *backend, struct hwloc_obj *first_obj);
-
 /** \brief Return the offset of the given capability in the PCI config space buffer
  *
  * This function requires a 256-bytes config space. Unknown/unavailable bytes should be set to 0xff.
@@ -424,6 +398,49 @@ HWLOC_DECLSPEC int hwloc_pci_find_linkspeed(const unsigned char *config, unsigne
  * This function requires 64 bytes of common configuration header at the beginning of config.
  */
 HWLOC_DECLSPEC int hwloc_pci_prepare_bridge(hwloc_obj_t obj, const unsigned char *config);
+
+/** \brief Insert a PCI object in the given PCI tree by looking at PCI bus IDs.
+ *
+ * If \p treep points to \c NULL, the new object is inserted there.
+ */
+HWLOC_DECLSPEC void hwloc_pci_tree_insert_by_busid(struct hwloc_obj **treep, struct hwloc_obj *obj);
+
+/** \brief Add some hostbridges on top of the given tree of PCI objects and attach them to the root of the topology.
+ *
+ * The core will move them to their actual PCI locality using hwloc_pci_belowroot_apply_locality()
+ * at the end of the discovery.
+ * In the meantime, other backends will easily lookup PCI objects (for instance to attach OS devices)
+ * by using hwloc_pci_belowroot_find_by_busid() or by manually looking at the topology root object
+ * io_first_child pointer.
+ */
+HWLOC_DECLSPEC int hwloc_pci_tree_attach_belowroot(struct hwloc_topology *topology, struct hwloc_obj *tree);
+
+/** \brief Find the PCI object that matches the bus ID.
+ *
+ * To be used after a PCI backend added PCI devices with hwloc_pci_tree_attach_belowroot()
+ * and before the core moves them to their actual location with hwloc_pci_belowroot_apply_locality().
+ *
+ * If no exactly matching object is found, return the container bridge if any, or NULL.
+ *
+ * On failure, it may be possible to find the PCI locality (instead of the PCI device)
+ * by calling hwloc_pci_find_busid_parent().
+ *
+ * \note This is semantically identical to hwloc_get_pcidev_by_busid() which only works
+ * after the topology is fully loaded.
+ */
+HWLOC_DECLSPEC struct hwloc_obj * hwloc_pci_belowroot_find_by_busid(struct hwloc_topology *topology, unsigned domain, unsigned bus, unsigned dev, unsigned func);
+
+/** \brief Find the normal parent of a PCI bus ID.
+ *
+ * Look at PCI affinity to find out where the given PCI bus ID should be attached.
+ *
+ * This function should be used to attach an I/O device directly under a normal
+ * (non-I/O) object, instead of below a PCI object.
+ * It is usually used by backends when hwloc_pci_belowroot_find_by_busid() failed
+ * to find the hwloc object corresponding to this bus ID, for instance because
+ * PCI discovery is not supported on this platform.
+ */
+HWLOC_DECLSPEC struct hwloc_obj * hwloc_pci_find_busid_parent(struct hwloc_topology *topology, unsigned domain, unsigned bus, unsigned dev, unsigned func);
 
 /** @} */
 

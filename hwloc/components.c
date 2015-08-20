@@ -523,6 +523,19 @@ hwloc_disc_components_enable_others(struct hwloc_topology *topology)
       if (s) {
 	char c;
 
+	/* replace linuxpci with linuxio for backward compatibility with pre-v2.0 */
+	if (!strncmp(curenv, "linuxpci", s)) {
+	  curenv[5] = 'i';
+	  curenv[6] = 'o';
+	  curenv[7] = *HWLOC_COMPONENT_SEPS;
+	} else if (curenv[0] == HWLOC_COMPONENT_EXCLUDE_CHAR && !strncmp(curenv+1, "linuxpci", s-1)) {
+	  curenv[6] = 'i';
+	  curenv[7] = 'o';
+	  curenv[8] = *HWLOC_COMPONENT_SEPS;
+	  /* skip this name, it's a negated one */
+	  goto nextname;
+	}
+
 	if (curenv[0] == HWLOC_COMPONENT_EXCLUDE_CHAR)
 	  goto nextname;
 
@@ -641,8 +654,7 @@ hwloc_backend_alloc(struct hwloc_disc_component *component)
   backend->component = component;
   backend->flags = 0;
   backend->discover = NULL;
-  backend->get_obj_cpuset = NULL;
-  backend->notify_new_object = NULL;
+  backend->get_pci_busid_cpuset = NULL;
   backend->disable = NULL;
   backend->is_thissystem = -1;
   backend->next = NULL;
@@ -746,33 +758,16 @@ hwloc_backends_is_thissystem(struct hwloc_topology *topology)
 }
 
 int
-hwloc_backends_get_obj_cpuset(struct hwloc_backend *caller, struct hwloc_obj *obj, hwloc_bitmap_t cpuset)
+hwloc_backends_get_pci_busid_cpuset(struct hwloc_topology *topology, struct hwloc_pcidev_attr_s *busid, hwloc_bitmap_t cpuset)
 {
-  struct hwloc_topology *topology = caller->topology;
   struct hwloc_backend *backend = topology->backends;
-  /* use the first backend's get_obj_cpuset callback */
+  /* use the first backend's get_pci_busid_cpuset callback */
   while (backend != NULL) {
-    if (backend->get_obj_cpuset)
-      return backend->get_obj_cpuset(backend, caller, obj, cpuset);
+    if (backend->get_pci_busid_cpuset)
+      return backend->get_pci_busid_cpuset(backend, busid, cpuset);
     backend = backend->next;
   }
   return -1;
-}
-
-int
-hwloc_backends_notify_new_object(struct hwloc_backend *caller, struct hwloc_obj *obj)
-{
-  struct hwloc_backend *backend;
-  int res = 0;
-
-  backend = caller->topology->backends;
-  while (NULL != backend) {
-    if (backend != caller && backend->notify_new_object)
-      res += backend->notify_new_object(backend, caller, obj);
-    backend = backend->next;
-  }
-
-  return res;
 }
 
 void

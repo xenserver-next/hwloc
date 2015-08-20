@@ -49,10 +49,6 @@ struct hwloc_linux_backend_data_s {
 #endif
 
   struct utsname utsname; /* fields contain \0 when unknown */
-
-  int deprecated_classlinks_model; /* -2 if never tried, -1 if unknown, 0 if new (device contains class/name), 1 if old (device contains class:name) */
-  int mic_need_directlookup; /* if not tried yet, 0 if not needed, 1 if needed */
-  unsigned mic_directlookup_id_max; /* -1 if not tried yet, 0 if none to lookup, maxid+1 otherwise */
 };
 
 
@@ -224,6 +220,18 @@ hwloc_opendirat(const char *path, int fsroot_fd)
   return fdopendir(dir_fd);
 }
 
+static int
+hwloc_readlinkat(const char *path, char *buf, size_t buflen, int fsroot_fd)
+{
+  const char *relative_path;
+
+  relative_path = hwloc_checkat(path, fsroot_fd);
+  if (!relative_path)
+    return -1;
+
+  return readlinkat(fsroot_fd, relative_path, buf, buflen);
+}
+
 #endif /* HAVE_OPENAT */
 
 /* Static inline version of fopen so that we can use openat if we have
@@ -289,6 +297,16 @@ hwloc_opendir(const char *p, int d __hwloc_attribute_unused)
     return hwloc_opendirat(p, d);
 #else
     return opendir(p);
+#endif
+}
+
+static __hwloc_inline int
+hwloc_readlink(const char *p, char *l, size_t ll, int d __hwloc_attribute_unused)
+{
+#ifdef HAVE_OPENAT
+  return hwloc_readlinkat(p, l, ll, d);
+#else
+  return readlink(p, l, ll);
 #endif
 }
 
@@ -2236,182 +2254,6 @@ hwloc__get_dmi_id_info(struct hwloc_linux_backend_data_s *data, hwloc_obj_t obj)
   hwloc__get_dmi_id_one_info(data, obj, path, pathlen, "sys_vendor", "DMISysVendor");
 }
 
-struct hwloc_firmware_dmi_mem_device_header {
-  unsigned char type;
-  unsigned char length;
-  unsigned char handle[2];
-  unsigned char phy_mem_handle[2];
-  unsigned char mem_err_handle[2];
-  unsigned char tot_width[2];
-  unsigned char dat_width[2];
-  unsigned char size[2];
-  unsigned char ff;
-  unsigned char dev_set;
-  unsigned char dev_loc_str_num;
-  unsigned char bank_loc_str_num;
-  unsigned char mem_type;
-  unsigned char type_detail[2];
-  unsigned char speed[2];
-  unsigned char manuf_str_num;
-  unsigned char serial_str_num;
-  unsigned char asset_tag_str_num;
-  unsigned char part_num_str_num;
-  /* don't include the following fields since we don't need them,
-   * some old implementations may miss them.
-   */
-};
-
-static int check_dmi_entry(const char *buffer)
-{
-  /* reject empty strings */
-  if (!*buffer)
-    return 0;
-  /* reject strings of spaces (at least Dell use this for empty memory slots) */
-  if (strspn(buffer, " ") == strlen(buffer))
-    return 0;
-  return 1;
-}
-
-static void
-hwloc__get_firmware_dmi_memory_info_one(struct hwloc_topology *topology,
-					unsigned idx, const char *path, FILE *fd,
-					struct hwloc_firmware_dmi_mem_device_header *header)
-{
-  unsigned slen;
-  char buffer[256]; /* enough for memory device strings, or at least for each of them */
-  unsigned foff; /* offset in raw file */
-  unsigned boff; /* offset in buffer read from raw file */
-  unsigned i;
-  struct hwloc_obj_info_s *infos = NULL;
-  unsigned infos_count = 0;
-  hwloc_obj_t misc;
-  int foundinfo = 0;
-
-  hwloc__add_info(&infos, &infos_count, "Type", "MemoryModule");
-
-  /* start after the header */
-  foff = header->length;
-  i = 1;
-  while (1) {
-    /* read one buffer */
-    if (fseek(fd, foff, SEEK_SET) < 0)
-      break;
-    if (!fgets(buffer, sizeof(buffer), fd))
-      break;
-    /* read string at the beginning of the buffer */
-    boff = 0;
-    while (1) {
-      /* stop on empty string */
-      if (!buffer[boff])
-        goto done;
-      /* stop if this string goes to the end of the buffer */
-      slen = strlen(buffer+boff);
-      if (boff + slen+1 == sizeof(buffer))
-        break;
-      /* string didn't get truncated, should be OK */
-      if (i == header->manuf_str_num) {
-	if (check_dmi_entry(buffer+boff)) {
-	  hwloc__add_info(&infos, &infos_count, "Vendor", buffer+boff);
-	  foundinfo = 1;
-	}
-      }	else if (i == header->serial_str_num) {
-	if (check_dmi_entry(buffer+boff)) {
-	  hwloc__add_info(&infos, &infos_count, "SerialNumber", buffer+boff);
-	  foundinfo = 1;
-	}
-      } else if (i == header->asset_tag_str_num) {
-	if (check_dmi_entry(buffer+boff)) {
-	  hwloc__add_info(&infos, &infos_count, "AssetTag", buffer+boff);
-	  foundinfo = 1;
-	}
-      } else if (i == header->part_num_str_num) {
-	if (check_dmi_entry(buffer+boff)) {
-	  hwloc__add_info(&infos, &infos_count, "PartNumber", buffer+boff);
-	  foundinfo = 1;
-	}
-      } else if (i == header->dev_loc_str_num) {
-	if (check_dmi_entry(buffer+boff)) {
-	  hwloc__add_info(&infos, &infos_count, "DeviceLocation", buffer+boff);
-	  /* only a location, not an actual info about the device */
-	}
-      } else if (i == header->bank_loc_str_num) {
-	if (check_dmi_entry(buffer+boff)) {
-	  hwloc__add_info(&infos, &infos_count, "BankLocation", buffer+boff);
-	  /* only a location, not an actual info about the device */
-	}
-      } else {
-	goto done;
-      }
-      /* next string in buffer */
-      boff += slen+1;
-      i++;
-    }
-    /* couldn't read a single full string from that buffer, we're screwed */
-    if (!boff) {
-      fprintf(stderr, "hwloc could read a DMI firmware entry #%u in %s\n",
-	      i, path);
-      break;
-    }
-    /* reread buffer after previous string */
-    foff += boff;
-  }
-
-done:
-  if (!foundinfo) {
-    /* found no actual info about the device. if there's only location info, the slot may be empty */
-    goto out_with_infos;
-  }
-
-  misc = hwloc_alloc_setup_object(HWLOC_OBJ_MISC, idx);
-  if (!misc)
-    goto out_with_infos;
-
-  hwloc__move_infos(&misc->infos, &misc->infos_count, &infos, &infos_count);
-  /* FIXME: find a way to identify the corresponding NUMA node and attach these objects there.
-   * but it means we need to parse DeviceLocation=DIMM_B4 but these vary significantly
-   * with the vendor, and it's hard to be 100% sure 'B' is second socket.
-   * Examples at http://sourceforge.net/p/edac-utils/code/HEAD/tree/trunk/src/etc/labels.db
-   * or https://github.com/grondo/edac-utils/blob/master/src/etc/labels.db
-   */
-  hwloc_insert_object_by_parent(topology, hwloc_get_root_obj(topology), misc);
-  return;
-
- out_with_infos:
-  hwloc__free_infos(infos, infos_count);
-}
-
-static void
-hwloc__get_firmware_dmi_memory_info(struct hwloc_topology *topology,
-				    struct hwloc_linux_backend_data_s *data)
-{
-  char path[128];
-  unsigned i;
-
-  for(i=0; ; i++) {
-    FILE *fd;
-    struct hwloc_firmware_dmi_mem_device_header header;
-    int err;
-
-    snprintf(path, sizeof(path), "/sys/firmware/dmi/entries/17-%u/raw", i);
-    fd = hwloc_fopen(path, "r", data->root_fd);
-    if (!fd)
-      break;
-
-    err = fread(&header, sizeof(header), 1, fd);
-    if (err != 1)
-      break;
-    if (header.length < sizeof(header)) {
-      /* invalid, or too old entry/spec that doesn't contain what we need */
-      fclose(fd);
-      break;
-    }
-
-    hwloc__get_firmware_dmi_memory_info_one(topology, i, path, fd, &header);
-
-    fclose(fd);
-  }
-}
-
 
 /***********************************
  ****** Device tree Discovery ******
@@ -3923,8 +3765,6 @@ hwloc_look_linuxfs(struct hwloc_backend *backend)
 
   /* Gather DMI info */
   hwloc__get_dmi_id_info(data, topology->levels[0][0]);
-  if (hwloc_topology_get_flags(topology) & (HWLOC_TOPOLOGY_FLAG_IO_DEVICES|HWLOC_TOPOLOGY_FLAG_WHOLE_IO))
-    hwloc__get_firmware_dmi_memory_info(topology, data);
 
   hwloc_obj_add_info(topology->levels[0][0], "Backend", "Linux");
   if (cpuset_name) {
@@ -3944,9 +3784,264 @@ hwloc_look_linuxfs(struct hwloc_backend *backend)
 
 /****************************************
  ***** Linux PCI backend callbacks ******
- ****************************************
- * Do not support changing the fsroot (use sysfs)
+ ****************************************/
+
+/*
+ * backend callback for retrieving the location of a pci device
  */
+static int
+hwloc_linux_backend_get_pci_busid_cpuset(struct hwloc_backend *backend,
+					 struct hwloc_pcidev_attr_s *busid, hwloc_bitmap_t cpuset)
+{
+  struct hwloc_linux_backend_data_s *data = backend->private_data;
+  char path[256];
+  FILE *file;
+  int err;
+
+  snprintf(path, sizeof(path), "/sys/bus/pci/devices/%04x:%02x:%02x.%01x/local_cpus",
+	   busid->domain, busid->bus,
+	   busid->dev, busid->func);
+  file = hwloc_fopen(path, "r", data->root_fd);
+  if (file) {
+    err = hwloc_linux_parse_cpumap_file(file, cpuset);
+    fclose(file);
+    if (!err && !hwloc_bitmap_iszero(cpuset))
+      return 0;
+  }
+  return -1;
+}
+
+
+
+/*******************************
+ ******* Linux component *******
+ *******************************/
+
+static void
+hwloc_linux_backend_disable(struct hwloc_backend *backend)
+{
+  struct hwloc_linux_backend_data_s *data = backend->private_data;
+#ifdef HAVE_OPENAT
+  close(data->root_fd);
+#endif
+#ifdef HAVE_LIBUDEV_H
+  if (data->udev)
+    udev_unref(data->udev);
+#endif
+  free(data);
+}
+
+static struct hwloc_backend *
+hwloc_linux_component_instantiate(struct hwloc_disc_component *component,
+				  const void *_data1,
+				  const void *_data2 __hwloc_attribute_unused,
+				  const void *_data3 __hwloc_attribute_unused)
+{
+  struct hwloc_backend *backend;
+  struct hwloc_linux_backend_data_s *data;
+  const char * fsroot_path = _data1;
+  int flags, root = -1;
+
+  backend = hwloc_backend_alloc(component);
+  if (!backend)
+    goto out;
+
+  data = malloc(sizeof(*data));
+  if (!data) {
+    errno = ENOMEM;
+    goto out_with_backend;
+  }
+
+  backend->private_data = data;
+  backend->discover = hwloc_look_linuxfs;
+  backend->get_pci_busid_cpuset = hwloc_linux_backend_get_pci_busid_cpuset;
+  backend->disable = hwloc_linux_backend_disable;
+
+  /* default values */
+  data->is_real_fsroot = 1;
+  if (!fsroot_path)
+    fsroot_path = "/";
+
+#ifdef HAVE_OPENAT
+  root = open(fsroot_path, O_RDONLY | O_DIRECTORY);
+  if (root < 0)
+    goto out_with_data;
+
+  if (strcmp(fsroot_path, "/")) {
+    backend->is_thissystem = 0;
+    data->is_real_fsroot = 0;
+  }
+
+  /* Since this fd stays open after hwloc returns, mark it as
+     close-on-exec so that children don't inherit it.  Stevens says
+     that we should GETFD before we SETFD, so we do. */
+  flags = fcntl(root, F_GETFD, 0);
+  if (-1 == flags ||
+      -1 == fcntl(root, F_SETFD, FD_CLOEXEC | flags)) {
+      close(root);
+      root = -1;
+      goto out_with_data;
+  }
+#else
+  if (strcmp(fsroot_path, "/")) {
+    errno = ENOSYS;
+    goto out_with_data;
+  }
+#endif
+  data->root_fd = root;
+
+#ifdef HAVE_LIBUDEV_H
+  data->udev = NULL;
+  if (data->is_real_fsroot) {
+    data->udev = udev_new();
+  }
+#endif
+
+  return backend;
+
+ out_with_data:
+  free(data);
+ out_with_backend:
+  free(backend);
+ out:
+  return NULL;
+}
+
+static struct hwloc_disc_component hwloc_linux_disc_component = {
+  HWLOC_DISC_COMPONENT_TYPE_CPU,
+  "linux",
+  HWLOC_DISC_COMPONENT_TYPE_GLOBAL,
+  hwloc_linux_component_instantiate,
+  50,
+  NULL
+};
+
+const struct hwloc_component hwloc_linux_component = {
+  HWLOC_COMPONENT_ABI,
+  NULL, NULL,
+  HWLOC_COMPONENT_TYPE_DISC,
+  0,
+  &hwloc_linux_disc_component
+};
+
+
+
+
+#ifdef HWLOC_HAVE_LINUXIO
+
+/***********************************
+ ******* Linux I/O component *******
+ ***********************************/
+
+static hwloc_obj_t
+hwloc_linuxfs_find_osdev_parent(struct hwloc_backend *backend, int root_fd,
+				const char *osdevpath, int allowvirtual)
+{
+  struct hwloc_topology *topology = backend->topology;
+  char path[256], buf[10];
+  FILE *file;
+  int foundpci;
+  unsigned pcidomain = 0, pcibus = 0, pcidev = 0, pcifunc = 0;
+  unsigned _pcidomain, _pcibus, _pcidev, _pcifunc;
+  hwloc_bitmap_t cpuset;
+  const char *tmp;
+  hwloc_obj_t parent;
+  int err;
+
+  err = hwloc_readlink(osdevpath, path, sizeof(path), root_fd);
+  if (err < 0)
+    return NULL;
+  path[err] = '\0';
+
+  if (!allowvirtual) {
+    if (strstr(path, "/virtual/"))
+      return NULL;
+  }
+
+  tmp = strstr(path, "/pci");
+  if (!tmp)
+    goto nopci;
+  tmp = strchr(tmp+4, '/');
+  if (!tmp)
+    goto nopci;
+  tmp++;
+
+  /* iterate through busid to find the last on" (previous ones are bridges) */
+  foundpci = 0;
+ nextpci:
+  if (sscanf(tmp+1, "%x:%x:%x.%x", &_pcidomain, &_pcibus, &_pcidev, &_pcifunc) == 4) {
+    foundpci = 1;
+    pcidomain = _pcidomain;
+    pcibus = _pcibus;
+    pcidev = _pcidev;
+    pcifunc = _pcifunc;
+    tmp += 13;
+    goto nextpci;
+  }
+  if (sscanf(tmp+1, "%x:%x.%x", &_pcibus, &_pcidev, &_pcifunc) == 3) {
+    foundpci = 1;
+    pcidomain = 0;
+    pcibus = _pcibus;
+    pcidev = _pcidev;
+    pcifunc = _pcifunc;
+    tmp += 8;
+    goto nextpci;
+  }
+
+  if (foundpci) {
+    /* attach to a PCI parent */
+    parent = hwloc_pci_belowroot_find_by_busid(topology, pcidomain, pcibus, pcidev, pcifunc);
+    if (parent)
+      return parent;
+    /* attach to a normal (non-I/O) parent found by PCI affinity */
+    parent = hwloc_pci_find_busid_parent(topology, pcidomain, pcibus, pcidev, pcifunc);
+    if (parent)
+      return parent;
+  }
+
+ nopci:
+  /* attach directly to the right NUMA node */
+  snprintf(path, sizeof(path), "%s/device/numa_node", osdevpath);
+  file = hwloc_fopen(path, "r", root_fd);
+  if (file) {
+    err = fread(buf, 1, sizeof(buf), file);
+    fclose(file);
+    if (err > 0) {
+      int node = atoi(buf);
+      if (node >= 0) {
+	parent = hwloc_get_numanode_obj_by_os_index(topology, node);
+	if (parent)
+	  return parent;
+      }
+    }
+  }
+
+  /* attach directly to the right cpuset */
+  cpuset = hwloc_bitmap_alloc();
+  snprintf(path, sizeof(path), "%s/device/local_cpus", osdevpath);
+  file = hwloc_fopen(path, "r", root_fd);
+  if (file) {
+    err = hwloc_linux_parse_cpumap_file(file, cpuset);
+    fclose(file);
+    if (!err) {
+      parent = hwloc_find_insert_io_parent_by_complete_cpuset(topology, cpuset);
+      if (parent) {
+        hwloc_bitmap_free(cpuset);
+	return parent;
+      }
+    }
+  }
+  hwloc_bitmap_free(cpuset);
+
+  /* FIXME: {numa_node,local_cpus} may be missing when the device link points to a subdirectory.
+   * For instance, device of scsi blocks may point to foo/ata1/host0/target0:0:0/0:0:0:0/ instead of foo/
+   * In such case, we should look for device/../../../../{numa_node,local_cpus} instead of device/{numa_node,local_cpus}
+   * Not needed yet since scsi blocks use the PCI locality above.
+   */
+
+  /* fallback to the root object */
+  return hwloc_get_root_obj(topology);
+}
 
 static hwloc_obj_t
 hwloc_linux_add_os_device(struct hwloc_backend *backend, struct hwloc_obj *pcidev, hwloc_obj_osdev_type_t type, const char *name)
@@ -3963,126 +4058,236 @@ hwloc_linux_add_os_device(struct hwloc_backend *backend, struct hwloc_obj *pcide
   return obj;
 }
 
-typedef void (*hwloc_linux_class_fillinfos_t)(struct hwloc_backend *backend, struct hwloc_obj *osdev, const char *osdevpath);
-
-/* cannot be used in fsroot-aware code, would have to move to a per-topology variable */
-
 static void
-hwloc_linux_check_deprecated_classlinks_model(struct hwloc_linux_backend_data_s *data)
+hwloc_linuxfs_block_class_fillinfos(struct hwloc_backend *backend __hwloc_attribute_unused, int root_fd,
+				    struct hwloc_obj *obj, const char *osdevpath)
 {
-  int root_fd = data->root_fd;
-  DIR *dir;
-  struct dirent *dirent;
-  char path[128];
-  struct stat st;
-
-  data->deprecated_classlinks_model = -1;
-
-  dir = hwloc_opendir("/sys/class/net", root_fd);
-  if (!dir)
-    return;
-  while ((dirent = readdir(dir)) != NULL) {
-    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, "..") || !strcmp(dirent->d_name, "lo"))
-      continue;
-    snprintf(path, sizeof(path), "/sys/class/net/%s/device/net/%s", dirent->d_name, dirent->d_name);
-    if (hwloc_stat(path, &st, root_fd) == 0) {
-      data->deprecated_classlinks_model = 0;
-      goto out;
-    }
-    snprintf(path, sizeof(path), "/sys/class/net/%s/device/net:%s", dirent->d_name, dirent->d_name);
-    if (hwloc_stat(path, &st, root_fd) == 0) {
-      data->deprecated_classlinks_model = 1;
-      goto out;
-    }
-  }
-out:
-  closedir(dir);
-}
-
-/* class objects that are immediately below pci devices:
- * look for objects of the given classname below a sysfs (pcidev) directory
- */
-static int
-hwloc_linux_class_readdir(struct hwloc_backend *backend,
-			  struct hwloc_obj *pcidev, const char *devicepath,
-			  hwloc_obj_osdev_type_t type, const char *classname,
-			  hwloc_linux_class_fillinfos_t fillinfo)
-{
+#ifdef HAVE_LIBUDEV_H
   struct hwloc_linux_backend_data_s *data = backend->private_data;
-  int root_fd = data->root_fd;
-  size_t classnamelen = strlen(classname);
+#endif
+  FILE *fd;
   char path[256];
-  DIR *dir;
-  struct dirent *dirent;
-  hwloc_obj_t obj;
-  int res = 0, err;
+  char line[128];
+  char vendor[64] = "";
+  char model[64] = "";
+  char serial[64] = "";
+  char revision[64] = "";
+  char blocktype[64] = "";
+  unsigned sectorsize = 0;
+  unsigned major_id, minor_id;
+  char *tmp;
 
-  if (data->deprecated_classlinks_model == -2)
-    hwloc_linux_check_deprecated_classlinks_model(data);
-
-  if (data->deprecated_classlinks_model != 1) {
-    /* modern sysfs: <device>/<class>/<name> */
-    struct stat st;
-    snprintf(path, sizeof(path), "%s/%s", devicepath, classname);
-
-    /* some very host kernel (2.6.9/RHEL4) have <device>/<class> symlink without any way to find <name>.
-     * make sure <device>/<class> is a directory to avoid this case.
-     */
-    err = hwloc_lstat(path, &st, root_fd);
-    if (err < 0 || !S_ISDIR(st.st_mode))
-      goto trydeprecated;
-
-    dir = hwloc_opendir(path, root_fd);
-    if (dir) {
-      data->deprecated_classlinks_model = 0;
-      while ((dirent = readdir(dir)) != NULL) {
-	if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
-	  continue;
-	obj = hwloc_linux_add_os_device(backend, pcidev, type, dirent->d_name);
-	if (fillinfo) {
-	  snprintf(path, sizeof(path), "%s/%s/%s", devicepath, classname, dirent->d_name);
-	  fillinfo(backend, obj, path);
-	}
-	res++;
-      }
-      closedir(dir);
-      return res;
+  snprintf(path, sizeof(path), "%s/size", osdevpath);
+  fd = hwloc_fopen(path, "r", root_fd);
+  if (fd) {
+    char string[20];
+    if (fgets(string, sizeof(string), fd)) {
+      unsigned long long sectors = strtoull(string, NULL, 10);
+      /* linux always reports size in 512-byte units, we want kB */
+      snprintf(string, sizeof(string), "%llu", sectors / 2);
+      hwloc_obj_add_info(obj, "Size", string);
     }
+    fclose(fd);
   }
 
-trydeprecated:
-  if (data->deprecated_classlinks_model != 0) {
-    /* deprecated sysfs: <device>/<class>:<name> */
-    dir = hwloc_opendir(devicepath, root_fd);
-    if (dir) {
-      while ((dirent = readdir(dir)) != NULL) {
-	if (strncmp(dirent->d_name, classname, classnamelen) || dirent->d_name[classnamelen] != ':')
-	  continue;
-	data->deprecated_classlinks_model = 1;
-	obj = hwloc_linux_add_os_device(backend, pcidev, type, dirent->d_name + classnamelen+1);
-	if (fillinfo) {
-	  snprintf(path, sizeof(path), "%s/%s", devicepath, dirent->d_name);
-	  fillinfo(backend, obj, path);
-	}
-	res++;
-      }
-      closedir(dir);
-      return res;
+  snprintf(path, sizeof(path), "%s/queue/hw_sector_size", osdevpath);
+  fd = hwloc_fopen(path, "r", root_fd);
+  if (fd) {
+    char string[20];
+    if (fgets(string, sizeof(string), fd)) {
+      sectorsize = strtoul(string, NULL, 10);
     }
+    fclose(fd);
   }
 
-  return 0;
+  /* pmem have device/devtype containing "nd_btt" (sectors)
+   * or "nd_namespace_io" (byte-granularity).
+   * Note that device/sector_size in btt devices includes integrity metadata
+   * (512/4096 block + 0/N) while queue/hw_sector_size above is the user sectorsize
+   * without metadata.
+   */
+  snprintf(path, sizeof(path), "%s/device/devtype", osdevpath);
+  fd = hwloc_fopen(path, "r", root_fd);
+  if (fd) {
+    char string[32];
+    if (fgets(string, sizeof(string), fd)) {
+      if (!strncmp(string, "nd_", 3)) {
+	strcpy(blocktype, "NVDIMM"); /* Save the blocktype now since udev reports "" so far */
+	if (!strcmp(string, "nd_namespace_io"))
+	  sectorsize = 1;
+      }
+    }
+    fclose(fd);
+  }
+  if (sectorsize) {
+    char string[16];
+    snprintf(string, sizeof(string), "%u", sectorsize);
+    hwloc_obj_add_info(obj, "SectorSize", string);
+  }
+
+  snprintf(path, sizeof(path), "%s/dev", osdevpath);
+  fd = hwloc_fopen(path, "r", root_fd);
+  if (!fd)
+    return;
+
+  if (NULL == fgets(line, sizeof(line), fd)) {
+    fclose(fd);
+    return;
+  }
+  fclose(fd);
+
+  if (sscanf(line, "%u:%u", &major_id, &minor_id) != 2)
+    return;
+  tmp = strchr(line, '\n');
+  if (tmp)
+    *tmp = '\0';
+  hwloc_obj_add_info(obj, "LinuxDeviceID", line);
+
+#ifdef HAVE_LIBUDEV_H
+  if (data->udev) {
+    struct udev_device *dev;
+    const char *prop;
+    dev = udev_device_new_from_subsystem_sysname(data->udev, "block", obj->name);
+    if (!dev)
+      return;
+    prop = udev_device_get_property_value(dev, "ID_VENDOR");
+    if (prop)
+      strcpy(vendor, prop);
+    prop = udev_device_get_property_value(dev, "ID_MODEL");
+    if (prop)
+      strcpy(model, prop);
+    prop = udev_device_get_property_value(dev, "ID_REVISION");
+    if (prop)
+      strcpy(revision, prop);
+    prop = udev_device_get_property_value(dev, "ID_SERIAL_SHORT");
+    if (prop)
+      strcpy(serial, prop);
+    prop = udev_device_get_property_value(dev, "ID_TYPE");
+    if (prop)
+      strcpy(blocktype, prop);
+
+    udev_device_unref(dev);
+  } else
+    /* fallback to reading files, works with any fsroot */
+#endif
+ {
+  snprintf(path, sizeof(path), "/run/udev/data/b%u:%u", major_id, minor_id);
+  fd = hwloc_fopen(path, "r", root_fd);
+  if (!fd)
+    return;
+
+  while (NULL != fgets(line, sizeof(line), fd)) {
+    tmp = strchr(line, '\n');
+    if (tmp)
+      *tmp = '\0';
+    if (!strncmp(line, "E:ID_VENDOR=", strlen("E:ID_VENDOR="))) {
+      strncpy(vendor, line+strlen("E:ID_VENDOR="), sizeof(vendor));
+      vendor[sizeof(vendor)-1] = '\0';
+    } else if (!strncmp(line, "E:ID_MODEL=", strlen("E:ID_MODEL="))) {
+      strncpy(model, line+strlen("E:ID_MODEL="), sizeof(model));
+      model[sizeof(model)-1] = '\0';
+    } else if (!strncmp(line, "E:ID_REVISION=", strlen("E:ID_REVISION="))) {
+      strncpy(revision, line+strlen("E:ID_REVISION="), sizeof(revision));
+      revision[sizeof(revision)-1] = '\0';
+    } else if (!strncmp(line, "E:ID_SERIAL_SHORT=", strlen("E:ID_SERIAL_SHORT="))) {
+      strncpy(serial, line+strlen("E:ID_SERIAL_SHORT="), sizeof(serial));
+      serial[sizeof(serial)-1] = '\0';
+    } else if (!strncmp(line, "E:ID_TYPE=", strlen("E:ID_TYPE="))) {
+      strncpy(blocktype, line+strlen("E:ID_TYPE="), sizeof(blocktype));
+      blocktype[sizeof(blocktype)-1] = '\0';
+    }
+  }
+  fclose(fd);
+ }
+
+  /* clear fake "ATA" vendor name */
+  if (!strcasecmp(vendor, "ATA"))
+    *vendor = '\0';
+  /* overwrite vendor name from model when possible */
+  if (!*vendor) {
+    if (!strncasecmp(model, "wd", 2))
+      strcpy(vendor, "Western Digital");
+    else if (!strncasecmp(model, "st", 2))
+      strcpy(vendor, "Seagate");
+    else if (!strncasecmp(model, "samsung", 7))
+      strcpy(vendor, "Samsung");
+    else if (!strncasecmp(model, "sandisk", 7))
+      strcpy(vendor, "SanDisk");
+    else if (!strncasecmp(model, "toshiba", 7))
+      strcpy(vendor, "Toshiba");
+  }
+
+  if (*vendor)
+    hwloc_obj_add_info(obj, "Vendor", vendor);
+  if (*model)
+    hwloc_obj_add_info(obj, "Model", model);
+  if (*revision)
+    hwloc_obj_add_info(obj, "Revision", revision);
+  if (*serial)
+    hwloc_obj_add_info(obj, "SerialNumber", serial);
+
+  if (!strcmp(blocktype, "disk"))
+    hwloc_obj_add_info(obj, "Type", "Disk");
+  else if (!strcmp(blocktype, "NVDIMM")) /* FIXME: set by us above, to workaround udev returning "" so far */
+    hwloc_obj_add_info(obj, "Type", "NVDIMM");
+  else if (!strcmp(blocktype, "tape"))
+    hwloc_obj_add_info(obj, "Type", "Tape");
+  else if (!strcmp(blocktype, "cd") || !strcmp(blocktype, "floppy") || !strcmp(blocktype, "optical"))
+    hwloc_obj_add_info(obj, "Type", "Removable Media Device");
+  else /* generic, usb mass storage/rbc, usb mass storage/scsi */
+    hwloc_obj_add_info(obj, "Type", "Other");
 }
 
-/*
- * look for net objects below a pcidev in sysfs
- */
-static void
-hwloc_linux_net_class_fillinfos(struct hwloc_backend *backend,
-				struct hwloc_obj *obj, const char *osdevpath)
+static int
+hwloc_linuxfs_lookup_block_class(struct hwloc_backend *backend)
 {
   struct hwloc_linux_backend_data_s *data = backend->private_data;
   int root_fd = data->root_fd;
+  int res = 0;
+  DIR *dir;
+  struct dirent *dirent;
+
+  dir = hwloc_opendir("/sys/class/block", root_fd);
+  if (!dir)
+    return 0;
+
+  while ((dirent = readdir(dir)) != NULL) {
+    char path[256];
+    struct stat stbuf;
+    hwloc_obj_t obj, parent;
+
+    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
+      continue;
+
+    /* ignore partitions */
+    snprintf(path, sizeof(path), "/sys/class/block/%s/partition", dirent->d_name);
+    if (hwloc_stat(path, &stbuf, root_fd) >= 0)
+      continue;
+
+    snprintf(path, sizeof(path), "/sys/class/block/%s", dirent->d_name);
+    parent = hwloc_linuxfs_find_osdev_parent(backend, root_fd, path, 0 /* no virtual */);
+    if (!parent)
+      continue;
+
+    /* USB device are created here but removed later when USB PCI devices get filtered out
+     * (unless WHOLE_IO is enabled).
+     */
+
+    obj = hwloc_linux_add_os_device(backend, parent, HWLOC_OBJ_OSDEV_BLOCK, dirent->d_name);
+
+    hwloc_linuxfs_block_class_fillinfos(backend, root_fd, obj, path);
+    res++;
+  }
+
+  closedir(dir);
+
+  return res;
+}
+
+static void
+hwloc_linuxfs_net_class_fillinfos(int root_fd,
+				  struct hwloc_obj *obj, const char *osdevpath)
+{
   FILE *fd;
   struct stat st;
   char path[256];
@@ -4120,21 +4325,45 @@ hwloc_linux_net_class_fillinfos(struct hwloc_backend *backend,
 }
 
 static int
-hwloc_linux_lookup_net_class(struct hwloc_backend *backend,
-			     struct hwloc_obj *pcidev, const char *pcidevpath)
-{
-  return hwloc_linux_class_readdir(backend, pcidev, pcidevpath, HWLOC_OBJ_OSDEV_NETWORK, "net", hwloc_linux_net_class_fillinfos);
-}
-
-/*
- * look for infiniband objects below a pcidev in sysfs
- */
-static void
-hwloc_linux_infiniband_class_fillinfos(struct hwloc_backend *backend,
-				       struct hwloc_obj *obj, const char *osdevpath)
+hwloc_linuxfs_lookup_net_class(struct hwloc_backend *backend)
 {
   struct hwloc_linux_backend_data_s *data = backend->private_data;
   int root_fd = data->root_fd;
+  int res = 0;
+  DIR *dir;
+  struct dirent *dirent;
+
+  dir = hwloc_opendir("/sys/class/net", root_fd);
+  if (!dir)
+    return 0;
+
+  while ((dirent = readdir(dir)) != NULL) {
+    char path[256];
+    hwloc_obj_t obj, parent;
+
+    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
+      continue;
+
+    snprintf(path, sizeof(path), "/sys/class/net/%s", dirent->d_name);
+    parent = hwloc_linuxfs_find_osdev_parent(backend, root_fd, path, 0 /* no virtual */);
+    if (!parent)
+      continue;
+
+    obj = hwloc_linux_add_os_device(backend, parent, HWLOC_OBJ_OSDEV_NETWORK, dirent->d_name);
+
+    hwloc_linuxfs_net_class_fillinfos(root_fd, obj, path);
+    res++;
+  }
+
+  closedir(dir);
+
+  return res;
+}
+
+static void
+hwloc_linuxfs_infiniband_class_fillinfos(int root_fd,
+					 struct hwloc_obj *obj, const char *osdevpath)
+{
   FILE *fd;
   char path[256];
   unsigned i,j;
@@ -4241,357 +4470,49 @@ hwloc_linux_infiniband_class_fillinfos(struct hwloc_backend *backend,
 }
 
 static int
-hwloc_linux_lookup_openfabrics_class(struct hwloc_backend *backend,
-				     struct hwloc_obj *pcidev, const char *pcidevpath)
+hwloc_linuxfs_lookup_infiniband_class(struct hwloc_backend *backend)
 {
-  return hwloc_linux_class_readdir(backend, pcidev, pcidevpath, HWLOC_OBJ_OSDEV_OPENFABRICS, "infiniband", hwloc_linux_infiniband_class_fillinfos);
+  struct hwloc_linux_backend_data_s *data = backend->private_data;
+  int root_fd = data->root_fd;
+  int res = 0;
+  DIR *dir;
+  struct dirent *dirent;
+
+  dir = hwloc_opendir("/sys/class/infiniband", root_fd);
+  if (!dir)
+    return 0;
+
+  while ((dirent = readdir(dir)) != NULL) {
+    char path[256];
+    hwloc_obj_t obj, parent;
+
+    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
+      continue;
+
+    /* blocklist scif* fake devices */
+    if (!strncmp(dirent->d_name, "scif", 4))
+      continue;
+
+    snprintf(path, sizeof(path), "/sys/class/infiniband/%s", dirent->d_name);
+    parent = hwloc_linuxfs_find_osdev_parent(backend, root_fd, path, 0 /* no virtual */);
+    if (!parent)
+      continue;
+
+    obj = hwloc_linux_add_os_device(backend, parent, HWLOC_OBJ_OSDEV_OPENFABRICS, dirent->d_name);
+
+    hwloc_linuxfs_infiniband_class_fillinfos(root_fd, obj, path);
+    res++;
+  }
+
+  closedir(dir);
+
+  return res;
 }
-
-/* look for dma objects below a pcidev in sysfs */
-static int
-hwloc_linux_lookup_dma_class(struct hwloc_backend *backend,
-			     struct hwloc_obj *pcidev, const char *pcidevpath)
-{
-  return hwloc_linux_class_readdir(backend, pcidev, pcidevpath, HWLOC_OBJ_OSDEV_DMA, "dma", NULL);
-}
-
-/* look for drm objects below a pcidev in sysfs */
-static int
-hwloc_linux_lookup_drm_class(struct hwloc_backend *backend,
-			     struct hwloc_obj *pcidev, const char *pcidevpath)
-{
-  return hwloc_linux_class_readdir(backend, pcidev, pcidevpath, HWLOC_OBJ_OSDEV_GPU, "drm", NULL);
-
-  /* we could look at the "graphics" class too, but it doesn't help for proprietary drivers either */
-
-  /* GPU devices (even with a proprietary driver) seem to have a boot_vga field in their PCI device directory (since 2.6.30),
-   * so we could create a OS device for each PCI devices with such a field.
-   * boot_vga is actually created when class >> 8 == VGA (it contains 1 for boot vga device), so it's trivial anyway.
-   */
-}
-
-/*
- * look for block objects below a pcidev in sysfs
- */
 
 static void
-hwloc_linux_block_class_fillinfos(struct hwloc_backend *backend,
+hwloc_linuxfs_mic_class_fillinfos(int root_fd,
 				  struct hwloc_obj *obj, const char *osdevpath)
 {
-  struct hwloc_linux_backend_data_s *data = backend->private_data;
-  int root_fd = data->root_fd;
-  FILE *fd;
-  char path[256];
-  char line[128];
-  char vendor[64] = "";
-  char model[64] = "";
-  char serial[64] = "";
-  char revision[64] = "";
-  char blocktype[64] = "";
-  unsigned major_id, minor_id;
-  char *tmp;
-
-  snprintf(path, sizeof(path), "%s/size", osdevpath);
-  fd = hwloc_fopen(path, "r", root_fd);
-  if (fd) {
-    char string[20];
-    if (fgets(string, sizeof(string), fd)) {
-      unsigned long long sectors = strtoull(string, NULL, 10);
-      char string[16];
-      /* linux always reports size in 512-byte units, we want kB */
-      snprintf(string, sizeof(string), "%llu", sectors / 2);
-      hwloc_obj_add_info(obj, "Size", string);
-    }
-    fclose(fd);
-  }
-
-  snprintf(path, sizeof(path), "%s/dev", osdevpath);
-  fd = hwloc_fopen(path, "r", root_fd);
-  if (!fd)
-    return;
-
-  if (NULL == fgets(line, sizeof(line), fd)) {
-    fclose(fd);
-    return;
-  }
-  fclose(fd);
-
-  if (sscanf(line, "%u:%u", &major_id, &minor_id) != 2)
-    return;
-  tmp = strchr(line, '\n');
-  if (tmp)
-    *tmp = '\0';
-  hwloc_obj_add_info(obj, "LinuxDeviceID", line);
-
-#ifdef HAVE_LIBUDEV_H
-  if (data->udev) {
-    struct udev_device *dev;
-    const char *prop;
-    dev = udev_device_new_from_subsystem_sysname(data->udev, "block", obj->name);
-    if (!dev)
-      return;
-    prop = udev_device_get_property_value(dev, "ID_VENDOR");
-    if (prop)
-      strcpy(vendor, prop);
-    prop = udev_device_get_property_value(dev, "ID_MODEL");
-    if (prop)
-      strcpy(model, prop);
-    prop = udev_device_get_property_value(dev, "ID_REVISION");
-    if (prop)
-      strcpy(revision, prop);
-    prop = udev_device_get_property_value(dev, "ID_SERIAL_SHORT");
-    if (prop)
-      strcpy(serial, prop);
-    prop = udev_device_get_property_value(dev, "ID_TYPE");
-    if (prop)
-      strcpy(blocktype, prop);
-
-    udev_device_unref(dev);
-  } else
-    /* fallback to reading files, works with any fsroot */
-#endif
- {
-  snprintf(path, sizeof(path), "/run/udev/data/b%u:%u", major_id, minor_id);
-  fd = hwloc_fopen(path, "r", root_fd);
-  if (!fd)
-    return;
-
-  while (NULL != fgets(line, sizeof(line), fd)) {
-    tmp = strchr(line, '\n');
-    if (tmp)
-      *tmp = '\0';
-    if (!strncmp(line, "E:ID_VENDOR=", strlen("E:ID_VENDOR="))) {
-      strncpy(vendor, line+strlen("E:ID_VENDOR="), sizeof(vendor));
-      vendor[sizeof(vendor)-1] = '\0';
-    } else if (!strncmp(line, "E:ID_MODEL=", strlen("E:ID_MODEL="))) {
-      strncpy(model, line+strlen("E:ID_MODEL="), sizeof(model));
-      model[sizeof(model)-1] = '\0';
-    } else if (!strncmp(line, "E:ID_REVISION=", strlen("E:ID_REVISION="))) {
-      strncpy(revision, line+strlen("E:ID_REVISION="), sizeof(revision));
-      revision[sizeof(revision)-1] = '\0';
-    } else if (!strncmp(line, "E:ID_SERIAL_SHORT=", strlen("E:ID_SERIAL_SHORT="))) {
-      strncpy(serial, line+strlen("E:ID_SERIAL_SHORT="), sizeof(serial));
-      serial[sizeof(serial)-1] = '\0';
-    } else if (!strncmp(line, "E:ID_TYPE=", strlen("E:ID_TYPE="))) {
-      strncpy(blocktype, line+strlen("E:ID_TYPE="), sizeof(blocktype));
-      blocktype[sizeof(blocktype)-1] = '\0';
-    }
-  }
-  fclose(fd);
- }
-
-  /* clear fake "ATA" vendor name */
-  if (!strcasecmp(vendor, "ATA"))
-    *vendor = '\0';
-  /* overwrite vendor name from model when possible */
-  if (!*vendor) {
-    if (!strncasecmp(model, "wd", 2))
-      strcpy(vendor, "Western Digital");
-    else if (!strncasecmp(model, "st", 2))
-      strcpy(vendor, "Seagate");
-    else if (!strncasecmp(model, "samsung", 7))
-      strcpy(vendor, "Samsung");
-    else if (!strncasecmp(model, "sandisk", 7))
-      strcpy(vendor, "SanDisk");
-    else if (!strncasecmp(model, "toshiba", 7))
-      strcpy(vendor, "Toshiba");
-  }
-
-  if (*vendor)
-    hwloc_obj_add_info(obj, "Vendor", vendor);
-  if (*model)
-    hwloc_obj_add_info(obj, "Model", model);
-  if (*revision)
-    hwloc_obj_add_info(obj, "Revision", revision);
-  if (*serial)
-    hwloc_obj_add_info(obj, "SerialNumber", serial);
-
-  if (!strcmp(blocktype, "disk"))
-    hwloc_obj_add_info(obj, "Type", "Disk");
-  else if (!strcmp(blocktype, "tape"))
-    hwloc_obj_add_info(obj, "Type", "Tape");
-  else if (!strcmp(blocktype, "cd") || !strcmp(blocktype, "floppy") || !strcmp(blocktype, "optical"))
-    hwloc_obj_add_info(obj, "Type", "Removable Media Device");
-  else /* generic, usb mass storage/rbc, usb mass storage/scsi */
-    hwloc_obj_add_info(obj, "Type", "Other");
-}
-
-/* block class objects are in
- * host%d/target%d:%d:%d/%d:%d:%d:%d/
- * or
- * host%d/port-%d:%d/end_device-%d:%d/target%d:%d:%d/%d:%d:%d:%d/
- * or
- * ide%d/%d.%d/
- * below pci devices */
-static int
-hwloc_linux_lookup_host_block_class(struct hwloc_backend *backend,
-				    struct hwloc_obj *pcidev, char *path, size_t pathlen)
-{
-  struct hwloc_linux_backend_data_s *data = backend->private_data;
-  int root_fd = data->root_fd;
-  DIR *hostdir, *portdir, *targetdir;
-  struct dirent *hostdirent, *portdirent, *targetdirent;
-  size_t hostdlen, portdlen, targetdlen;
-  int dummy;
-  int res = 0;
-
-  hostdir = hwloc_opendir(path, root_fd);
-  if (!hostdir)
-    return 0;
-
-  while ((hostdirent = readdir(hostdir)) != NULL) {
-    if (sscanf(hostdirent->d_name, "port-%d:%d", &dummy, &dummy) == 2)
-    {
-      /* found host%d/port-%d:%d */
-      path[pathlen] = '/';
-      strcpy(&path[pathlen+1], hostdirent->d_name);
-      pathlen += hostdlen = 1+strlen(hostdirent->d_name);
-      portdir = hwloc_opendir(path, root_fd);
-      if (!portdir)
-	continue;
-      while ((portdirent = readdir(portdir)) != NULL) {
-	if (sscanf(portdirent->d_name, "end_device-%d:%d", &dummy, &dummy) == 2) {
-	  /* found host%d/port-%d:%d/end_device-%d:%d */
-	  path[pathlen] = '/';
-	  strcpy(&path[pathlen+1], portdirent->d_name);
-	  pathlen += portdlen = 1+strlen(portdirent->d_name);
-	  res += hwloc_linux_lookup_host_block_class(backend, pcidev, path, pathlen);
-	  /* restore parent path */
-	  pathlen -= portdlen;
-	  path[pathlen] = '\0';
-	}
-      }
-      closedir(portdir);
-      /* restore parent path */
-      pathlen -= hostdlen;
-      path[pathlen] = '\0';
-      continue;
-    } else if (sscanf(hostdirent->d_name, "target%d:%d:%d", &dummy, &dummy, &dummy) == 3) {
-      /* found host%d/target%d:%d:%d */
-      path[pathlen] = '/';
-      strcpy(&path[pathlen+1], hostdirent->d_name);
-      pathlen += hostdlen = 1+strlen(hostdirent->d_name);
-      targetdir = hwloc_opendir(path, root_fd);
-      if (!targetdir)
-	continue;
-      while ((targetdirent = readdir(targetdir)) != NULL) {
-	if (sscanf(targetdirent->d_name, "%d:%d:%d:%d", &dummy, &dummy, &dummy, &dummy) != 4)
-	  continue;
-	/* found host%d/target%d:%d:%d/%d:%d:%d:%d */
-	path[pathlen] = '/';
-	strcpy(&path[pathlen+1], targetdirent->d_name);
-	pathlen += targetdlen = 1+strlen(targetdirent->d_name);
-	/* lookup block class for real */
-	res += hwloc_linux_class_readdir(backend, pcidev, path, HWLOC_OBJ_OSDEV_BLOCK, "block", hwloc_linux_block_class_fillinfos);
-	/* restore parent path */
-	pathlen -= targetdlen;
-	path[pathlen] = '\0';
-      }
-      closedir(targetdir);
-      /* restore parent path */
-      pathlen -= hostdlen;
-      path[pathlen] = '\0';
-    }
-  }
-  closedir(hostdir);
-
-  return res;
-}
-
-static int
-hwloc_linux_lookup_block_class(struct hwloc_backend *backend,
-			       struct hwloc_obj *pcidev, const char *pcidevpath)
-{
-  struct hwloc_linux_backend_data_s *data = backend->private_data;
-  int root_fd = data->root_fd;
-  size_t pathlen;
-  DIR *devicedir, *hostdir;
-  struct dirent *devicedirent, *hostdirent;
-  size_t devicedlen, hostdlen;
-  char path[256];
-  int dummy;
-  int res = 0;
-
-  strcpy(path, pcidevpath);
-  pathlen = strlen(path);
-
-  devicedir = hwloc_opendir(pcidevpath, root_fd);
-  if (!devicedir)
-    return 0;
-
-  while ((devicedirent = readdir(devicedir)) != NULL) {
-    if (sscanf(devicedirent->d_name, "ide%d", &dummy) == 1) {
-      /* found ide%d */
-      path[pathlen] = '/';
-      strcpy(&path[pathlen+1], devicedirent->d_name);
-      pathlen += devicedlen = 1+strlen(devicedirent->d_name);
-      hostdir = hwloc_opendir(path, root_fd);
-      if (!hostdir)
-	continue;
-      while ((hostdirent = readdir(hostdir)) != NULL) {
-	if (sscanf(hostdirent->d_name, "%d.%d", &dummy, &dummy) == 2) {
-	  /* found ide%d/%d.%d */
-	  path[pathlen] = '/';
-	  strcpy(&path[pathlen+1], hostdirent->d_name);
-	  pathlen += hostdlen = 1+strlen(hostdirent->d_name);
-	  /* lookup block class for real */
-	  res += hwloc_linux_class_readdir(backend, pcidev, path, HWLOC_OBJ_OSDEV_BLOCK, "block", NULL);
-	  /* restore parent path */
-	  pathlen -= hostdlen;
-	  path[pathlen] = '\0';
-	}
-      }
-      closedir(hostdir);
-      /* restore parent path */
-      pathlen -= devicedlen;
-      path[pathlen] = '\0';
-    } else if (sscanf(devicedirent->d_name, "host%d", &dummy) == 1) {
-      /* found host%d */
-      path[pathlen] = '/';
-      strcpy(&path[pathlen+1], devicedirent->d_name);
-      pathlen += devicedlen = 1+strlen(devicedirent->d_name);
-      res += hwloc_linux_lookup_host_block_class(backend, pcidev, path, pathlen);
-      /* restore parent path */
-      pathlen -= devicedlen;
-      path[pathlen] = '\0';
-    } else if (sscanf(devicedirent->d_name, "ata%d", &dummy) == 1) {
-      /* found ata%d */
-      path[pathlen] = '/';
-      strcpy(&path[pathlen+1], devicedirent->d_name);
-      pathlen += devicedlen = 1+strlen(devicedirent->d_name);
-      hostdir = hwloc_opendir(path, root_fd);
-      if (!hostdir)
-	continue;
-      while ((hostdirent = readdir(hostdir)) != NULL) {
-	if (sscanf(hostdirent->d_name, "host%d", &dummy) == 1) {
-	  /* found ata%d/host%d */
-	  path[pathlen] = '/';
-	  strcpy(&path[pathlen+1], hostdirent->d_name);
-	  pathlen += hostdlen = 1+strlen(hostdirent->d_name);
-	  /* lookup block class for real */
-          res += hwloc_linux_lookup_host_block_class(backend, pcidev, path, pathlen);
-	  /* restore parent path */
-	  pathlen -= hostdlen;
-	  path[pathlen] = '\0';
-	}
-      }
-      closedir(hostdir);
-      /* restore parent path */
-      pathlen -= devicedlen;
-      path[pathlen] = '\0';
-    }
-  }
-  closedir(devicedir);
-
-  return res;
-}
-
-static void
-hwloc_linux_mic_class_fillinfos(struct hwloc_backend *backend,
-				struct hwloc_obj *obj, const char *osdevpath)
-{
-  struct hwloc_linux_backend_data_s *data = backend->private_data;
-  int root_fd = data->root_fd;
   FILE *fd;
   char path[256];
 
@@ -4662,312 +4583,321 @@ hwloc_linux_mic_class_fillinfos(struct hwloc_backend *backend,
 }
 
 static int
-hwloc_linux_lookup_mic_class(struct hwloc_backend *backend,
-			     struct hwloc_obj *pcidev, const char *pcidevpath)
-{
-  return hwloc_linux_class_readdir(backend, pcidev, pcidevpath, HWLOC_OBJ_OSDEV_COPROC, "mic", hwloc_linux_mic_class_fillinfos);
-}
-
-static int
-hwloc_linux_directlookup_mic_class(struct hwloc_backend *backend,
-				   struct hwloc_obj *pcidev)
+hwloc_linuxfs_lookup_mic_class(struct hwloc_backend *backend)
 {
   struct hwloc_linux_backend_data_s *data = backend->private_data;
   int root_fd = data->root_fd;
-  char path[256];
-  struct stat st;
-  hwloc_obj_t obj;
   unsigned idx;
   int res = 0;
+  DIR *dir;
+  struct dirent *dirent;
 
-  if (!data->mic_directlookup_id_max)
-    /* already tried, nothing to do */
+  dir = hwloc_opendir("/sys/class/mic", root_fd);
+  if (!dir)
     return 0;
 
-  if (data->mic_directlookup_id_max == (unsigned) -1) {
-    /* never tried, find out the max id */
-    DIR *dir;
-    struct dirent *dirent;
+  while ((dirent = readdir(dir)) != NULL) {
+    char path[256];
+    hwloc_obj_t obj, parent;
 
-    /* make sure we never do this lookup again */
-    data->mic_directlookup_id_max = 0;
-
-    /* read the entire class and find the max id of mic%u dirents */
-    dir = hwloc_opendir("/sys/devices/virtual/mic", root_fd);
-    if (!dir) {
-      dir = hwloc_opendir("/sys/class/mic", root_fd);
-      if (!dir)
-	return 0;
-    }
-    while ((dirent = readdir(dir)) != NULL) {
-      if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
-	continue;
-      if (sscanf(dirent->d_name, "mic%u", &idx) != 1)
-	continue;
-      if (idx >= data->mic_directlookup_id_max)
-	data->mic_directlookup_id_max = idx+1;
-    }
-    closedir(dir);
-  }
-
-  /* now iterate over the mic ids and see if one matches our pcidev */
-  for(idx=0; idx<data->mic_directlookup_id_max; idx++) {
-    snprintf(path, sizeof(path), "/sys/class/mic/mic%u/pci_%02x:%02x.%02x",
-	     idx, pcidev->attr->pcidev.bus,  pcidev->attr->pcidev.dev,  pcidev->attr->pcidev.func);
-    if (hwloc_stat(path, &st, root_fd) < 0)
+    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
       continue;
-    snprintf(path, sizeof(path), "mic%u", idx);
-    obj = hwloc_linux_add_os_device(backend, pcidev, HWLOC_OBJ_OSDEV_COPROC, path);
+    if (sscanf(dirent->d_name, "mic%u", &idx) != 1)
+      continue;
+
     snprintf(path, sizeof(path), "/sys/class/mic/mic%u", idx);
-    hwloc_linux_mic_class_fillinfos(backend, obj, path);
+    parent = hwloc_linuxfs_find_osdev_parent(backend, root_fd, path, 0 /* no virtual */);
+    if (!parent)
+      continue;
+
+    obj = hwloc_linux_add_os_device(backend, parent, HWLOC_OBJ_OSDEV_COPROC, dirent->d_name);
+
+    hwloc_linuxfs_mic_class_fillinfos(root_fd, obj, path);
     res++;
   }
 
+  closedir(dir);
+
   return res;
 }
 
-/*
- * backend callback for inserting objects inside a pci device
- */
 static int
-hwloc_linux_backend_notify_new_object(struct hwloc_backend *backend, struct hwloc_backend *caller __hwloc_attribute_unused,
-				      struct hwloc_obj *obj)
+hwloc_linuxfs_lookup_drm_class(struct hwloc_backend *backend)
 {
   struct hwloc_linux_backend_data_s *data = backend->private_data;
-  char pcidevpath[256];
+  int root_fd = data->root_fd;
   int res = 0;
+  DIR *dir;
+  struct dirent *dirent;
 
-  /* this callback is only used in the libpci backend for now */
-  assert(obj->type == HWLOC_OBJ_PCI_DEVICE);
+  dir = hwloc_opendir("/sys/class/drm", root_fd);
+  if (!dir)
+    return 0;
 
-  snprintf(pcidevpath, sizeof(pcidevpath), "/sys/bus/pci/devices/%04x:%02x:%02x.%01x/",
-	   obj->attr->pcidev.domain, obj->attr->pcidev.bus,
-	   obj->attr->pcidev.dev, obj->attr->pcidev.func);
+  while ((dirent = readdir(dir)) != NULL) {
+    char path[256];
+    hwloc_obj_t parent;
+    struct stat stbuf;
 
-  res += hwloc_linux_lookup_net_class(backend, obj, pcidevpath);
-  res += hwloc_linux_lookup_openfabrics_class(backend, obj, pcidevpath);
-  res += hwloc_linux_lookup_dma_class(backend, obj, pcidevpath);
-  res += hwloc_linux_lookup_drm_class(backend, obj, pcidevpath);
-  res += hwloc_linux_lookup_block_class(backend, obj, pcidevpath);
+    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
+      continue;
 
-  if (data->mic_need_directlookup == -1) {
-    struct stat st;
-    if (hwloc_stat("/sys/class/mic/mic0", &st, data->root_fd) == 0
-	&& hwloc_stat("/sys/class/mic/mic0/device/mic/mic0", &st, data->root_fd) == -1)
-      /* hwloc_linux_lookup_mic_class will fail because pcidev sysfs directories
-       * do not have mic/mic%u symlinks to mic devices (old mic driver).
-       * if so, try from the mic class.
-       */
-      data->mic_need_directlookup = 1;
-    else
-      data->mic_need_directlookup = 0;
+    /* only keep main devices, not subdevices for outputs */
+    snprintf(path, sizeof(path), "/sys/class/drm/%s/dev", dirent->d_name);
+    if (hwloc_stat(path, &stbuf, root_fd) < 0)
+      continue;
+
+    /* FIXME: only keep cardX ? */
+    /* FIXME: drop cardX for proprietary drivers that get CUDA/OpenCL devices? */
+
+    snprintf(path, sizeof(path), "/sys/class/drm/%s", dirent->d_name);
+    parent = hwloc_linuxfs_find_osdev_parent(backend, root_fd, path, 0 /* no virtual */);
+    if (!parent)
+      continue;
+
+    hwloc_linux_add_os_device(backend, parent, HWLOC_OBJ_OSDEV_GPU, dirent->d_name);
+
+    res++;
   }
-  if (data->mic_need_directlookup)
-    res += hwloc_linux_directlookup_mic_class(backend, obj);
-  else
-    res += hwloc_linux_lookup_mic_class(backend, obj, pcidevpath);
+
+  closedir(dir);
 
   return res;
 }
 
-/*
- * backend callback for retrieving the location of a pci device
- */
 static int
-hwloc_linux_backend_get_obj_cpuset(struct hwloc_backend *backend,
-				   struct hwloc_backend *caller __hwloc_attribute_unused,
-				   struct hwloc_obj *obj, hwloc_bitmap_t cpuset)
+hwloc_linuxfs_lookup_dma_class(struct hwloc_backend *backend)
 {
   struct hwloc_linux_backend_data_s *data = backend->private_data;
-  char path[256];
-  FILE *file;
-  int err;
+  int root_fd = data->root_fd;
+  int res = 0;
+  DIR *dir;
+  struct dirent *dirent;
 
-  /* this callback is only used in the libpci backend for now */
-  assert(obj->type == HWLOC_OBJ_PCI_DEVICE
-	 || (obj->type == HWLOC_OBJ_BRIDGE && obj->attr->bridge.upstream_type == HWLOC_OBJ_BRIDGE_PCI));
+  dir = hwloc_opendir("/sys/class/dma", root_fd);
+  if (!dir)
+    return 0;
 
-  snprintf(path, sizeof(path), "/sys/bus/pci/devices/%04x:%02x:%02x.%01x/local_cpus",
-	   obj->attr->pcidev.domain, obj->attr->pcidev.bus,
-	   obj->attr->pcidev.dev, obj->attr->pcidev.func);
-  file = hwloc_fopen(path, "r", data->root_fd);
-  if (file) {
-    err = hwloc_linux_parse_cpumap_file(file, cpuset);
-    fclose(file);
-    if (!err && !hwloc_bitmap_iszero(cpuset))
-      return 0;
+  while ((dirent = readdir(dir)) != NULL) {
+    char path[256];
+    hwloc_obj_t parent;
+
+    if (!strcmp(dirent->d_name, ".") || !strcmp(dirent->d_name, ".."))
+      continue;
+
+    snprintf(path, sizeof(path), "/sys/class/dma/%s", dirent->d_name);
+    parent = hwloc_linuxfs_find_osdev_parent(backend, root_fd, path, 0 /* no virtual */);
+    if (!parent)
+      continue;
+
+    hwloc_linux_add_os_device(backend, parent, HWLOC_OBJ_OSDEV_DMA, dirent->d_name);
+
+    res++;
   }
-  return -1;
+
+  closedir(dir);
+
+  return res;
 }
 
-
-
-/*******************************
- ******* Linux component *******
- *******************************/
-
-static void
-hwloc_linux_backend_disable(struct hwloc_backend *backend)
-{
-  struct hwloc_linux_backend_data_s *data = backend->private_data;
-#ifdef HAVE_OPENAT
-  close(data->root_fd);
-#endif
-#ifdef HAVE_LIBUDEV_H
-  if (data->udev)
-    udev_unref(data->udev);
-#endif
-  free(data);
-}
-
-static struct hwloc_backend *
-hwloc_linux_component_instantiate(struct hwloc_disc_component *component,
-				  const void *_data1,
-				  const void *_data2 __hwloc_attribute_unused,
-				  const void *_data3 __hwloc_attribute_unused)
-{
-  struct hwloc_backend *backend;
-  struct hwloc_linux_backend_data_s *data;
-  const char * fsroot_path = _data1;
-  int flags, root = -1;
-
-  backend = hwloc_backend_alloc(component);
-  if (!backend)
-    goto out;
-
-  data = malloc(sizeof(*data));
-  if (!data) {
-    errno = ENOMEM;
-    goto out_with_backend;
-  }
-
-  backend->private_data = data;
-  backend->discover = hwloc_look_linuxfs;
-  backend->get_obj_cpuset = hwloc_linux_backend_get_obj_cpuset;
-  backend->notify_new_object = hwloc_linux_backend_notify_new_object;
-  backend->disable = hwloc_linux_backend_disable;
-
-  /* default values */
-  data->is_real_fsroot = 1;
-  if (!fsroot_path)
-    fsroot_path = "/";
-
-#ifdef HAVE_OPENAT
-  root = open(fsroot_path, O_RDONLY | O_DIRECTORY);
-  if (root < 0)
-    goto out_with_data;
-
-  if (strcmp(fsroot_path, "/")) {
-    backend->is_thissystem = 0;
-    data->is_real_fsroot = 0;
-  }
-
-  /* Since this fd stays open after hwloc returns, mark it as
-     close-on-exec so that children don't inherit it.  Stevens says
-     that we should GETFD before we SETFD, so we do. */
-  flags = fcntl(root, F_GETFD, 0);
-  if (-1 == flags ||
-      -1 == fcntl(root, F_SETFD, FD_CLOEXEC | flags)) {
-      close(root);
-      root = -1;
-      goto out_with_data;
-  }
-#else
-  if (strcmp(fsroot_path, "/")) {
-    errno = ENOSYS;
-    goto out_with_data;
-  }
-#endif
-  data->root_fd = root;
-
-#ifdef HAVE_LIBUDEV_H
-  data->udev = NULL;
-  if (data->is_real_fsroot) {
-    data->udev = udev_new();
-  }
-#endif
-
-  data->deprecated_classlinks_model = -2; /* never tried */
-  data->mic_need_directlookup = -1; /* not initialized */
-  data->mic_directlookup_id_max = -1; /* not initialized */
-
-  return backend;
-
- out_with_data:
-  free(data);
- out_with_backend:
-  free(backend);
- out:
-  return NULL;
-}
-
-static struct hwloc_disc_component hwloc_linux_disc_component = {
-  HWLOC_DISC_COMPONENT_TYPE_CPU,
-  "linux",
-  HWLOC_DISC_COMPONENT_TYPE_GLOBAL,
-  hwloc_linux_component_instantiate,
-  50,
-  NULL
+struct hwloc_firmware_dmi_mem_device_header {
+  unsigned char type;
+  unsigned char length;
+  unsigned char handle[2];
+  unsigned char phy_mem_handle[2];
+  unsigned char mem_err_handle[2];
+  unsigned char tot_width[2];
+  unsigned char dat_width[2];
+  unsigned char size[2];
+  unsigned char ff;
+  unsigned char dev_set;
+  unsigned char dev_loc_str_num;
+  unsigned char bank_loc_str_num;
+  unsigned char mem_type;
+  unsigned char type_detail[2];
+  unsigned char speed[2];
+  unsigned char manuf_str_num;
+  unsigned char serial_str_num;
+  unsigned char asset_tag_str_num;
+  unsigned char part_num_str_num;
+  /* don't include the following fields since we don't need them,
+   * some old implementations may miss them.
+   */
 };
 
-const struct hwloc_component hwloc_linux_component = {
-  HWLOC_COMPONENT_ABI,
-  NULL, NULL,
-  HWLOC_COMPONENT_TYPE_DISC,
-  0,
-  &hwloc_linux_disc_component
-};
+static int check_dmi_entry(const char *buffer)
+{
+  /* reject empty strings */
+  if (!*buffer)
+    return 0;
+  /* reject strings of spaces (at least Dell use this for empty memory slots) */
+  if (strspn(buffer, " ") == strlen(buffer))
+    return 0;
+  return 1;
+}
 
+static int
+hwloc__get_firmware_dmi_memory_info_one(struct hwloc_topology *topology,
+					unsigned idx, const char *path, FILE *fd,
+					struct hwloc_firmware_dmi_mem_device_header *header)
+{
+  unsigned slen;
+  char buffer[256]; /* enough for memory device strings, or at least for each of them */
+  unsigned foff; /* offset in raw file */
+  unsigned boff; /* offset in buffer read from raw file */
+  unsigned i;
+  struct hwloc_obj_info_s *infos = NULL;
+  unsigned infos_count = 0;
+  hwloc_obj_t misc;
+  int foundinfo = 0;
 
+  hwloc__add_info(&infos, &infos_count, "Type", "MemoryModule");
 
+  /* start after the header */
+  foff = header->length;
+  i = 1;
+  while (1) {
+    /* read one buffer */
+    if (fseek(fd, foff, SEEK_SET) < 0)
+      break;
+    if (!fgets(buffer, sizeof(buffer), fd))
+      break;
+    /* read string at the beginning of the buffer */
+    boff = 0;
+    while (1) {
+      /* stop on empty string */
+      if (!buffer[boff])
+        goto done;
+      /* stop if this string goes to the end of the buffer */
+      slen = strlen(buffer+boff);
+      if (boff + slen+1 == sizeof(buffer))
+        break;
+      /* string didn't get truncated, should be OK */
+      if (i == header->manuf_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "Vendor", buffer+boff);
+	  foundinfo = 1;
+	}
+      }	else if (i == header->serial_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "SerialNumber", buffer+boff);
+	  foundinfo = 1;
+	}
+      } else if (i == header->asset_tag_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "AssetTag", buffer+boff);
+	  foundinfo = 1;
+	}
+      } else if (i == header->part_num_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "PartNumber", buffer+boff);
+	  foundinfo = 1;
+	}
+      } else if (i == header->dev_loc_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "DeviceLocation", buffer+boff);
+	  /* only a location, not an actual info about the device */
+	}
+      } else if (i == header->bank_loc_str_num) {
+	if (check_dmi_entry(buffer+boff)) {
+	  hwloc__add_info(&infos, &infos_count, "BankLocation", buffer+boff);
+	  /* only a location, not an actual info about the device */
+	}
+      } else {
+	goto done;
+      }
+      /* next string in buffer */
+      boff += slen+1;
+      i++;
+    }
+    /* couldn't read a single full string from that buffer, we're screwed */
+    if (!boff) {
+      fprintf(stderr, "hwloc could read a DMI firmware entry #%u in %s\n",
+	      i, path);
+      break;
+    }
+    /* reread buffer after previous string */
+    foff += boff;
+  }
+
+done:
+  if (!foundinfo) {
+    /* found no actual info about the device. if there's only location info, the slot may be empty */
+    goto out_with_infos;
+  }
+
+  misc = hwloc_alloc_setup_object(HWLOC_OBJ_MISC, idx);
+  if (!misc)
+    goto out_with_infos;
+
+  hwloc__move_infos(&misc->infos, &misc->infos_count, &infos, &infos_count);
+  /* FIXME: find a way to identify the corresponding NUMA node and attach these objects there.
+   * but it means we need to parse DeviceLocation=DIMM_B4 but these vary significantly
+   * with the vendor, and it's hard to be 100% sure 'B' is second socket.
+   * Examples at http://sourceforge.net/p/edac-utils/code/HEAD/tree/trunk/src/etc/labels.db
+   * or https://github.com/grondo/edac-utils/blob/master/src/etc/labels.db
+   */
+  hwloc_insert_object_by_parent(topology, hwloc_get_root_obj(topology), misc);
+  return 1;
+
+ out_with_infos:
+  hwloc__free_infos(infos, infos_count);
+  return 0;
+}
+
+static int
+hwloc__get_firmware_dmi_memory_info(struct hwloc_topology *topology,
+				    struct hwloc_linux_backend_data_s *data)
+{
+  char path[128];
+  unsigned i;
+  unsigned res = 0;
+
+  for(i=0; ; i++) {
+    FILE *fd;
+    struct hwloc_firmware_dmi_mem_device_header header;
+    int err;
+
+    snprintf(path, sizeof(path), "/sys/firmware/dmi/entries/17-%u/raw", i);
+    fd = hwloc_fopen(path, "r", data->root_fd);
+    if (!fd)
+      break;
+
+    err = fread(&header, sizeof(header), 1, fd);
+    if (err != 1)
+      break;
+    if (header.length < sizeof(header)) {
+      /* invalid, or too old entry/spec that doesn't contain what we need */
+      fclose(fd);
+      break;
+    }
+
+    res += hwloc__get_firmware_dmi_memory_info_one(topology, i, path, fd, &header);
+
+    fclose(fd);
+  }
+
+  return res;
+}
 
 #ifdef HWLOC_HAVE_LINUXPCI
-
-/***********************************
- ******* Linux PCI component *******
- ***********************************/
 
 #define HWLOC_PCI_REVISION_ID 0x08
 #define HWLOC_PCI_CAP_ID_EXP 0x10
 #define HWLOC_PCI_CLASS_NOT_DEFINED 0x0000
 
 static int
-hwloc_look_linuxfs_pci(struct hwloc_backend *backend)
+hwloc_linuxfs_pci_look_pcidevices(struct hwloc_backend *backend)
 {
-  struct hwloc_topology *topology = backend->topology;
-  struct hwloc_backend *tmpbackend;
-  hwloc_obj_t first_obj = NULL, last_obj = NULL;
-  int root_fd = -1;
+  struct hwloc_linux_backend_data_s *data = backend->private_data;
+  hwloc_obj_t tree = NULL;
+  int root_fd = data->root_fd;
   DIR *dir;
   struct dirent *dirent;
-  int res = 0;
-
-  if (!(hwloc_topology_get_flags(topology) & (HWLOC_TOPOLOGY_FLAG_IO_DEVICES|HWLOC_TOPOLOGY_FLAG_WHOLE_IO)))
-    return 0;
-
-  if (hwloc_get_next_pcidev(topology, NULL)) {
-    hwloc_debug("%s", "PCI objects already added, ignoring linuxpci backend.\n");
-    return 0;
-  }
-
-  /* hackily find the linux backend to steal its fsroot */
-  tmpbackend = topology->backends;
-  while (tmpbackend) {
-    if (tmpbackend->component == &hwloc_linux_disc_component) {
-      root_fd = ((struct hwloc_linux_backend_data_s *) tmpbackend->private_data)->root_fd;
-      hwloc_debug("linuxpci backend stole linux backend root_fd %d\n", root_fd);
-      break;    }
-    tmpbackend = tmpbackend->next;
-  }
-  /* take our own descriptor, either pointing to linux fsroot, or to / if not found */
-  if (root_fd >= 0)
-    root_fd = dup(root_fd);
-  else
-    root_fd = open("/", O_RDONLY | O_DIRECTORY);
 
   dir = hwloc_opendir("/sys/bus/pci/devices/", root_fd);
   if (!dir)
-    goto out_with_rootfd;
+    return 0;
 
   while ((dirent = readdir(dir)) != NULL) {
     unsigned domain, bus, dev, func;
@@ -5068,14 +4998,63 @@ hwloc_look_linuxfs_pci(struct hwloc_backend *backend)
 	hwloc_pci_find_linkspeed(config_space_cache, offset, &attr->linkspeed);
     }
 
-    if (first_obj)
-      last_obj->next_sibling = obj;
-    else
-      first_obj = obj;
-    last_obj = obj;
+    hwloc_pci_tree_insert_by_busid(&tree, obj);
   }
 
   closedir(dir);
+
+  return hwloc_pci_tree_attach_belowroot(backend->topology, tree);
+}
+
+static hwloc_obj_t
+hwloc_linuxfs_pci_find_pcislot_obj(struct hwloc_obj *tree,
+				   unsigned domain, unsigned bus, unsigned dev)
+{
+  for ( ; tree; tree = tree->next_sibling) {
+    if (tree->type == HWLOC_OBJ_PCI_DEVICE
+	|| (tree->type == HWLOC_OBJ_BRIDGE
+	    && tree->attr->bridge.upstream_type == HWLOC_OBJ_BRIDGE_PCI)) {
+      if (tree->attr->pcidev.domain == domain
+	  && tree->attr->pcidev.bus == bus
+	  && tree->attr->pcidev.dev == dev
+	  && tree->attr->pcidev.func == 0)
+	/* that's the right bus id */
+	return tree;
+      if (tree->attr->pcidev.domain > domain
+	  || (tree->attr->pcidev.domain == domain
+	      && tree->attr->pcidev.bus > bus))
+	/* bus id too high, won't find anything later */
+	return NULL;
+      if (tree->type == HWLOC_OBJ_BRIDGE
+	  && tree->attr->bridge.downstream_type == HWLOC_OBJ_BRIDGE_PCI
+	  && tree->attr->bridge.downstream.pci.domain == domain
+	  && tree->attr->bridge.downstream.pci.secondary_bus <= bus
+	  && tree->attr->bridge.downstream.pci.subordinate_bus >= bus)
+	/* not the right bus id, but it's included in the bus below that bridge */
+	return hwloc_linuxfs_pci_find_pcislot_obj(tree->io_first_child, domain, bus, dev);
+
+    } else if (tree->type == HWLOC_OBJ_BRIDGE
+	       && tree->attr->bridge.upstream_type != HWLOC_OBJ_BRIDGE_PCI
+	       && tree->attr->bridge.downstream_type == HWLOC_OBJ_BRIDGE_PCI
+	       /* non-PCI to PCI bridge, just look at the subordinate bus */
+	       && tree->attr->bridge.downstream.pci.domain == domain
+	       && tree->attr->bridge.downstream.pci.secondary_bus <= bus
+	       && tree->attr->bridge.downstream.pci.subordinate_bus >= bus) {
+      /* contains our bus, recurse */
+      return hwloc_linuxfs_pci_find_pcislot_obj(tree->io_first_child, domain, bus, dev);
+    }
+  }
+  return NULL;
+}
+
+static int
+hwloc_linuxfs_pci_look_pcislots(struct hwloc_backend *backend)
+{
+  struct hwloc_topology *topology = backend->topology;
+  struct hwloc_linux_backend_data_s *data = backend->private_data;
+  int root_fd = data->root_fd;
+  DIR *dir;
+  struct dirent *dirent;
 
   dir = hwloc_opendir("/sys/bus/pci/slots/", root_fd);
   if (dir) {
@@ -5089,17 +5068,9 @@ hwloc_look_linuxfs_pci(struct hwloc_backend *backend)
       if (file) {
 	unsigned domain, bus, dev;
 	if (fscanf(file, "%x:%x:%x", &domain, &bus, &dev) == 3) {
-	  hwloc_obj_t obj = first_obj;
-	  while (obj) {
-	    if (obj->attr->pcidev.domain == domain
-		&& obj->attr->pcidev.bus == bus
-		&& obj->attr->pcidev.dev == dev
-		&& obj->attr->pcidev.func == 0) {
-	      hwloc_obj_add_info(obj, "PCISlot", dirent->d_name);
-	      break;
-	    }
-	    obj = obj->next_sibling;
-	  }
+	  hwloc_obj_t obj = hwloc_linuxfs_pci_find_pcislot_obj(hwloc_get_root_obj(topology)->io_first_child, domain, bus, dev);
+	  if (obj)
+	    hwloc_obj_add_info(obj, "PCISlot", dirent->d_name);
 	}
 	fclose(file);
       }
@@ -5107,18 +5078,80 @@ hwloc_look_linuxfs_pci(struct hwloc_backend *backend)
     closedir(dir);
   }
 
-  res = hwloc_insert_pci_device_list(backend, first_obj);
+  return 0;
+}
+#endif /* HWLOC_HAVE_LINUXPCI */
 
- out_with_rootfd:
-  close(root_fd);
+static int
+hwloc_look_linuxfs_io(struct hwloc_backend *backend)
+{
+  struct hwloc_topology *topology = backend->topology;
+  struct hwloc_linux_backend_data_s *data = NULL;
+  struct hwloc_backend *tmpbackend;
+  int root_fd = -1;
+#ifdef HWLOC_HAVE_LINUXPCI
+  struct hwloc_obj *tmp;
+  int needpcidiscovery;
+#endif
+  int res = 0;
+
+  if (!(hwloc_topology_get_flags(topology) & (HWLOC_TOPOLOGY_FLAG_IO_DEVICES|HWLOC_TOPOLOGY_FLAG_WHOLE_IO)))
+    return 0;
+
+  /* hackily find the linux backend to steal its private_data (for fsroot) */
+  tmpbackend = topology->backends;
+  while (tmpbackend) {
+    if (tmpbackend->component == &hwloc_linux_disc_component) {
+      data = tmpbackend->private_data;
+      break;
+    }
+    tmpbackend = tmpbackend->next;
+  }
+  assert(data);
+  backend->private_data = data;
+  root_fd = data->root_fd;
+  hwloc_debug("linuxio backend stole linux backend root_fd %d\n", root_fd);
+
+#ifdef HWLOC_HAVE_LINUXPCI
+  /* don't rediscovery PCI devices if another backend did it
+   * (they are attached to root until later in the core discovery)
+   */
+  needpcidiscovery = 1;
+  tmp = hwloc_get_root_obj(topology)->io_first_child;
+  while (tmp) {
+    if (tmp->type == HWLOC_OBJ_PCI_DEVICE
+	|| (tmp->type == HWLOC_OBJ_BRIDGE && tmp->attr->bridge.downstream_type == HWLOC_OBJ_BRIDGE_PCI)) {
+      hwloc_debug("%s", "PCI objects already added, ignoring linuxio PCI discovery.\n");
+      needpcidiscovery = 0;
+      break;
+    }
+    tmp = tmp->next_sibling;
+  }
+
+  if (needpcidiscovery)
+    res = hwloc_linuxfs_pci_look_pcidevices(backend);
+
+  hwloc_linuxfs_pci_look_pcislots(backend);
+#endif /* HWLOC_HAVE_LINUXPCI */
+
+  res += hwloc_linuxfs_lookup_block_class(backend);
+  res += hwloc_linuxfs_lookup_net_class(backend);
+  res += hwloc_linuxfs_lookup_infiniband_class(backend);
+  res += hwloc_linuxfs_lookup_mic_class(backend);
+  res += hwloc_linuxfs_lookup_drm_class(backend);
+  if (hwloc_topology_get_flags(topology) & HWLOC_TOPOLOGY_FLAG_WHOLE_IO)
+    res += hwloc_linuxfs_lookup_dma_class(backend);
+  if (hwloc_topology_get_flags(topology) & HWLOC_TOPOLOGY_FLAG_WHOLE_IO)
+    res += hwloc__get_firmware_dmi_memory_info(topology, data);
+
   return res;
 }
 
 static struct hwloc_backend *
-hwloc_linuxpci_component_instantiate(struct hwloc_disc_component *component,
-				     const void *_data1 __hwloc_attribute_unused,
-				     const void *_data2 __hwloc_attribute_unused,
-				     const void *_data3 __hwloc_attribute_unused)
+hwloc_linuxio_component_instantiate(struct hwloc_disc_component *component,
+				    const void *_data1 __hwloc_attribute_unused,
+				    const void *_data2 __hwloc_attribute_unused,
+				    const void *_data3 __hwloc_attribute_unused)
 {
   struct hwloc_backend *backend;
 
@@ -5127,26 +5160,29 @@ hwloc_linuxpci_component_instantiate(struct hwloc_disc_component *component,
   backend = hwloc_backend_alloc(component);
   if (!backend)
     return NULL;
-  backend->flags = HWLOC_BACKEND_FLAG_NEED_LEVELS;
-  backend->discover = hwloc_look_linuxfs_pci;
+  backend->discover = hwloc_look_linuxfs_io;
+  /* backend->private_data will point to the main linux private_data after load(),
+   * once the main linux component is instantiated for sure.
+   * it remains valid until the main linux component gets disabled during topology destroy.
+   */
   return backend;
 }
 
-static struct hwloc_disc_component hwloc_linuxpci_disc_component = {
+static struct hwloc_disc_component hwloc_linuxio_disc_component = {
   HWLOC_DISC_COMPONENT_TYPE_MISC,
-  "linuxpci",
+  "linuxio",
   HWLOC_DISC_COMPONENT_TYPE_GLOBAL,
-  hwloc_linuxpci_component_instantiate,
+  hwloc_linuxio_component_instantiate,
   19, /* after pci */
   NULL
 };
 
-const struct hwloc_component hwloc_linuxpci_component = {
+const struct hwloc_component hwloc_linuxio_component = {
   HWLOC_COMPONENT_ABI,
   NULL, NULL,
   HWLOC_COMPONENT_TYPE_DISC,
   0,
-  &hwloc_linuxpci_disc_component
+  &hwloc_linuxio_disc_component
 };
 
-#endif /* HWLOC_HAVE_LINUXPCI */
+#endif /* HWLOC_HAVE_LINUXIO */

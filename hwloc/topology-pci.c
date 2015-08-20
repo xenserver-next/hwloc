@@ -1,6 +1,6 @@
 /*
  * Copyright © 2009 CNRS
- * Copyright © 2009-2014 Inria.  All rights reserved.
+ * Copyright © 2009-2015 Inria.  All rights reserved.
  * Copyright © 2009-2011, 2013 Université Bordeaux
  * Copyright © 2014 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -77,25 +77,30 @@ static int
 hwloc_look_pci(struct hwloc_backend *backend)
 {
   struct hwloc_topology *topology = backend->topology;
-  struct hwloc_obj *first_obj = NULL, *last_obj = NULL;
+  struct hwloc_obj *tree = NULL, *tmp;
   int ret;
   struct pci_device_iterator *iter;
   struct pci_device *pcidev;
-#ifdef HWLOC_LINUX_SYS
-  DIR *dir;
-#endif
 
   if (!(hwloc_topology_get_flags(topology) & (HWLOC_TOPOLOGY_FLAG_IO_DEVICES|HWLOC_TOPOLOGY_FLAG_WHOLE_IO)))
     return 0;
 
-  if (hwloc_get_next_pcidev(topology, NULL)) {
-    hwloc_debug("%s", "PCI objects already added, ignoring pci backend.\n");
-    return 0;
-  }
-
   if (!hwloc_topology_is_thissystem(topology)) {
     hwloc_debug("%s", "\nno PCI detection (not thissystem)\n");
     return 0;
+  }
+
+  /* don't do anything if another backend attached PCI already
+   * (they are attached to root until later in the core discovery)
+   */
+  tmp = hwloc_get_root_obj(topology)->io_first_child;
+  while (tmp) {
+    if (tmp->type == HWLOC_OBJ_PCI_DEVICE
+	|| (tmp->type == HWLOC_OBJ_BRIDGE && tmp->attr->bridge.downstream_type == HWLOC_OBJ_BRIDGE_PCI)) {
+      hwloc_debug("%s", "PCI objects already added, ignoring linuxpci backend.\n");
+      return 0;
+    }
+    tmp = tmp->next_sibling;
   }
 
   hwloc_debug("%s", "\nScanning PCI buses...\n");
@@ -243,52 +248,14 @@ hwloc_look_pci(struct hwloc_backend *backend)
 		device_class, pcidev->vendor_id, pcidev->device_id,
 		fullname && *fullname ? fullname : "??");
 
-    /* queue the object for now */
-    if (first_obj)
-      last_obj->next_sibling = obj;
-    else
-      first_obj = obj;
-    last_obj = obj;
+    hwloc_pci_tree_insert_by_busid(&tree, obj);
   }
 
   /* finalize device scanning */
   pci_iterator_destroy(iter);
   pci_system_cleanup();
 
-#ifdef HWLOC_LINUX_SYS
-  dir = opendir("/sys/bus/pci/slots/");
-  if (dir) {
-    struct dirent *dirent;
-    while ((dirent = readdir(dir)) != NULL) {
-      char path[64];
-      FILE *file;
-      if (dirent->d_name[0] == '.')
-	continue;
-      snprintf(path, sizeof(path), "/sys/bus/pci/slots/%s/address", dirent->d_name);
-      file = fopen(path, "r");
-      if (file) {
-	unsigned domain, bus, dev;
-	if (fscanf(file, "%x:%x:%x", &domain, &bus, &dev) == 3) {
-	  hwloc_obj_t obj = first_obj;
-	  while (obj) {
-	    if (obj->attr->pcidev.domain == domain
-		&& obj->attr->pcidev.bus == bus
-		&& obj->attr->pcidev.dev == dev
-		&& obj->attr->pcidev.func == 0) {
-	      hwloc_obj_add_info(obj, "PCISlot", dirent->d_name);
-	      break;
-	    }
-	    obj = obj->next_sibling;
-	  }
-	}
-	fclose(file);
-      }
-    }
-    closedir(dir);
-  }
-#endif
-
-  return hwloc_insert_pci_device_list(backend, first_obj);
+  return hwloc_pci_tree_attach_belowroot(topology, tree);
 }
 
 static struct hwloc_backend *
@@ -304,7 +271,6 @@ hwloc_pci_component_instantiate(struct hwloc_disc_component *component,
   backend = hwloc_backend_alloc(component);
   if (!backend)
     return NULL;
-  backend->flags = HWLOC_BACKEND_FLAG_NEED_LEVELS;
   backend->discover = hwloc_look_pci;
   return backend;
 }

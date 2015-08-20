@@ -234,7 +234,6 @@ extern "C" {
 #define hwloc_get_next_osdev HWLOC_NAME(get_next_osdev)
 #define hwloc_get_next_bridge HWLOC_NAME(get_next_bridge)
 #define hwloc_bridge_covers_pcibus HWLOC_NAME(bridge_covers_pcibus)
-#define hwloc_get_hostbridge_by_pcibus HWLOC_NAME(get_hostbridge_by_pcibus)
 
 /* hwloc/bitmap.h */
 
@@ -474,8 +473,7 @@ extern "C" {
 
 #define hwloc_backend_alloc HWLOC_NAME(backend_alloc)
 #define hwloc_backend_enable HWLOC_NAME(backend_enable)
-#define hwloc_backends_get_obj_cpuset HWLOC_NAME(backends_get_obj_cpuset)
-#define hwloc_backends_notify_new_object HWLOC_NAME(backends_notify_new_object)
+#define hwloc_backends_get_pci_busid_cpuset HWLOC_NAME(backends_get_pci_busid_cpuset)
 
 #define hwloc_component_type_e HWLOC_NAME(component_type_e)
 #define HWLOC_COMPONENT_TYPE_DISC HWLOC_NAME_CAPS(COMPONENT_TYPE_DISC)
@@ -494,10 +492,13 @@ extern "C" {
 #define hwloc_alloc_setup_object HWLOC_NAME(alloc_setup_object)
 #define hwloc_obj_add_children_sets HWLOC_NAME(add_children_sets)
 
-#define hwloc_insert_pci_device_list HWLOC_NAME(insert_pci_device_list)
 #define hwloc_pci_find_cap HWLOC_NAME(pci_find_cap)
 #define hwloc_pci_find_linkspeed HWLOC_NAME(pci_find_linkspeed)
 #define hwloc_pci_prepare_bridge HWLOC_NAME(pci_prepare_bridge)
+#define hwloc_pci_tree_insert_by_busid HWLOC_NAME(pci_tree_insert_by_busid)
+#define hwloc_pci_tree_attach_belowroot HWLOC_NAME(pci_tree_attach_belowroot)
+#define hwloc_pci_belowroot_find_by_busid HWLOC_NAME(pci_belowroot_find_by_busid)
+#define hwloc_pci_find_busid_parent HWLOC_NAME(pci_find_busid_parent)
 
 /* hwloc/deprecated.h */
 
@@ -583,6 +584,9 @@ extern "C" {
 
 #define hwloc_topology_setup_defaults HWLOC_NAME(topology_setup_defaults)
 #define hwloc_topology_clear HWLOC_NAME(topology_clear)
+
+#define hwloc_find_insert_io_parent_by_complete_cpuset HWLOC_NAME(hwloc_find_insert_io_parent_by_complete_cpuset)
+#define hwloc_pci_belowroot_apply_locality HWLOC_NAME(pci_belowroot_apply_locality)
 
 #define hwloc__add_info HWLOC_NAME(_add_info)
 #define hwloc__find_info_slot HWLOC_NAME(_find_info_slot)
