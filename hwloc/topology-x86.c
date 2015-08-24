@@ -349,6 +349,11 @@ static void get_fill_intel_tlb(struct procinfo *infos, struct cpuiddump *src_cpu
 }
 
 static int add_tlb_from_amd_register(struct tlbinfo * tlbSet,unsigned* numTlb, unsigned regist, unsigned type, int size){
+/*
+  type: 0 : L1 instruction,   1 : L1 data,
+   2 : L2 shared,    3 : L2 instruction,    4 : L2 data
+  size: 0 : 4 KB pages,    1 : 2/4 MB pages,     2 : 1 GB pages
+*/
   int associativity;
   if(type == 1 || type == 4)
     regist=regist>>16;
@@ -873,7 +878,7 @@ static int annotateCore(struct hwloc_backend *backend, struct procinfo *infos, h
         length += snprintf(property + length,128-length,", 1GB : %d",infos->tlbs[i].entriesnumber1GB);
 
       if(length >= 128){
-        fprintf(stderr, "buffer too small (annotateCore from topology-x86) tried to put %d in a buffer of size 128\n", lenght);
+        fprintf(stderr, "buffer too small (annotateCore from topology-x86) tried to put %d in a buffer of size 128\n", length);
       }
       hwloc_obj_add_info(toAnnotate,propertyName,property);
     }
@@ -1273,6 +1278,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos)
 
   for (i = 0; i < nbprocs; i++) {
     free(infos[i].cache);
+    free(infos[i].tlbs);
     if (infos[i].otherids)
       free(infos[i].otherids);
   }
