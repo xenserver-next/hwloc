@@ -234,15 +234,17 @@ static void fill_amd_cache(struct procinfo *infos, unsigned level, int type, uns
     cache->nbthreads_sharing = infos->max_log_proc;
   cache->linesize = cpuid & 0xff;
   cache->linepart = 0;
+  cache->inclusiveness = 0;
+  /*get inclusiveness old AMD (K8-K10 suposed to have exclusive cache)
+  *http://www.cpu-world.com/CPUs/K8/AMD-Opteron%20144%20-%20OSA144CCO5AG.html
+  *http://www.cpu-world.com/CPUs/K10/AMD-Opteron%206164%20HE%20-%20OS6164VATCEGO.html
+  */
   if (level == 1) {
-    cache->inclusiveness = 0;//get inclusiveness old AMD ( suposed to be L1 false)
-
     cache->ways = (cpuid >> 16) & 0xff;
     if (cache->ways == 0xff)
       /* Fully associative */
       cache->ways = -1;
   } else {
-    cache->inclusiveness = 1;//get inclusivenessold AMD ( suposed to be L2 L3 true)
 
     static const unsigned ways_tab[] = { 0, 1, 2, 0, 4, 0, 8, 0, 16, 0, 32, 48, 64, 96, 128, -1 };
     unsigned ways = (cpuid >> 12) & 0xf;
@@ -900,7 +902,7 @@ static hwloc_obj_t addCache(struct hwloc_backend *backend, struct procinfo *info
     hwloc_obj_t cacheAdded;
     unsigned j,level, type;
     unsigned packageid = infos[infoId].packageid;
-    unsigned cacheid = (infos[infoId].apicid % infos[j].max_log_proc) / cacheList->caches[cacheList->numberFound]->nbthreads_sharing;
+    unsigned cacheid = (infos[infoId].apicid % infos[infoId].max_log_proc) / cacheList->caches[cacheList->numberFound]->nbthreads_sharing;
     unsigned nbprocs = ((struct hwloc_x86_backend_data_s *)backend->private_data)->nbprocs;
     cache_cpuset = hwloc_bitmap_alloc();
     level = cacheList->caches[cacheList->numberFound]->level;//numberFound : number of cache found
