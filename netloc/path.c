@@ -17,7 +17,7 @@
 netloc_path_t *netloc_path_construct(void)
 {
     netloc_path_t *path = (netloc_path_t *)
-        malloc(sizeof(netloc_path_t ));
+        malloc(sizeof(netloc_path_t));
     utarray_new(path->links, &ut_ptr_icd);
 
     return path;

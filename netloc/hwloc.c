@@ -97,7 +97,7 @@ int netloc_topology_read_hwloc(netloc_topology_t *topology, int num_nodes,
             }
             else
                 fclose(fxml);
-            asprintf(&refname, "%s", node->hostname);
+            refname = strdup(node->hostname);
         }
 
         /* Add the hwloc topology */

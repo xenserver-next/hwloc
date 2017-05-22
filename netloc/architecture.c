@@ -18,7 +18,6 @@ typedef struct netloc_analysis_data_t {
     void *userdata;
 } netloc_analysis_data;
 
-
 static int partition_topology_to_tleaf(netloc_topology_t *topology,
         int partition, int num_cores, netloc_arch_t *arch);
 static netloc_arch_tree_t *tree_merge(netloc_arch_tree_t *main,
@@ -31,9 +30,8 @@ static netloc_arch_node_t *netloc_arch_node_construct(void);
     if (fscanf(f, " %1023s", w) != 1) { \
         fprintf(stderr, "Cannot read %s\n", str); \
         perror("fscanf"); \
-        goto ERROR; \
+        goto failed; \
     }
-
 
 /* Complete the topology to have a complete balanced tree  */
 void netloc_arch_tree_complete(netloc_arch_tree_t *tree, UT_array **down_degrees_by_level,
@@ -124,51 +122,51 @@ static int get_current_resources(int *pnum_nodes, char ***pnodes, int **pslot_id
         return NETLOC_ERROR;
     }
 
-    checked_fscanf(file, word, "num_nodes", failed);
+    checked_fscanf(file, word, "num_nodes", ERROR);
 
     int num_nodes;
     num_nodes = strtol(word, &end_word, 10);
     if (*word == '\0' || *end_word != '\0' || num_nodes <= 0) {
-        fprintf(stderr, "Oups: incorrect number of nodes (%d) in \"%s\"\n",
+        fprintf(stderr, "Error: incorrect number of nodes (%d) in \"%s\"\n",
                 num_nodes, word);
         goto ERROR;
     }
 
     nodes = (char **)malloc(sizeof(char *[num_nodes]));
     for (int n = 0; n < num_nodes; n++) {
-        checked_fscanf(file, word, "node", failed);
+        checked_fscanf(file, word, "node", ERROR);
         nodes[n] = strdup(word);
     }
 
     slot_idx = (int *)malloc(sizeof(int[num_nodes+1]));
     slot_idx[0] = 0;
     for (int n = 0; n < num_nodes; n++) {
-        checked_fscanf(file, word, "slot index", failed);
+        checked_fscanf(file, word, "slot index size", ERROR);
 
-        int slot_index = strtol(word, &end_word, 10);
-        if (*word == '\0' || *end_word != '\0' || num_nodes <= 0) {
-            fprintf(stderr, "Oups: incorrect slot index (%d) in \"%s\"\n",
-                    slot_index, word);
+        int nslots = strtol(word, &end_word, 10);
+        if (*word == '\0' || *end_word != '\0' || nslots <= 0) {
+            fprintf(stderr, "Error: incorrect slot index size (%d) in \"%s\"\n",
+                    nslots, word);
             goto ERROR;
         }
-        slot_idx[n+1] = slot_idx[n]+slot_index;
+        slot_idx[n+1] = slot_idx[n]+nslots;
     }
 
     slot_list = (int *)malloc(sizeof(int[slot_idx[num_nodes]]));
     rank_list = (int *)malloc(sizeof(int[slot_idx[num_nodes]]));
     for (int s = 0; s < slot_idx[num_nodes]; s++) {
-        checked_fscanf(file, word, "slot number", failed);
+        checked_fscanf(file, word, "slot number", ERROR);
         slot_list[s] = strtol(word, &end_word, 10);
-        if (*word == '\0' || *end_word != '\0' || num_nodes <= 0) {
-            fprintf(stderr, "Oups: incorrect slot number (%d) in \"%s\"\n",
+        if (*word == '\0' || *end_word != '\0' || slot_list[s] < 0) {
+            fprintf(stderr, "Error: incorrect slot index (%d) in \"%s\"\n",
                     slot_list[s], word);
             goto ERROR;
         }
 
-        checked_fscanf(file, word, "rank number", failed);
+        checked_fscanf(file, word, "rank number", ERROR);
         rank_list[s] = strtol(word, &end_word, 10);
-        if (*word == '\0' || *end_word != '\0' || num_nodes <= 0) {
-            fprintf(stderr, "Oups: incorrect rank number (%d) in \"%s\"\n",
+        if (*word == '\0' || *end_word != '\0' || rank_list[s] <= 0) {
+            fprintf(stderr, "Error: incorrect rank number (%d) in \"%s\"\n",
                     rank_list[s], word);
             goto ERROR;
         }
@@ -197,15 +195,16 @@ int netloc_arch_set_current_resources(netloc_arch_t *arch)
 {
     int ret;
     int num_nodes;
-    char **nodenames;
-    int *slot_idx;
-    int *slot_list;
-    int *rank_list;
+    char **nodenames = NULL;
+    int *slot_idx  = NULL;
+    int *slot_list = NULL;
+    int *rank_list = NULL;
 
     ret = get_current_resources(&num_nodes, &nodenames, &slot_idx, &slot_list,
             &rank_list);
 
-    if (ret != NETLOC_SUCCESS || num_nodes <= 0)
+    if (ret != NETLOC_SUCCESS)
+        /* || (num_nodes <= 0) No need for this check : done in get_current_resources */
         assert(0); // XXX
 
     NETLOC_int *current_nodes = NULL;
@@ -242,7 +241,6 @@ int netloc_arch_set_current_resources(netloc_arch_t *arch)
         if (ret != NETLOC_SUCCESS)
             goto ERROR;
 
-
         if (!arch->has_slots) {
             current_nodes[n] = node->idx_in_topo;
         }
@@ -257,7 +255,7 @@ int netloc_arch_set_current_resources(netloc_arch_t *arch)
         if (!arch->has_slots) {
             if (constant_num_slots) {
                 if (constant_num_slots != num_slots) {
-                    fprintf(stderr, "Oups: the same number of cores by node is needed!\n");
+                    fprintf(stderr, "Error: the same number of cores by node is needed!\n");
                     assert(constant_num_slots == num_slots);
                 }
             } else {
@@ -402,7 +400,7 @@ int netloc_arch_set_global_resources(netloc_arch_t *arch)
         if (!arch->has_slots) {
             if (constant_num_slots) {
                 if (constant_num_slots != num_slots) {
-                    fprintf(stderr, "Oups: the same number of cores by node is needed!\n");
+                    fprintf(stderr, "Error: the same number of cores by node is needed!\n");
                     assert(constant_num_slots == num_slots);
                 }
             } else {
