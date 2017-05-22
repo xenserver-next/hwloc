@@ -67,7 +67,7 @@ netloc_topology_t *netloc_topology_construct(char *path)
         subnet = strdup(line);
     }
 
-    char *hwlocpath;
+    char *hwlocpath = NULL;
     if (netloc_line_get(&line, &linesize, input) == -1) {
         fprintf(stderr, "Cannot read hwloc path in %s\n", path);
         perror("fscanf");
@@ -87,19 +87,18 @@ netloc_topology_t *netloc_topology_construct(char *path)
             char *path_tmp = strdup(path);
             asprintf(&realhwlocpath, "%s/%s", dirname(path_tmp), hwlocpath);
             free(path_tmp);
-        } else {
-            realhwlocpath = strdup(hwlocpath);
+            free(hwlocpath);
+            hwlocpath = realhwlocpath;
         }
-        if (!(hwlocdir = opendir(realhwlocpath))) {
-            fprintf(stderr, "Couldn't open hwloc directory: \"%s\"\n", realhwlocpath);
+        if (!(hwlocdir = opendir(hwlocpath))) {
+            fprintf(stderr, "Couldn't open hwloc directory: \"%s\"\n", hwlocpath);
             perror("opendir");
             free(subnet);
-            free(realhwlocpath);
+            free(hwlocpath);
             fclose(input);
             return NULL;
         } else {
             closedir(hwlocdir);
-            free(realhwlocpath);
         }
     }
 
@@ -108,6 +107,7 @@ netloc_topology_t *netloc_topology_construct(char *path)
         fprintf(stderr, "Cannot read the number of nodes in %s\n", path);
         perror("fscanf");
         free(subnet);
+        free(hwlocpath);
         fclose(input);
         return NULL;
     }
@@ -116,6 +116,7 @@ netloc_topology_t *netloc_topology_construct(char *path)
         fprintf(stderr, "Oups: incorrect number of nodes (%d) in %s\n",
                 num_nodes, path);
         free(subnet);
+        free(hwlocpath);
         fclose(input);
         return NULL;
     }
@@ -126,6 +127,7 @@ netloc_topology_t *netloc_topology_construct(char *path)
     topology = (netloc_topology_t *)malloc(sizeof(netloc_topology_t) * 1);
     if( NULL == topology ) {
         free(subnet);
+        free(hwlocpath);
         fclose(input);
         return NULL;
     }
@@ -181,8 +183,11 @@ netloc_topology_t *netloc_topology_construct(char *path)
 
         if (!node) {
             fprintf(stderr, "Node not found: %s\n", field);
+            free(subnet);
+            free(hwlocpath);            
             utarray_free(topology->partitions);
             utarray_free(topology->topos);
+            fclose(input);
             return NULL;
         }
 
