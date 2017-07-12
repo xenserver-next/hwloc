@@ -1,8 +1,7 @@
-# Copyright © 2014 Cisco Systems, Inc.  All rights reserved.
+# Copyright © 2014      Cisco Systems, Inc.  All rights reserved.
 # Copyright © 2014      University of Wisconsin-La Crosse.
-#                         All rights reserved.
-#
-# Copyright © 2016 Inria.  All rights reserved.
+#                       All rights reserved.
+# Copyright © 2016-2017 Inria.  All rights reserved.
 # See COPYING in top-level directory.
 #
 # $HEADER$
@@ -11,7 +10,8 @@
 if BUILD_NETLOC
 AM_CPPFLAGS = \
         $(NETLOC_CPPFLAGS) \
-        $(HWLOC_CPPFLAGS)
+        $(HWLOC_CPPFLAGS) \
+	$(HWLOC_LIBXML2_CFLAGS)
 
 # If we're in standalone mode, build the installable library.
 # Otherwise, build the embedded library.
@@ -25,6 +25,7 @@ endif
 sources = \
         support.c \
         topology.c \
+	partition.c \
         edge.c \
         node.c \
         physical_link.c \
@@ -39,7 +40,8 @@ sources = \
 libnetloc_la_SOURCES = $(sources)
 libnetloc_la_LDFLAGS = $(ldflags) -version-info $(libnetloc_so_version)
 libnetloc_la_LIBADD = \
-        $(top_builddir)/hwloc/libhwloc.la
+        $(top_builddir)/hwloc/libhwloc.la \
+	$(HWLOC_LIBXML2_LIBS)
 
 # Embedded library (note the lack of a .so version number -- that
 # intentionally only appears in the installable library).  Also note
@@ -49,7 +51,8 @@ libnetloc_la_LIBADD = \
 libnetloc_embedded_la_SOURCES = $(sources)
 libnetloc_embedded_la_LDFLAGS = $(ldflags)
 libnetloc_embedded_la_LIBADD = \
-        $(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la
+        $(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la \
+	$(HWLOC_LIBXML2_LIBS)
 
 if BUILD_NETLOCSCOTCH
 # If we're in standalone mode, build the installable library.

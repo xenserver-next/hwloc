@@ -1,0 +1,20 @@
+# Copyright © 2017      Inria.  All rights reserved.
+#
+# See COPYING in top-level directory.
+#
+# $HEADER$
+#
+
+noinst_LTLIBRARIES = libnetloc_libxml_write.la
+
+AM_CPPFLAGS = \
+        -I$(top_builddir)/include \
+        -I$(top_srcdir)/include \
+	$(HWLOC_LIBXML2_CFLAGS)
+
+libnetloc_libxml_write_la_SOURCES = \
+        netloc_libxml_write.c
+
+libnetloc_libxml_write_la_LIBADD = \
+	$(top_builddir)/netloc/libnetloc.la \
+	$(HWLOC_LIBXML2_LIBS)

@@ -44,6 +44,11 @@ EOF])
     AS_IF([test "$netloc_happy" = "yes"],
           [NETLOC_CHECK_PLATFORM([netloc_happy])])
 
+    # Grr; we use #ifndef for NETLOC_DEBUG!  :-(
+    AH_TEMPLATE(NETLOC_DEBUG, [Whether we are in debugging mode or not])
+    AS_IF([test "$hwloc_debug" = "1"], [AC_DEFINE([NETLOC_DEBUG])])
+    AC_MSG_RESULT([$hwloc_debug_msg])
+
     AC_SUBST(NETLOC_CFLAGS)
     AC_SUBST(NETLOC_CPPFLAGS)
     AC_SUBST(NETLOC_LDFLAGS)

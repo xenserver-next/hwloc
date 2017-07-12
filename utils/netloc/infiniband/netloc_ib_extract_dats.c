@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016 Inria.  All rights reserved.
+ * Copyright © 2016-2017 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <private/netloc.h>
+#include <private/utils/xml.h>
 #include <netloc/uthash.h>
 #include <netloc/utarray.h>
 
@@ -28,79 +29,7 @@
 #include <fcntl.h>
 #include <string.h>
 
-int global_link_idx = 0;
-
-typedef struct {
-    UT_hash_handle hh;         /* makes this structure hashable */
-    char dest[20];             /* key */
-    float total_gbits;
-    UT_array *physical_link_idx;
-    int *partitions;
-} edge_t;
-
-typedef struct {
-    UT_hash_handle hh;       /* makes this structure hashable */
-    char physical_id[20];    /* key */
-    long logical_id;
-    int type;
-    char *description;
-    edge_t *edges;
-    int main_partition;
-    char *hostname;
-    int *partitions;
-    UT_array *physical_links;
-} node_t;
-node_t *nodes = NULL;
-
-typedef struct {
-    int int_id; // TODO long long
-    int ports[2];
-    node_t *dest;
-    char *width;
-    char *speed;
-    float gbits;
-    char *description;
-    int *partitions;
-    int other_id;
-    edge_t *parent_edge;
-    node_t *parent_node;
-} physical_link_t;
-UT_icd physical_link_icd = {sizeof(physical_link_t), NULL, NULL, NULL };
-
-UT_icd partitions_icd = {sizeof(char *), NULL, NULL, NULL };
-UT_array *partitions = NULL;
-
-const int NODE_TYPE_HOST = 0;
-const int NODE_TYPE_SWITH = 1;
-const int NODE_TYPE_UNKNOWN = 2;
-
-/* Route tables */
-typedef struct {
-    UT_hash_handle hh;       /* makes this structure hashable */
-    char physical_id[20];    /* key */
-    int port;
-} route_dest_t;
-typedef struct {
-    UT_hash_handle hh;       /* makes this structure hashable */
-    char physical_id[20];    /* key */
-    route_dest_t *dest;
-} route_source_t;
-route_source_t *routes = NULL;
-
-/* Paths tables */
-typedef struct {
-    UT_hash_handle hh;       /* makes this structure hashable */
-    char physical_id[20];    /* key */
-    node_t *node;
-    UT_array *links;
-} path_dest_t;
-typedef struct {
-    UT_hash_handle hh;       /* makes this structure hashable */
-    char physical_id[20];    /* key */
-    node_t *node;
-    path_dest_t *dest;
-} path_source_t;
-path_source_t *paths = NULL;
+unsigned long long int global_link_idx = 0;
 
 int read_routes(char *subnet, char *path, char *route_filename);
 int read_discover(char *subnet, char *discover_path, char *filename);
@@ -141,7 +70,7 @@ static char *node_find_hostname(node_t *node)
     char *old_hostname = hostname;
     hostname = realloc(hostname, i*sizeof(char));
     if (!hostname) {
-        fprintf(stderr, "Oups: cannot reallocate memory\n");
+        fprintf(stderr, "ERROR: cannot reallocate memory\n");
         hostname = old_hostname;
     }
     return hostname;
@@ -164,17 +93,13 @@ node_t *get_node(node_t **nodes, char *type, char *lid,
         sprintf(node->physical_id, "%s", id);
 
         node->logical_id = atol(lid);
-        if (!strcmp(type, "CA"))
-            node->type = NODE_TYPE_HOST;
-        else if (!strcmp(type, "SW"))
-            node->type = NODE_TYPE_SWITH;
-        else
-            node->type = NODE_TYPE_UNKNOWN;
+        node->type = netloc_node_type_decode(type);
         node->edges = NULL;
         node->description = strdup(desc);
         node->hostname = node_find_hostname(node);
         node->main_partition = -1;
         node->partitions = NULL;
+        node->subnodes = NULL;
         
         utarray_new(node->physical_links, &physical_link_icd);
 
@@ -185,7 +110,7 @@ node_t *get_node(node_t **nodes, char *type, char *lid,
     return node;
 }
 
-static int find_other_physical_link(physical_link_t *link)
+static physical_link_t *find_other_physical_link(physical_link_t *link)
 {
     node_t *dest = link->dest;
     unsigned int dest_port = link->ports[1];
@@ -193,7 +118,7 @@ static int find_other_physical_link(physical_link_t *link)
     physical_link_t *other_link = (physical_link_t *)
         utarray_eltptr(dest->physical_links, dest_port-1);
 
-    return other_link->int_id;
+    return other_link;
 }
 
 static float compute_gbits(char *speed, char *width)
@@ -243,19 +168,19 @@ int build_paths(void)
 {
     node_t *node_src, *node_dest, *node_tmp1, *node_tmp2;
     HASH_ITER(hh, nodes, node_src, node_tmp1) {
-        if (node_src->type != NODE_TYPE_HOST)
+        if (node_src->type != NETLOC_NODE_TYPE_HOST)
             continue;
         char *id_src = node_src->physical_id;
 
         path_source_t *path = (path_source_t *)
             malloc(sizeof(path_source_t));
-        sprintf(path->physical_id, "%s", id_src);
+        snprintf(path->physical_id, MAX_STR, "%s", id_src);
         path->node = node_src;
         path->dest = NULL;
         HASH_ADD_STR(paths, physical_id, path);
 
         HASH_ITER(hh, nodes, node_dest, node_tmp2) {
-            if (node_dest->type != NODE_TYPE_HOST)
+            if (node_dest->type != NETLOC_NODE_TYPE_HOST)
                 continue;
 
             if (node_dest == node_src) {
@@ -298,7 +223,7 @@ int build_paths(void)
             if (completed) {
                 path_dest_t *path_dest = (path_dest_t *)
                     malloc(sizeof(path_dest_t));
-                sprintf(path_dest->physical_id, "%s", id_dest);
+                snprintf(path_dest->physical_id, MAX_STR, "%s", id_dest);
                 path_dest->node = node_dest;
                 path_dest->links = found_links;
                 HASH_ADD_STR(path->dest, physical_id, path_dest);
@@ -320,7 +245,7 @@ static char *node_find_partition_name(node_t *node)
     char *partition;
 
     max_size = strlen(node->hostname);
-    partition = (char *)malloc((max_size+1)*sizeof(char));
+    partition = (char *)malloc(sizeof(char[max_size+1]));
     name = node->hostname;
 
     /* Looking for the name of the partition */
@@ -332,9 +257,9 @@ static char *node_find_partition_name(node_t *node)
     partition[i++] = '\0';
 
     char *old_partition = partition;
-    partition = realloc(partition, i*sizeof(char));
+    partition = realloc(partition, sizeof(char[i]));
     if (!partition) {
-        fprintf(stderr, "Oups: cannot reallocate memory\n");
+        fprintf(stderr, "ERROR: cannot reallocate memory\n");
         partition = old_partition;
     }
     return partition;
@@ -349,14 +274,14 @@ int netloc_topology_find_partitions(void)
     node_t **hosts;
 
     num_nodes = HASH_COUNT(nodes);
-    partition_names = (char **)malloc(num_nodes*sizeof(char *));
-    hosts = (node_t **)malloc(num_nodes*sizeof(node_t *));
+    partition_names = (char **)malloc(sizeof(char *[num_nodes]));
+    hosts = (node_t **)malloc(sizeof(node_t *[num_nodes]));
 
     /* Save all the partition names */
     int n = 0;
     node_t *node, *node_tmp;
     HASH_ITER(hh, nodes, node, node_tmp) {
-        if (node->type != NODE_TYPE_HOST)
+        if (node->type != NETLOC_NODE_TYPE_HOST)
             continue;
         partition_names[n] = node_find_partition_name(node);
         hosts[n] = node;
@@ -374,6 +299,7 @@ int netloc_topology_find_partitions(void)
         partition_names[num_partitions] = partition_names[n1];
         hosts[n1]->main_partition = num_partitions;
 
+        /* Ensure each partition name is unique in the array */
         for (int n2 = n1+1; n2 < num_hosts; n2++) {
             if (!partition_names[n2])
                 continue;
@@ -388,7 +314,7 @@ int netloc_topology_find_partitions(void)
     }
 
     printf("%d partitions found\n", num_partitions);
-    utarray_new(partitions, &partitions_icd);
+    utarray_new(partitions, &ut_ptr_icd);
     utarray_reserve(partitions, num_partitions);
     for (int p = 0; p < num_partitions; p++) {
         printf("\t'%s'\n", partition_names[p]);
@@ -441,10 +367,21 @@ int netloc_topology_set_partitions(void)
                 link->partitions[partition] = 1;
                 link->parent_node->partitions[partition] = 1;
                 link->parent_edge->partitions[partition] = 1;
+                /* Set reverse physical_link */
+                link = link->other_link;
+                if (!link) {
+                    continue;
+                } else if (!link->partitions) {
+                    link->partitions = (int *)
+                        calloc(utarray_len(partitions), sizeof(int));
+                }
+                link->partitions[partition] = 1;
+                link->parent_node->partitions[partition] = 1;
+                link->parent_edge->partitions[partition] = 1;
             }
         }
     }
-    return 0;
+    return NETLOC_SUCCESS;
 }
 
 void help(char *name, FILE *f)
@@ -579,7 +516,8 @@ int main(int argc, char **argv)
             build_paths();
             netloc_topology_set_partitions();
 
-            write_into_file(subnet, outpath, hwlocpath);
+            netloc_write_into_xml_file(subnet, outpath, hwlocpath,
+                                       NETLOC_NETWORK_TYPE_INFINIBAND);
 
             /* Free node hash table */
             node_t *node, *node_tmp;
@@ -807,6 +745,7 @@ int read_discover(char *subnet, char *path, char *filename)
                 strcpy(edge->dest, dest_node->physical_id);
                 edge->total_gbits = 0;
                 edge->partitions =  NULL;
+                edge->subedges = NULL;
                 utarray_new(edge->physical_link_idx, &ut_int_icd);
                 HASH_ADD_STR(src_node->edges, dest, edge);
             }
@@ -825,7 +764,7 @@ int read_discover(char *subnet, char *path, char *filename)
             link->partitions = NULL;
             link->parent_edge = edge;
             link->parent_node = src_node;
-            link->other_id = -1;
+            link->other_link = NULL;
 
             unsigned int port_idx = link->ports[0]-1;
             /* NB: there is no function to set a specific index */
@@ -875,13 +814,27 @@ int read_discover(char *subnet, char *path, char *filename)
     /* Find the link in the other way */
     node_t *node, *node_tmp;
     HASH_ITER(hh, nodes, node, node_tmp) {
-        unsigned int num_links = utarray_len(node->physical_links);
-        for (unsigned int i = 0; i < num_links; i++) {
-            physical_link_t *link = (physical_link_t *)
-                utarray_eltptr(node->physical_links, i);
-            if (!link->dest)
-                continue;
-            link->other_id = find_other_physical_link(link);
+        if (node->subnodes) {
+            node_t*subnode, *subnode_tmp;
+            HASH_ITER(hh, node->subnodes, subnode, subnode_tmp) {
+                unsigned int num_links = utarray_len(subnode->physical_links);
+                for (unsigned int i = 0; i < num_links; i++) {
+                    physical_link_t *link = (physical_link_t *)
+                        utarray_eltptr(subnode->physical_links, i);
+                    if (!link->dest)
+                        continue;
+                    link->other_link = find_other_physical_link(link);
+                }
+            }
+        } else {
+            unsigned int num_links = utarray_len(node->physical_links);
+            for (unsigned int i = 0; i < num_links; i++) {
+                physical_link_t *link = (physical_link_t *)
+                    utarray_eltptr(node->physical_links, i);
+                if (!link->dest)
+                    continue;
+                link->other_link = find_other_physical_link(link);
+            }
         }
     }
 
@@ -893,22 +846,18 @@ char *partition_list_to_string(int *partition_list)
     if (!partition_list)
         return strdup("");
 
-    int first = 1;
     int offset = 0;
     int num_partitions = utarray_len(partitions);
-    char tmp[20];
-    int max_length = num_partitions*(sprintf(tmp, "%d", num_partitions)+1)+1;
+    int max_length = 1 + num_partitions * snprintf(NULL, 0, "%d:", num_partitions);
 
-    char *string = (char *)malloc(max_length*sizeof(char));
+    char *string = (char *)malloc(sizeof(char[max_length]));
     string[0] = '\0';
     for (int p = 0; p < num_partitions; p++) {
         if (partition_list[p] != 0) {
-            if (!first)
-                offset += sprintf(string+offset, ":");
-            offset += sprintf(string+offset, "%d", p);
-            first = 0;
+            offset += sprintf(string+offset, "%d:", p);
         }
     }
+    string[offset-1] = '\0';
     return string;
 }
 
@@ -925,7 +874,7 @@ int write_into_file(char *subnet, char *path, char *hwlocpath)
     }
     free(output_path);
 
-    fprintf(output, "%d\n", NETLOCFILE_VERSION);
+    fprintf(output, NETLOC_STR_VERS(NETLOCFILE_VERSION) "\n");
     fprintf(output, "%s\n", subnet);
     fprintf(output, "%s\n", hwlocpath? hwlocpath: "");
 
@@ -961,14 +910,14 @@ int write_into_file(char *subnet, char *path, char *hwlocpath)
                     utarray_eltptr(edge->physical_link_idx, l);
                 physical_link_t *link = (physical_link_t *)
                     utarray_eltptr(node->physical_links, link_idx);
-                fprintf(output, "%d,", link->int_id);
+                fprintf(output, "%llu,", link->int_id);
                 fprintf(output, "%d,", link->ports[0]);
                 fprintf(output, "%d,", link->ports[1]);
                 fprintf(output, "%s,", link->width);
                 fprintf(output, "%s,", link->speed);
                 fprintf(output, "%f,", link->gbits);
                 fprintf(output, "%s,", link->description);
-                fprintf(output, "%d,", link->other_id);
+                fprintf(output, "%d,", link->other_link->int_id);
                 char *partition_str = partition_list_to_string(link->partitions);
                 fprintf(output, "%s", partition_str);
                 free(partition_str);
@@ -998,7 +947,7 @@ int write_into_file(char *subnet, char *path, char *hwlocpath)
             for (unsigned int l = 0; l < utarray_len(path_dest->links); l++) {
                 physical_link_t *link = *(physical_link_t **)
                     utarray_eltptr(path_dest->links, l);
-                fprintf(output, ",%d", link->int_id);
+                fprintf(output, ",%llu", link->int_id);
             }
             fprintf(output, "\n");
         }
@@ -1048,7 +997,7 @@ int read_routes(char *subnet, char *path, char *route_dirname)
                 regcomp(&route_re, "^"
                         "0x([0-9a-f]+)[[:space:]]+"            // Dest lid
                         "([[:digit:]]+)[[:space:]]+"           // Port id
-                        ":[[:space:]]+[(]"                        // Separator
+                        ":[[:space:]]+[(]"                     // Separator
                         "(Channel Adapter|Switch)[[:space:]]+" // Type
                         "portguid 0x([0-9a-f]{16}):"           // Dest guid
                         ,
@@ -1061,10 +1010,10 @@ int read_routes(char *subnet, char *path, char *route_dirname)
                     regmatch_t pmatch[5];
                     char *matches[5];
                     int port;
-                    char dest_guid[20];
+                    char dest_guid[MAX_STR];
 
                     if (!regexec(&header_re, line, (size_t)2, pmatch, 0)) {
-                        char guid[20];
+                        char guid[MAX_STR];
                         get_match(line, 2, pmatch, matches);
                         sprintf(guid, "%.4s:%.4s:%.4s:%.4s",
                                 matches[1], matches[1]+4, matches[1]+8, matches[1]+12);
