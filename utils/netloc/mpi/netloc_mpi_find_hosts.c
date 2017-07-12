@@ -39,14 +39,14 @@ int main(int argc, char **argv)
 
     MPI_Init(&argc,&argv);
 
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <output file>\n", argv[0]);
+        MPI_Finalize();
+        exit(1);
+    }
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_ranks);
-
-    if (argc != 2) {
-        if (rank == 0)
-            fprintf(stderr, "Usage: %s <output file>\n", argv[0]);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
 
     hwloc_topology_init(&topology);
     hwloc_topology_load(topology);
@@ -179,12 +179,12 @@ int main(int argc, char **argv)
 
             /* Find hwloc dir path */
             char *hwloc_path;
-            if (netloc_topology->hwlocpath[0] != '/') {
+            if (netloc_topology->hwloc_dir_path[0] != '/') {
                 char *path_tmp = strdup(netloc_topology->topopath);
-                asprintf(&hwloc_path, "%s/%s", dirname(path_tmp), netloc_topology->hwlocpath);
+                asprintf(&hwloc_path, "%s/%s", dirname(path_tmp), netloc_topology->hwloc_dir_path);
                 free(path_tmp);
             } else {
-                hwloc_path = strdup(netloc_topology->hwlocpath);
+                hwloc_path = strdup(netloc_topology->hwloc_dir_path);
             }
 
             /* Check if already have an hwloc file */
