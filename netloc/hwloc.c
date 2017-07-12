@@ -24,148 +24,79 @@ static UT_icd topos_icd = {sizeof(hwloc_topology_t), NULL, NULL, NULL};
 int netloc_topology_read_hwloc(netloc_topology_t *topology, int num_nodes,
         netloc_node_t **node_list)
 {
-    int ret = 0;
-    int all = 0;
+    int ret = NETLOC_ERROR, all = 0, num_topos = 0, n = 0;
 
-    char *hwloc_path;
-
-    if (!topology->hwlocpath) {
-        printf("No hwloc directory recorded in the topology\n");
-        return NETLOC_ERROR;
+    if (!topology->hwlocpaths) {
+        fprintf(stderr, "WARN: No hwloc files recorded in the topology\n");
+        goto ERROR;
     }
 
-    if (topology->hwlocpath[0] != '/') {
-        char *path_tmp = strdup(topology->topopath);
-        asprintf(&hwloc_path, "%s/%s", dirname(path_tmp), topology->hwlocpath);
-        free(path_tmp);
-    } else {
-        hwloc_path = strdup(topology->hwlocpath);
+    if (!topology->hwloc_topos &&
+        !(topology->hwloc_topos = calloc(topology->nb_hwloc_topos, sizeof(hwloc_topology_t)))) {
+        fprintf(stderr, "ERROR: list of hwloc topologies cannot be allocated\n");
+        goto ERROR;
     }
-
-    DIR* dir = opendir(hwloc_path);
-    /* Directory does not exist */
-    if (!dir) {
-        printf("Directory (%s) to hwloc does not exist\n", hwloc_path);
-        free(hwloc_path);
-        return NETLOC_ERROR;
-    }
-    else {
-        closedir(dir);
-    }
-
-    UT_array *hwloc_topo_names = topology->topos;
-    UT_array *hwloc_topos;
-    utarray_new(hwloc_topos, &topos_icd);
-
-    int num_diffs = 0;
 
     if (!num_nodes) {
-        netloc_node_t *node, *node_tmp;
+        netloc_node_t *pnode, *ptmp;
         num_nodes = HASH_COUNT(topology->nodes);
-        node_list = (netloc_node_t **)malloc(sizeof(netloc_node_t *[num_nodes]));
-        int n = 0;
-        netloc_topology_iter_nodes(topology, node, node_tmp) {
-            node_list[n++] = node;
+        node_list = malloc(sizeof(netloc_node_t *[num_nodes]));
+        if (!node_list) {
+            fprintf(stderr, "ERROR: node_list cannot be allocated\n");
+            goto ERROR;
+        }
+        netloc_topology_iter_nodes(topology, pnode, ptmp) {
+            node_list[n++] = pnode;
         }
         all = 1;
     }
 
-    for (int n  = 0; n < num_nodes; n++) {
-        netloc_node_t *node = node_list[n];
-        char *hwloc_file;
-        char *refname;
+    /* Load all hwloc topologies */
+    size_t node_id;
+    for (int n = 0; n < num_nodes; ++n) {
+        node_id = node_list[n]->hwloc_topo_idx;
+        if (!topology->hwloc_topos[node_id]) {
+            hwloc_topology_init(&topology->hwloc_topos[node_id]);
+            hwloc_topology_set_flags(topology->hwloc_topos[node_id],
+                                     HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM);
 
-        if (netloc_node_is_switch(node))
-            continue;
-
-        /* We try to find a diff file */
-        asprintf(&hwloc_file, "%s/%s.diff.xml", hwloc_path, node->hostname);
-        hwloc_topology_diff_t diff;
-        int err;
-        if ((err = hwloc_topology_diff_load_xml(hwloc_file, &diff, &refname)) >= 0) {
-            refname[strlen(refname)-4] = '\0';
-            hwloc_topology_diff_destroy(diff);
-            num_diffs++;
-        }
-        else {
-            free(hwloc_file);
-            /* We try to find a regular file */
-            asprintf(&hwloc_file, "%s/%s.xml", hwloc_path, node->hostname);
-            FILE *fxml;
-            if (!(fxml = fopen(hwloc_file, "r"))) {
-                printf("Missing hwloc file: %s\n", hwloc_file);
-            }
-            else
-                fclose(fxml);
-            refname = strdup(node->hostname);
-        }
-
-        /* Add the hwloc topology */
-        unsigned int t = 0;
-        while (t < utarray_len(hwloc_topo_names) &&
-                strcmp(*(char **)utarray_eltptr(hwloc_topo_names, t), refname)) {
-            t++;
-        }
-        /* Topology not found */
-        if (t == utarray_len(hwloc_topo_names)) {
-            utarray_push_back(hwloc_topo_names, &refname);
-
-            /* Read the hwloc topology */
-            hwloc_topology_t topology;
-            hwloc_topology_init(&topology);
-            hwloc_topology_set_flags(topology, HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM);
-
-            char *hwloc_ref_path;
-            asprintf(&hwloc_ref_path, "%s/%s.xml", hwloc_path, refname);
-            ret = hwloc_topology_set_xml(topology, hwloc_ref_path);
-            free(hwloc_ref_path);
+            ret = hwloc_topology_set_xml(topology->hwloc_topos[node_id],
+                                         topology->hwlocpaths[node_id]);
             if (ret == -1) {
-                void *null = NULL;
-                utarray_push_back(hwloc_topos, &null);
-                fprintf(stdout, "Warning: no topology for %s\n", refname);
-                hwloc_topology_destroy(topology);
-                free(refname); free(hwloc_file);
+                fprintf(stderr, "WARN: no topology for %s\n", topology->hwlocpaths[node_id]);
+                hwloc_topology_destroy(topology->hwloc_topos[node_id]);
+                topology->hwloc_topos[node_id] = NULL;
                 continue;
             }
 
-            ret = hwloc_topology_set_all_types_filter(topology, HWLOC_TYPE_FILTER_KEEP_STRUCTURE);
+            ret = hwloc_topology_set_all_types_filter(topology->hwloc_topos[node_id],
+                                                      HWLOC_TYPE_FILTER_KEEP_STRUCTURE);
             if (ret == -1) {
                 fprintf(stderr, "hwloc_topology_set_all_types_filter failed\n");
-                free(refname); free(hwloc_file);
                 goto ERROR;
             }
 
-            ret = hwloc_topology_set_io_types_filter(topology, HWLOC_TYPE_FILTER_KEEP_NONE);
+            ret = hwloc_topology_set_io_types_filter(topology->hwloc_topos[node_id],
+                                                     HWLOC_TYPE_FILTER_KEEP_NONE);
             if (ret == -1) {
                 fprintf(stderr, "hwloc_topology_set_all_types_filter failed\n");
-                free(refname); free(hwloc_file);
                 goto ERROR;
             }
 
-            ret = hwloc_topology_load(topology);
+            ret = hwloc_topology_load(topology->hwloc_topos[node_id]);
             if (ret == -1) {
                 fprintf(stderr, "hwloc_topology_load failed\n");
-                free(refname); free(hwloc_file);
                 goto ERROR;
             }
-            utarray_push_back(hwloc_topos, &topology);
+
+            ++num_topos;
         }
-        free(refname);
-        free(hwloc_file);
-        node->hwlocTopo = *(hwloc_topology_t *)utarray_eltptr(hwloc_topos, t);
-        node->hwlocTopoIdx = t;
     }
 
-    if (!num_diffs) {
-        printf("Warning: no hwloc diff file found!\n");
-    }
-
-    topology->topos = hwloc_topo_names;
-    topology->hwloc_topos = (hwloc_topology_t *)hwloc_topos->d;
-
-    printf("%d hwloc topologies found:\n", utarray_len(topology->topos));
-    for (unsigned int p = 0; p < utarray_len(topology->topos); p++) {
-        printf("\t'%s'\n", *(char **)utarray_eltptr(topology->topos, p));
+    printf("%d hwloc topolog%s found:\n", num_topos, num_topos > 1 ? "ies" : "y");
+    for (unsigned int p = 0; p < topology->nb_hwloc_topos; p++) {
+        if (topology->hwloc_topos[p])
+            printf("\t'%s'\n", topology->hwlocpaths[p]);
     }
 
     ret = NETLOC_SUCCESS;
@@ -174,18 +105,14 @@ ERROR:
     if (all) {
         free(node_list);
     }
-    free(hwloc_path);
-    if (ret == NETLOC_SUCCESS)
-        free(hwloc_topos);
-    else
-        utarray_free(hwloc_topos);
+
     return ret;
 }
 
 /* Set the info from hwloc of the node in the correspondig arch */
-int netloc_arch_node_get_hwloc_info(netloc_arch_node_t *arch_node)
+int netloc_arch_node_get_hwloc_info(netloc_arch_node_t *arch_node, netloc_topology_t *nettopology)
 {
-    hwloc_topology_t topology = arch_node->node->hwlocTopo;
+    hwloc_topology_t topology = nettopology->hwloc_topos[arch_node->node->hwloc_topo_idx];
 
     hwloc_obj_t root = hwloc_get_root_obj(topology);
 

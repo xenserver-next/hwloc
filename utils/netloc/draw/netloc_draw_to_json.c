@@ -17,7 +17,7 @@
 #include <dirent.h>
 #include <libgen.h>
 
-#include "private/netloc.h"
+#include <private/netloc.h>
 #include "netloc.h"
 
 #define JSON_DRAW_FILE_LINK_ID "id"
@@ -66,6 +66,8 @@
 typedef enum {
     JSON_STRING,
     JSON_INT,
+    JSON_UINT,
+    JSON_ULLINT,
     JSON_FLOAT,
     JSON_ARRAY,
     JSON_DICT
@@ -228,6 +230,30 @@ json_t *json_int_new(int value)
     return integer;
 }
 
+json_t *json_uint_new(unsigned int value)
+{
+    json_t *uinteger = (json_t *)malloc(sizeof(json_t));
+    uinteger->type = JSON_UINT;
+    uinteger->contents = contents_new(1);
+
+    char *new_value;
+    asprintf(&new_value, "%u", value);
+    contents_add(uinteger->contents, new_value);
+    return uinteger;
+}
+
+json_t *json_ullint_new(unsigned long long int value)
+{
+    json_t *ullinteger = (json_t *)malloc(sizeof(json_t));
+    ullinteger->type = JSON_ULLINT;
+    ullinteger->contents = contents_new(1);
+
+    char *new_value;
+    asprintf(&new_value, "%llu", value);
+    contents_add(ullinteger->contents, new_value);
+    return ullinteger;
+}
+
 json_t *json_float_new(float value)
 {
     json_t *real = (json_t *)malloc(sizeof(json_t));
@@ -242,7 +268,7 @@ json_t *json_float_new(float value)
 
 void json_write(FILE *file, json_t *object)
 {
-    json_close_object(object);;
+    json_close_object(object);
     for (int i = 0; i < object->contents->num; i++) {
         fprintf(file, "%s", object->contents->strings[i]);
     }
@@ -264,7 +290,7 @@ void json_free(json_t *object)
 static char *remove_quote(char *string)
 {
     if (string[0] == '\'')
-        return strndup(string+1, strlen(string)-2);
+        return strndup(string+1, strrchr(string, '\'') - string-1);
     else
         return strndup(string, strlen(string));
 }
@@ -277,7 +303,7 @@ static int handle_link(netloc_physical_link_t *link, json_t *json_links)
 
     json_t *json_link = json_dict_new();
     json_dict_add(json_link,
-            JSON_DRAW_FILE_LINK_ID,        json_int_new(link->id));
+            JSON_DRAW_FILE_LINK_ID,        json_ullint_new(link->id));
     json_dict_add(json_link,
             JSON_DRAW_FILE_LINK_SRC,       json_string_new(src));
     json_dict_add(json_link,
@@ -299,8 +325,8 @@ static int handle_link(netloc_physical_link_t *link, json_t *json_links)
 
     for (unsigned int p = 0; p < netloc_get_num_partitions(link); p++)
     {
-        int partition = netloc_get_partition(link, p);
-        json_array_add(json_partitions, json_int_new(partition));
+        unsigned int partition = netloc_get_partition_id(link, p);
+        json_array_add(json_partitions, json_uint_new(partition));
     }
     json_dict_add(json_link, JSON_DRAW_FILE_LINK_PARTITIONS, json_partitions);
 
@@ -311,7 +337,6 @@ static int handle_link(netloc_physical_link_t *link, json_t *json_links)
 
 static int handle_edge(netloc_edge_t *edge, json_t *json_edges)
 {
-    //netloc_node_t *src, *dest;
     char *src = edge->node->physical_id;
     char *dest = edge->dest->physical_id;
 
@@ -336,8 +361,8 @@ static int handle_edge(netloc_edge_t *edge, json_t *json_edges)
     json_t *json_partitions = json_array_new();
     for (unsigned int p = 0; p < netloc_get_num_partitions(edge); p++)
     {
-        int partition = netloc_get_partition(edge, p);
-        json_array_add(json_partitions, json_int_new(partition));
+        unsigned int partition = netloc_get_partition_id(edge, p);
+        json_array_add(json_partitions, json_uint_new(partition));
     }
     json_dict_add(json_edge, JSON_DRAW_FILE_EDGE_PARTITIONS, json_partitions);
 
@@ -347,7 +372,7 @@ static int handle_edge(netloc_edge_t *edge, json_t *json_edges)
     {
         netloc_edge_t *subedge = netloc_edge_get_subedge(edge, s);
         json_array_add(json_subedges, json_int_new(subedge->id));
-        handle_edge(subedge, json_edges);
+        /* The subedges are already added to the dictionnary. We just need ids */
     }
     json_dict_add(json_edge, JSON_DRAW_FILE_EDGE_SUBEDGES, json_subedges);
 
@@ -362,7 +387,7 @@ static int handle_node(netloc_node_t *node, json_t *json_nodes,
     char *id = node->physical_id;
     char *desc = remove_quote(node->description);
     char *hostname = node->hostname;
-    int topoIdx = node->hwlocTopoIdx;
+    size_t topoIdx = node->hwloc_topo_idx;
 
     json_t *json_node = json_dict_new();
     json_dict_add(json_node, JSON_DRAW_FILE_NODE_ID, json_string_new(id));
@@ -394,8 +419,8 @@ static int handle_node(netloc_node_t *node, json_t *json_nodes,
     json_t *json_partitions = json_array_new();
     for (unsigned int p = 0; p < netloc_get_num_partitions(node); p++)
     {
-        int partition = netloc_get_partition(node, p);
-        json_array_add(json_partitions, json_int_new(partition));
+        unsigned int partition = netloc_get_partition_id(node, p);
+        json_array_add(json_partitions, json_uint_new(partition));
     }
     json_dict_add(json_node, JSON_DRAW_FILE_NODE_PARTITIONS, json_partitions);
 
@@ -446,20 +471,20 @@ static int handle_path(netloc_node_t *node, json_t *json_paths)
     return 0;
 }
 
-static int handle_partitions(netloc_topology_t *topology, json_t *json_partitions)
+static int handle_partitions(netloc_partition_t *partition, json_t *json_partitions)
 {
-    char **ppartition;
-    netloc_topology_iter_partitions(topology, ppartition) {
-        json_array_add(json_partitions, json_string_new(*ppartition));
-    }
+    json_array_add(json_partitions, json_string_new(partition->name));
     return 0;
 }
 
 static int handle_topos(netloc_topology_t *topology, json_t *json_topos)
 {
-    char **ptopo;
-    netloc_topology_iter_hwloctopos(topology, ptopo) {
-        json_array_add(json_topos, json_string_new(*ptopo));
+    char *ptopo, *basename_topo;
+    netloc_topology_iter_name_hwloctopos(topology, ptopo) {
+        basename_topo = basename(ptopo);
+        ptopo    = strrchr(basename_topo, '.'); /* Not a diff file, so extension must be .xml */
+        ptopo[0] = '\0';
+        json_array_add(json_topos, json_string_new(basename_topo));
     }
     return 0;
 }
@@ -467,19 +492,11 @@ static int handle_topos(netloc_topology_t *topology, json_t *json_topos)
 static int write_json(netloc_topology_t *topology, FILE *output)
 {
     json_t *json_root = json_dict_new();
+    json_t *json_nodes = json_array_new();
+    json_t *json_edges = json_array_new();
 
     /* Graph type */
     json_dict_add(json_root, JSON_DRAW_FILE_GRAPH_TYPE, json_string_new("tree"));
-
-    /* Nodes */
-    json_t *json_nodes = json_array_new();
-    json_t *json_edges = json_array_new();
-    netloc_node_t *node, *node_tmp;
-    HASH_ITER(hh, topology->nodes, node, node_tmp) {
-        handle_node(node, json_nodes, json_edges, 0);
-    }
-    json_dict_add(json_root, JSON_DRAW_FILE_NODES, json_nodes);
-    json_dict_add(json_root, JSON_DRAW_FILE_EDGES, json_edges);
 
     /* Physical links */
     json_t *json_links = json_array_new();
@@ -487,18 +504,30 @@ static int write_json(netloc_topology_t *topology, FILE *output)
     HASH_ITER(hh, topology->physical_links, link, link_tmp) {
         handle_link(link, json_links);
     }
-    json_dict_add(json_root, JSON_DRAW_FILE_LINKS, json_links);
 
     /* Paths */
     json_t *json_paths = json_array_new();
+    netloc_node_t *node, *node_tmp;
     HASH_ITER(hh, topology->nodes, node, node_tmp) {
         handle_path(node, json_paths);
     }
-    json_dict_add(json_root, JSON_DRAW_FILE_PATHS, json_paths);
 
     /* Partitions */
     json_t *json_partitions = json_array_new();
-    handle_partitions(topology, json_partitions);
+    netloc_partition_t *partition, *partition_tmp __netloc_attribute_unused;
+    netloc_topology_iter_partitions(topology, partition, partition_tmp) {
+        handle_partitions(partition, json_partitions);
+        /* Nodes */
+        netloc_partition_iter_nodes(partition, pnode) {
+            if (partition->id == netloc_get_partition_id(*pnode, 0))
+                handle_node(*pnode, json_nodes, json_edges, 0);
+        }
+    }
+
+    json_dict_add(json_root, JSON_DRAW_FILE_NODES, json_nodes);
+    json_dict_add(json_root, JSON_DRAW_FILE_EDGES, json_edges);
+    json_dict_add(json_root, JSON_DRAW_FILE_LINKS, json_links);
+    json_dict_add(json_root, JSON_DRAW_FILE_PATHS, json_paths);
     json_dict_add(json_root, JSON_DRAW_FILE_PARTITIONS, json_partitions);
 
     /* Hwloc topologies */
@@ -601,8 +630,8 @@ int main(int argc, char **argv)
         }
 #endif
 
-        /* Skip if does not end in .txt extension */
-        if( NULL == strstr(dir_entry->d_name, "-nodes.txt") ) {
+        /* Skip if does not end in .xml extension */
+        if( NULL == strstr(dir_entry->d_name, "-nodes.xml") ) {
             continue;
         }
 

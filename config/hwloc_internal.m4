@@ -330,7 +330,8 @@ EOF
         hwloc_config_prefix[utils/lstopo/Makefile]
         hwloc_config_prefix[hwloc.pc]
 
-        hwloc_config_prefix[netloc/Makefile]
+        hwloc_config_prefix[utils/netloc/Makefile]
+        hwloc_config_prefix[utils/netloc/xml/Makefile]
         hwloc_config_prefix[utils/netloc/infiniband/Makefile]
         hwloc_config_prefix[utils/netloc/draw/Makefile]
         hwloc_config_prefix[utils/netloc/scotch/Makefile]
@@ -417,7 +418,6 @@ int foo(void) {
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/Makefile]
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh]
         hwloc_config_prefix[utils/lstopo/test-lstopo.sh]
-        hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw]
         hwloc_config_prefix[contrib/systemd/Makefile]
         hwloc_config_prefix[contrib/misc/Makefile]
         hwloc_config_prefix[tests/netloc/Makefile]

@@ -19,7 +19,7 @@ typedef struct netloc_analysis_data_t {
 } netloc_analysis_data;
 
 static int partition_topology_to_tleaf(netloc_topology_t *topology,
-        int partition, int num_cores, netloc_arch_t *arch);
+        netloc_partition_t *partition, int num_cores, netloc_arch_t *arch);
 static netloc_arch_tree_t *tree_merge(netloc_arch_tree_t *main,
         netloc_arch_tree_t *sub);
 static int netloc_arch_tree_destruct(netloc_arch_tree_t *tree);
@@ -237,7 +237,7 @@ int netloc_arch_set_current_resources(netloc_arch_t *arch)
     for (int n = 0; n < num_nodes; n++) {
         netloc_arch_node_t *node = arch_node_list[n];
 
-        ret = netloc_arch_node_get_hwloc_info(node);
+        ret = netloc_arch_node_get_hwloc_info(node, arch->topology);
         if (ret != NETLOC_SUCCESS)
             goto ERROR;
 
@@ -379,7 +379,7 @@ int netloc_arch_set_global_resources(netloc_arch_t *arch)
     int current_idx = 0;
     netloc_arch_node_t *node, *node_tmp;
     HASH_ITER(hh, arch->nodes_by_name, node, node_tmp) {
-        ret = netloc_arch_node_get_hwloc_info(node);
+        ret = netloc_arch_node_get_hwloc_info(node, arch->topology);
         if (ret != NETLOC_SUCCESS)
             goto ERROR;
 
@@ -517,9 +517,8 @@ static int netloc_arch_tree_destruct(netloc_arch_tree_t *tree)
     return NETLOC_SUCCESS;
 }
 
-
 int partition_topology_to_tleaf(netloc_topology_t *topology,
-        int partition, int num_cores, netloc_arch_t *arch)
+        netloc_partition_t *partition, int num_cores, netloc_arch_t *arch)
 {
     int ret = 0;
     UT_array *nodes;
@@ -532,27 +531,26 @@ int partition_topology_to_tleaf(netloc_topology_t *topology,
 
     /* we build nodes from host list in the given partition
      * and we init all the analysis data */
-    netloc_node_t *node, *node_tmp;
-    netloc_topology_iter_nodes(topology, node, node_tmp) {
-        if (!netloc_node_is_in_partition(node, partition))
-            continue;
-        void *userdata = node->userdata;
-        node->userdata = (void *)malloc(sizeof(netloc_analysis_data));
-        netloc_analysis_data *analysis_data = (netloc_analysis_data *)node->userdata;
+    void *userdata;
+    netloc_analysis_data *analysis_data;
+    netloc_edge_t *edge, *edge_tmp;
+    netloc_iter_nodelist(partition->nodes, pnode) {
+        userdata = (*pnode)->userdata;
+        (*pnode)->userdata = (void *)malloc(sizeof(netloc_analysis_data));
+        analysis_data = (netloc_analysis_data *)(*pnode)->userdata;
         analysis_data->level = -1;
         analysis_data->userdata = userdata; 
 
-        netloc_edge_t *edge, *edge_tmp;
-        netloc_node_iter_edges(node, edge, edge_tmp) {
-            void *userdata = edge->userdata;
+        netloc_node_iter_edges((*pnode), edge, edge_tmp) {
+            userdata = edge->userdata;
             edge->userdata = (void *)malloc(sizeof(netloc_analysis_data));
-            netloc_analysis_data *analysis_data = (netloc_analysis_data *)edge->userdata;
+            analysis_data = (netloc_analysis_data *)edge->userdata;
             analysis_data->level = -1;
             analysis_data->userdata = userdata; 
         }
 
-        if (netloc_node_is_host(node)) {
-            utarray_push_back(nodes, &node);
+        if (netloc_node_is_host(*pnode)) {
+            utarray_push_back(nodes, *pnode);
         }
     }
 
@@ -577,7 +575,6 @@ int partition_topology_to_tleaf(netloc_topology_t *topology,
             }
             else {
                 node_data->level = num_levels;
-                netloc_edge_t *edge, *edge_tmp;
                 netloc_node_iter_edges(node, edge, edge_tmp) {
                     if (!netloc_edge_is_in_partition(edge, partition))
                         continue;
@@ -739,20 +736,17 @@ end:
         utarray_free(down_edges);
 
     /* We copy back all userdata */
-    netloc_topology_iter_nodes(topology, node, node_tmp) {
-        if (!netloc_node_is_in_partition(node, partition))
-            continue;
-        netloc_analysis_data *analysis_data = (netloc_analysis_data *)node->userdata;
+    netloc_partition_iter_nodes(partition, pnode) {
+        netloc_analysis_data *analysis_data = (netloc_analysis_data *)(*pnode)->userdata;
         if (analysis_data->level == -1 && ret != -1) {
             ret = -1;
-            printf("The node %s was not browsed\n", node->description);
+            printf("The node %s was not browsed\n", (*pnode)->description);
         }
         free(analysis_data);
 
-        netloc_edge_t *edge, *edge_tmp;
-        netloc_node_iter_edges(node, edge, edge_tmp) {
+        netloc_node_iter_edges(*pnode, edge, edge_tmp) {
             netloc_analysis_data *analysis_data = (netloc_analysis_data *)edge->userdata;
-            node->userdata = analysis_data->userdata;
+            (*pnode)->userdata = analysis_data->userdata;
             free(analysis_data);
         }
     }
@@ -764,6 +758,7 @@ int netloc_arch_build(netloc_arch_t *arch, int add_slots)
 {
     char *partition_name = getenv("NETLOC_PARTITION");
     char *topopath = getenv("NETLOC_TOPOFILE");
+    netloc_partition_t *partition;
 
     if (!topopath) {
         fprintf(stderr, "Error: you need to set NETLOC_TOPOFILE in your environment.\n");
@@ -784,16 +779,14 @@ int netloc_arch_build(netloc_arch_t *arch, int add_slots)
     if (!partition_name) {
         fprintf(stderr, "Error: you need to set NETLOC_PARTITION in your environment.\n");
         fprintf(stderr, "\tIt can be: ");
-        unsigned int num_partitions = utarray_len(topology->partitions);
-        for (unsigned int p = 0; p < num_partitions; p++) {
-            char *partition = *(char **)utarray_eltptr(topology->partitions, p);
-            fprintf(stderr, "%s%s", partition, p != num_partitions-1 ? ", ": "\n");
+        netloc_partition_t *partition_tmp;
+        netloc_topology_iter_partitions(topology, partition, partition_tmp) {
+            fprintf(stderr, "%s%s", partition->name, partition_tmp ? ", ": "\n");
         }
         return NETLOC_ERROR;
     }
 
-    int partition =
-        netloc_topology_find_partition_idx(topology, partition_name);
+    HASH_FIND_STR(topology->partitions, partition_name, partition);
 
     partition_topology_to_tleaf(topology, partition, 1, arch);
 

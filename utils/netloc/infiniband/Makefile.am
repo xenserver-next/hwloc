@@ -2,6 +2,7 @@
 # Copyright © 2013      University of Wisconsin-La Crosse.
 #                         All rights reserved.
 # Copyright © 2015-2018 Inria.  All rights reserved.
+# Copyright © 2013      Cisco Systems, Inc.  All rights reserved.
 #
 # See COPYING in top-level directory.
 #
@@ -17,7 +18,8 @@ install-exec-hook:
 
 AM_CPPFLAGS = \
         -I$(top_builddir)/include \
-        -I$(top_srcdir)/include
+        -I$(top_srcdir)/include \
+	$(HWLOC_LIBXML2_CFLAGS)
 
 bin_PROGRAMS = \
         netloc_ib_extract_dats
@@ -26,5 +28,6 @@ netloc_ib_extract_dats_SOURCES = \
         netloc_ib_extract_dats.c
 
 netloc_ib_extract_dats_LDADD = \
-        $(top_builddir)/netloc/libnetloc.la \
-		$(top_builddir)/hwloc/libhwloc.la
+	$(top_builddir)/netloc/libnetloc.la \
+	$(top_builddir)/utils/netloc/xml/libnetloc_libxml_write.la \
+	$(HWLOC_LIBXML2_LIBS)

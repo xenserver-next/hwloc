@@ -1,3 +1,4 @@
+/* -*- encoding: utf-8 -*- */
 /*
  * Copyright © 2014 Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2013-2014 University of Wisconsin-La Crosse.
@@ -21,7 +22,10 @@
 #include <netloc/utarray.h>
 #include <private/autogen/config.h>
 
+#define NETLOC_QUOTE(numver) # numver
+#define NETLOC_STR_VERS(numver) NETLOC_QUOTE(numver)
 #define NETLOCFILE_VERSION 1
+#define NETLOCFILE_VERSION_2_0 2.0
 
 #ifdef NETLOC_SCOTCH
 #include <stdint.h>
@@ -30,6 +34,14 @@
 #else
 #define NETLOC_int int
 #endif
+
+#if defined(HWLOC_HAVE_LIBXML2)
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+#include <libxml/xmlmemory.h>
+#else
+#warning No support available for netloc without libxml2
+#endif /* defined(HWLOC_HAVE_LIBXML2) */
 
 /*
  * "Import" a few things from hwloc
@@ -62,16 +74,16 @@ typedef enum {
  * Enumerated type for the various types of supported networks
  */
 typedef enum {
+    NETLOC_NETWORK_TYPE_INVALID     = 0, /**< Invalid network */
     NETLOC_NETWORK_TYPE_ETHERNET    = 1, /**< Ethernet network */
     NETLOC_NETWORK_TYPE_INFINIBAND  = 2, /**< InfiniBand network */
-    NETLOC_NETWORK_TYPE_INVALID     = 3  /**< Invalid network */
 } netloc_network_type_t;
 
 /**
  * Enumerated type for the various types of supported topologies
  */
 typedef enum {
-    NETLOC_TOPOLOGY_TYPE_INVALID = -1, /**< Invalid */
+    NETLOC_TOPOLOGY_TYPE_INVALID = 0, /**< Invalid */
     NETLOC_TOPOLOGY_TYPE_TREE    = 1,  /**< Tree */
 } netloc_topology_type_t;
 
@@ -79,9 +91,9 @@ typedef enum {
  * Enumerated type for the various types of nodes
  */
 typedef enum {
-    NETLOC_NODE_TYPE_HOST    = 0, /**< Host (a.k.a., network addressable endpoint - e.g., MAC Address) node */
-    NETLOC_NODE_TYPE_SWITCH  = 1, /**< Switch node */
-    NETLOC_NODE_TYPE_INVALID = 2  /**< Invalid node */
+    NETLOC_NODE_TYPE_INVALID = 0, /**< Invalid node */
+    NETLOC_NODE_TYPE_HOST    = 1, /**< Host (a.k.a., network addressable endpoint - e.g., MAC Address) node */
+    NETLOC_NODE_TYPE_SWITCH  = 2, /**< Switch node */
 } netloc_node_type_t;
 
 typedef enum {
@@ -93,6 +105,8 @@ typedef enum {
 /** \cond IGNORE */
 struct netloc_topology_t;
 typedef struct netloc_topology_t netloc_topology_t;
+struct netloc_partition_t;
+typedef struct netloc_partition_t netloc_partition_t;
 struct netloc_node_t;
 typedef struct netloc_node_t netloc_node_t;
 struct netloc_edge_t;
@@ -101,6 +115,8 @@ struct netloc_physical_link_t;
 typedef struct netloc_physical_link_t netloc_physical_link_t;
 struct netloc_path_t;
 typedef struct netloc_path_t netloc_path_t;
+struct netloc_hwloc_topology_t;
+typedef struct netloc_hwloc_topology_t netloc_hwloc_topology_t;
 
 struct netloc_arch_tree_t;
 typedef struct netloc_arch_tree_t netloc_arch_tree_t;
@@ -123,25 +139,44 @@ typedef struct netloc_arch_t netloc_arch_t;
 struct netloc_topology_t {
     /** Topology path */
     char *topopath;
+
     /** Subnet ID */
     char *subnet_id;
+
+    /** Partition List */
+    netloc_partition_t *partitions; /* Hash table of partitions by name */
 
     /** Node List */
     netloc_node_t *nodes; /* Hash table of nodes by physical_id */
     netloc_node_t *nodesByHostname; /* Hash table of nodes by hostname */
 
-    netloc_physical_link_t *physical_links; /* Hash table with physcial links */
-
-    /** Partition List */
-    UT_array *partitions;
+    /** Physical Link List */
+    netloc_physical_link_t *physical_links; /* Hash table with physical links */
 
     /** Hwloc topology List */
-    char *hwlocpath;
-    UT_array *topos;
+    char *hwloc_dir_path;
+    unsigned int nb_hwloc_topos;
+    char **hwlocpaths;
     hwloc_topology_t *hwloc_topos;
 
     /** Type of the graph */
     netloc_topology_type_t type;
+
+    /* Physical Transport Type */
+    netloc_network_type_t transport_type;
+};
+
+/**
+ * \brief Netloc Partition Type
+ *
+ * This data structure represents the partition, i.e., a set of nodes.
+ */
+struct netloc_partition_t {
+    UT_hash_handle hh;    /* makes this structure hashable with name */
+    unsigned int id;      /* rank in hashtable linked list */
+    char *name;           /* Partition's name */
+    UT_array *nodes;      /* Array of partition nodes */
+    UT_array *edges;      /* Array of partition edges */
 };
 
 /**
@@ -164,8 +199,11 @@ struct netloc_node_t {
     /** Type of the node */
     netloc_node_type_t type;
 
-    /* Pointer to physical_links */
+    /** Pointer to physical_links */
     UT_array *physical_links;
+
+    /** Array of partitions this node is part of */
+    UT_array *partitions;
 
     /** Description information from discovery (if any) */
     char *description;
@@ -179,16 +217,27 @@ struct netloc_node_t {
     /** Outgoing edges from this node */
     netloc_edge_t *edges;
 
-    UT_array *subnodes; /* the group of nodes for the virtual nodes */
+    /**
+     *  The number of subnodes in the node->subnodes array.  If
+     *  nsubnodes > 0, this node is a virtual one with subnodes,
+     *  node->subnodes must be not NULL.  If nsubnodes == 0 and
+     *  virtual_node != NULL, the current node is a node abstracted by
+     *  the virtual node pointed by node->virtual_node.  If node is
+     *  not virtual nor a subnode, node->virtual_node must equals NULL
+     *  and node->nsubnodes must equals 0.
+     */
+    unsigned int nsubnodes;
+    union {
+        netloc_node_t **subnodes; /**< The group of nodes for the virtual nodes */
+        netloc_node_t *virtual_node; /**< The parent node in case it is a virtual subnode */
+    };
 
     netloc_path_t *paths;
 
     char *hostname;
 
-    UT_array *partitions; /* index in the list from the topology */
-
-    hwloc_topology_t hwlocTopo;
-    int hwlocTopoIdx;
+    /** Hwloc topology */
+    size_t hwloc_topo_idx;
 };
 
 /**
@@ -208,33 +257,35 @@ struct netloc_edge_t {
 
     int id;
 
+    /** Array of partitions this edge is part of **/
+    UT_array *partitions;
+
     /** Pointers to the parent node */
     netloc_node_t *node;
 
-    /* Pointer to physical_links */
+    /** Pointer to physical_links */
     UT_array *physical_links;
 
     /** total gbits of the links */
     float total_gbits;
 
-    UT_array *partitions; /* index in the list from the topology */
+    unsigned int nsubedges;
+    netloc_edge_t **subnode_edges; /* for edges going to / coming from virtual nodes */
 
-    UT_array *subnode_edges; /* for edges going to virtual nodes */
-
-    struct netloc_edge_t *other_way;
+    netloc_edge_t *other_way;
 
     /**
      * Application-given private data pointer.
      * Initialized to NULL, and not used by the netloc library.
      */
-    void * userdata;
+    void *userdata;
 };
 
 
 struct netloc_physical_link_t {
     UT_hash_handle hh;       /* makes this structure hashable */
 
-    int id; // TODO long long
+    unsigned long long int id;
     netloc_node_t *src;
     netloc_node_t *dest;
     int ports[2];
@@ -243,16 +294,17 @@ struct netloc_physical_link_t {
 
     netloc_edge_t *edge;
 
-    int other_way_id;
+    unsigned long long int other_way_id;
     struct netloc_physical_link_t *other_way;
-
-    UT_array *partitions; /* index in the list from the topology */
 
     /** gbits of the link from speed and width */
     float gbits;
 
     /** Description information from discovery (if any) */
     char *description;
+
+    /** Array of partitions this physical_link is part of */
+    UT_array *partitions;
 };
 
 struct netloc_path_t {
@@ -261,6 +313,18 @@ struct netloc_path_t {
     UT_array *links;
 };
 
+/**
+ * \brief Hwloc Topology for Netloc Nodes
+ *
+ * Represents the Hwloc Topology for each Netloc Node, but hashable in
+ * order to be able to find it in the \ref netloc_topology_t
+ * structure.
+ */
+struct netloc_hwloc_topology_t {
+    UT_hash_handle hh;       /* makes this structure hashable */
+    char *path;              /**< Topology filepath */
+    size_t hwloc_topo_idx;
+};
 
 /**********************************************************************
  *        Architecture structures
@@ -331,29 +395,66 @@ netloc_topology_t *netloc_topology_construct(char *path);
  */
 int netloc_topology_destruct(netloc_topology_t *topology);
 
-int netloc_topology_find_partition_idx(netloc_topology_t *topology, char *partition_name);
+int read_from_xml_file(char *path, netloc_topology_t *topology);
 
 int netloc_topology_read_hwloc(netloc_topology_t *topology, int num_nodes,
-        netloc_node_t **node_list);
+                               netloc_node_t **node_list);
 
-#define netloc_topology_iter_partitions(topology,partition) \
-    for ((partition) = (char **)utarray_front(topology->partitions); \
-            (partition) != NULL; \
-            (partition) = (char **)utarray_next(topology->partitions, partition))
+#define netloc_topology_iter_partitions(topology,partition,_tmp)        \
+    HASH_ITER(hh, (topology)->partitions, partition, _tmp)
 
-#define netloc_topology_iter_hwloctopos(topology,hwloctopo) \
-    for ((hwloctopo) = (char **)utarray_front(topology->topos); \
-            (hwloctopo) != NULL; \
-            (hwloctopo) = (char **)utarray_next(topology->topos, hwloctopo))
+#define netloc_topology_iter_name_hwloctopos(topology,hwloctoponame)    \
+    for (int __idx = 0; __idx < (topology)->nb_hwloc_topos              \
+             && ((hwloctoponame) = (topology)->hwlocpaths[__idx]);      \
+         (hwloctoponame) = (topology)->hwlocpaths[__idx++])
 
-#define netloc_topology_find_node(topology,node_id,node) \
-    HASH_FIND_STR(topology->nodes, node_id, node)
+#define netloc_topology_iter_hwloctopos(topology,hwloctopo)             \
+    for (int __idx = 0; __idx < (topology)->nb_hwloc_topos              \
+             && ((hwloctopo) = (topology)->hwloc_topos[__idx]);         \
+         (hwloctopo) = (topology)->hwloc_topos[__idx++])
 
-#define netloc_topology_iter_nodes(topology,node,_tmp) \
-    HASH_ITER(hh, topology->nodes, node, _tmp)
+#define netloc_topology_find_node(topology,node_id,node)        \
+    HASH_FIND_STR((topology)->nodes, node_id, node)
 
-#define netloc_topology_num_nodes(topology) \
-    HASH_COUNT(topology->nodes)
+#define netloc_topology_iter_nodes(topology,node,_tmp)  \
+    HASH_ITER(hh, (topology)->nodes, node, _tmp)
+
+#define netloc_topology_num_nodes(topology)     \
+    HASH_COUNT((topology)->nodes)
+
+
+/*************************************************/
+
+
+/**
+ * Constructor for netloc_partition_t
+ *
+ * User is responsible for calling the destructor on the handle.
+ *
+ * \param id New partition's id in the hashtable in \ref netloc_topology_t
+ * \param name A pointer to a valid string which correspond to the partition's name
+ *
+ * Returns
+ *   A newly allocated pointer to the partition information.
+ */
+netloc_partition_t *netloc_partition_construct(unsigned int id, char *name);
+
+/**
+ * Destructor for netloc_partition_t
+ *
+ * \param partition A valid partition handle
+ *
+ * Returns
+ *   NETLOC_SUCCESS on success
+ *   NETLOC_ERROR on error
+ */
+int netloc_partition_destruct(netloc_partition_t *partition);
+
+#define netloc_partition_iter_nodes(partition, pnode)                   \
+    netloc_iter_nodelist((partition)->nodes, pnode)
+
+#define netloc_partition_iter_edges(partition, pedge)                   \
+    netloc_iter_edgelist((partition)->edges, pedge)
 
 /*************************************************/
 
@@ -364,7 +465,7 @@ int netloc_topology_read_hwloc(netloc_topology_t *topology, int num_nodes,
  * User is responsible for calling the destructor on the handle.
  *
  * Returns
- *   A newly allocated pointer to the network information.
+ *   A newly allocated pointer to the node information.
  */
 netloc_node_t *netloc_node_construct(void);
 
@@ -381,11 +482,39 @@ int netloc_node_destruct(netloc_node_t *node);
 
 char *netloc_node_pretty_print(netloc_node_t* node);
 
+#if defined(HWLOC_HAVE_LIBXML2)
+
+/**
+ * Load the netloc node as described in the xml file, of which
+ * \ref it_node is a valid pointer to a DOM element.
+ *
+ * The returned element is to be added to the \ref
+ * netloc_topology_t. If the \ref netloc_node_t returned has nsubnodes
+ * > 0, this means that the node is virtual. The subnodes (contained
+ * in the node->subnodes array) have to be added before the virtual
+ * node to ease the hashtable liberation.
+ *
+ * \param it_node A valid XML DOM node pointing to the proper <node> tag
+ * \param hwlocpath The path to the directory containing the hwloc topology files
+ * \param hwloc_topos A valid pointer to the hwloc_topos field in \ref netloc_topology_t
+ *
+ * Returns
+ *   A newly allocated and initialized pointer to the node information.
+ */
+netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
+                                     netloc_hwloc_topology_t **hwloc_topos);
+#else
+netloc_node_t *
+netloc_node_xml_load(void *it_node                         __netloc_attribute_unused,
+                     char *hwlocpath                       __netloc_attribute_unused,
+                     netloc_hwloc_topology_t **hwloc_topos __netloc_attribute_unused);
+#endif /* defined(HWLOC_HAVE_LIBXML2) */
+
 #define netloc_node_get_num_subnodes(node) \
-    utarray_len((node)->subnodes)
+    (node)->nsubnodes
 
 #define netloc_node_get_subnode(node,i) \
-    (*(netloc_node_t **)utarray_eltptr((node)->subnodes, (i)))
+    (node)->subnodes[(i)]
 
 #define netloc_node_get_num_edges(node) \
     utarray_len((node)->edges)
@@ -394,21 +523,21 @@ char *netloc_node_pretty_print(netloc_node_t* node);
     (*(netloc_edge_t **)utarray_eltptr((node)->edges, (i)))
 
 #define netloc_node_iter_edges(node,edge,_tmp) \
-    HASH_ITER(hh, node->edges, edge, _tmp)
+    HASH_ITER(hh, (node)->edges, edge, _tmp)
 
 #define netloc_node_iter_paths(node,path,_tmp) \
-    HASH_ITER(hh, node->paths, path, _tmp)
+    HASH_ITER(hh, (node)->paths, path, _tmp)
 
 #define netloc_node_is_host(node) \
-    (node->type == NETLOC_NODE_TYPE_HOST)
+    ((node)->type == NETLOC_NODE_TYPE_HOST)
 
 #define netloc_node_is_switch(node) \
-    (node->type == NETLOC_NODE_TYPE_SWITCH)
+    ((node)->type == NETLOC_NODE_TYPE_SWITCH)
 
 #define netloc_node_iter_paths(node, path,_tmp) \
-    HASH_ITER(hh, node->paths, path, _tmp)
+    HASH_ITER(hh, (node)->paths, path, _tmp)
 
-int netloc_node_is_in_partition(netloc_node_t *node, int partition);
+int netloc_node_is_in_partition(netloc_node_t *node, netloc_partition_t *partition);
 
 /*************************************************/
 
@@ -421,7 +550,7 @@ int netloc_node_is_in_partition(netloc_node_t *node, int partition);
  * Returns
  *   A newly allocated pointer to the edge information.
  */
-netloc_edge_t *netloc_edge_construct(void);
+netloc_edge_t *netloc_edge_construct();
 
 /**
  * Destructor for netloc_edge_t
@@ -438,7 +567,33 @@ char * netloc_edge_pretty_print(netloc_edge_t* edge);
 
 void netloc_edge_reset_uid(void);
 
-int netloc_edge_is_in_partition(netloc_edge_t *edge, int partition);
+#if defined(HWLOC_HAVE_LIBXML2)
+/**
+ * Load the netloc edge as described in the xml file, of which
+ * \ref it_edge is a valid pointer to a DOM element.
+ *
+ * The returned element is to be added to the corresponding \ref
+ * netloc_node_t. The node has to be already part of the \ref
+ * netloc_topology_t
+ *
+ * \param it_edge A valid XML DOM node pointing to the proper <connexion> tag
+ * \param topology A valid pointer to the current topology being loaded
+ * \param partition A valid pointer to the current partition being loaded
+ *
+ * Returns
+ *   A newly allocated and initialized pointer to the edge information.
+ */
+netloc_edge_t *
+netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology,
+                     netloc_partition_t *partition);
+#else
+netloc_edge_t *
+netloc_edge_xml_load(void *it_edge                 __netloc_attribute_unused,
+                     netloc_topology_t *topology   __netloc_attribute_unused,
+                     netloc_partition_t *partition __netloc_attribute_unused);
+#endif /* defined(HWLOC_HAVE_LIBXML2) */
+
+int netloc_edge_is_in_partition(netloc_edge_t *edge, netloc_partition_t *partition);
 
 #define netloc_edge_get_num_links(edge) \
     utarray_len((edge)->physical_links)
@@ -447,10 +602,10 @@ int netloc_edge_is_in_partition(netloc_edge_t *edge, int partition);
     (*(netloc_physical_link_t **)utarray_eltptr((edge)->physical_links, (i)))
 
 #define netloc_edge_get_num_subedges(edge) \
-    utarray_len((edge)->subnode_edges)
+    ((edge)->nsubedges)
 
 #define netloc_edge_get_subedge(edge,i) \
-    (*(netloc_edge_t **)utarray_eltptr((edge)->subnode_edges, (i)))
+    ((edge)->subnode_edges[(i)])
 
 /*************************************************/
 
@@ -465,6 +620,21 @@ int netloc_edge_is_in_partition(netloc_edge_t *edge, int partition);
  */
 netloc_physical_link_t * netloc_physical_link_construct(void);
 
+
+/**
+ * Copy constructor for netloc_physical_link_t
+ *
+ * User is responsible for calling the destructor on the handle.  The
+ * newly allocated physical link has the same informations as \ref
+ * origin.  All strings and \ref UT_array attributes are dupplicated.
+ *
+ * \param origin A valid physical link to be copied
+ *
+ * Returns
+ *   A newly allocated pointer to the physical link information.
+ */
+netloc_physical_link_t * netloc_physical_link_deep_copy(netloc_physical_link_t *origin);
+
 /**
  * Destructor for netloc_physical_link_t
  *
@@ -475,6 +645,30 @@ netloc_physical_link_t * netloc_physical_link_construct(void);
 int netloc_physical_link_destruct(netloc_physical_link_t *link);
 
 char * netloc_link_pretty_print(netloc_physical_link_t* link);
+
+#if defined(HWLOC_HAVE_LIBXML2)
+/**
+ * Load the netloc physical link as described in the xml file, of which
+ * \ref it_link is a valid pointer to a DOM element.
+ *
+ * The returned element is to be added to the \ref netloc_edge_t.
+ *
+ * \param it_link A valid XML DOM node pointing to the proper <link> tag
+ * \param edge A valid pointer to the current edge being loaded
+ * \param partition A valid pointer to the current partition being loaded
+ *
+ * Returns
+ *   A newly allocated and initialized pointer to the physical link information.
+ */
+netloc_physical_link_t *
+netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
+                              netloc_partition_t *partition);
+#else
+netloc_physical_link_t *
+netloc_physical_link_xml_load(void *it_link                 __netloc_attribute_unused,
+                              netloc_edge_t *edge           __netloc_attribute_unused,
+                              netloc_partition_t *partition __netloc_attribute_unused);
+#endif /* defined(HWLOC_HAVE_LIBXML2) */
 
 /*************************************************/
 
@@ -497,7 +691,7 @@ int netloc_arch_set_current_resources(netloc_arch_t *arch);
 
 int netloc_arch_set_global_resources(netloc_arch_t *arch);
 
-int netloc_arch_node_get_hwloc_info(netloc_arch_node_t *arch);
+int netloc_arch_node_get_hwloc_info(netloc_arch_node_t *arch, netloc_topology_t *topology);
 
 void netloc_arch_tree_complete(netloc_arch_tree_t *tree, UT_array **down_degrees_by_level,
         int num_hosts, int **parch_idx);
@@ -512,14 +706,23 @@ NETLOC_int netloc_arch_tree_num_leaves(netloc_arch_tree_t *tree);
 #define netloc_get_num_partitions(object) \
     utarray_len((object)->partitions)
 
-#define netloc_get_partition(object,i) \
-    (*(int *)utarray_eltptr((object)->partitions, (i)))
+#define netloc_get_partition_id(object,i) \
+    ((*(netloc_partition_t **)utarray_eltptr((object)->partitions, (i)))->id)
 
+#define netloc_path_iter_links(path,link)                               \
+    for(netloc_physical_link_t **link = (netloc_physical_link_t **)utarray_front((path)->links); \
+         (link) != NULL;                                                \
+         link = (netloc_physical_link_t **)utarray_next((path)->links, link))
 
-#define netloc_path_iter_links(path,link) \
-    for ((link) = (netloc_physical_link_t **)utarray_front(path->links); \
-            (link) != NULL; \
-            (link) = (netloc_physical_link_t **)utarray_next(path->links, link))
+#define netloc_iter_nodelist(nl,pnode)                                  \
+    for(netloc_node_t **pnode = (netloc_node_t **)utarray_front(nl);    \
+        (pnode) != NULL;                                                \
+        pnode = (netloc_node_t **)utarray_next(nl,pnode))
+
+#define netloc_iter_edgelist(el,pedge)                                  \
+    for(netloc_edge_t **pedge = (netloc_edge_t **)utarray_front(el);    \
+        (pedge) != NULL;                                                \
+        pedge = (netloc_edge_t **)utarray_next(el,pedge))
 
 /**********************************************************************
  *        Misc functions
@@ -533,7 +736,7 @@ NETLOC_int netloc_arch_tree_num_leaves(netloc_arch_tree_t *tree);
  * \returns NULL if the type is invalid
  * \returns A string for that \ref netloc_network_type_t type
  */
-static inline const char * netloc_network_type_decode(netloc_network_type_t net_type) {
+static inline const char * netloc_network_type_encode(const netloc_network_type_t net_type) {
     if( NETLOC_NETWORK_TYPE_ETHERNET == net_type ) {
         return "ETH";
     }
@@ -546,6 +749,25 @@ static inline const char * netloc_network_type_decode(netloc_network_type_t net_
 }
 
 /**
+ * Encode the network type
+ *
+ * \param net_type_str The network type as read from the XML topology file.
+ *
+ * \returns A valid member of the \ref netloc_network_type_t type
+ */
+static inline netloc_network_type_t netloc_network_type_decode(const char *net_type_str) {
+    if( !strcmp(net_type_str, "ETH") ) {
+        return NETLOC_NETWORK_TYPE_ETHERNET;
+    }
+    else if( !strcmp(net_type_str, "IB") ) {
+        return NETLOC_NETWORK_TYPE_INFINIBAND;
+    }
+    else {
+        return NETLOC_NETWORK_TYPE_INVALID;
+    }
+}
+
+/**
  * Decode the node type
  *
  * \param node_type A valid member of the \ref netloc_node_type_t type
@@ -553,7 +775,7 @@ static inline const char * netloc_network_type_decode(netloc_network_type_t net_
  * \returns NULL if the type is invalid
  * \returns A string for that \ref netloc_node_type_t type
  */
-static inline const char * netloc_node_type_decode(netloc_node_type_t node_type) {
+static inline const char * netloc_node_type_encode(const netloc_node_type_t node_type) {
     if( NETLOC_NODE_TYPE_SWITCH == node_type ) {
         return "SW";
     }
@@ -565,14 +787,40 @@ static inline const char * netloc_node_type_decode(netloc_node_type_t node_type)
     }
 }
 
+/**
+ * Encode the node type
+ *
+ * \param node_type_str The node type as read from the XML topology file.
+ *
+ * \returns A valid member of the \ref netloc_node_type_t type
+ */
+static inline netloc_node_type_t netloc_node_type_decode(const char * node_type_str) {
+    if( !strcmp(node_type_str, "SW") ) {
+        return NETLOC_NODE_TYPE_SWITCH;
+    }
+    else if( !strcmp(node_type_str, "CA") ) {
+        return NETLOC_NODE_TYPE_HOST;
+    }
+    else {
+        return NETLOC_NODE_TYPE_INVALID;
+    }
+}
+
 ssize_t netloc_line_get(char **lineptr, size_t *n, FILE *stream);
 
 char *netloc_line_get_next_token(char **string, char c);
 
 int netloc_build_comm_mat(char *filename, int *pn, double ***pmat);
 
-#define STRDUP_IF_NOT_NULL(str) (NULL == str ? NULL : strdup(str))
-#define STR_EMPTY_IF_NULL(str) (NULL == str ? "" : str)
+#define STRDUP_IF_NOT_NULL(str) (NULL == (str) ? NULL : strdup(str))
+#define STR_EMPTY_IF_NULL(str) (NULL == (str) ? "" : str)
 
+#if defined(HWLOC_HAVE_LIBXML2)
+xmlDoc *netloc_xml_reader_init(char *path);
+int netloc_xml_reader_clean_and_out(xmlDoc *doc);
+#else
+void *netloc_xml_reader_init(char *path __netloc_attribute_unused);
+int netloc_xml_reader_clean_and_out(void *doc __netloc_attribute_unused);
+#endif /* defined(HWLOC_HAVE_LIBXML2) */
 
 #endif // _NETLOC_PRIVATE_H_

@@ -640,6 +640,7 @@ do {                                                                            
 
 /* remove an item from a given bucket */
 #define HASH_DEL_IN_BKT(hh,head,hh_del)                                          \
+do {                                                                             \
     (head).count--;                                                              \
     if ((head).hh_head == hh_del) {                                              \
       (head).hh_head = hh_del->hh_next;                                          \
@@ -649,7 +650,8 @@ do {                                                                            
     }                                                                            \
     if (hh_del->hh_next) {                                                       \
         hh_del->hh_next->hh_prev = hh_del->hh_prev;                              \
-    }
+    }                                                                            \
+ } while (0)
 
 /* Bucket expansion has the effect of doubling the number of buckets
  * and redistributing the items into the new buckets. Ideally the

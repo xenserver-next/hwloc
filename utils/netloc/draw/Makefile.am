@@ -10,7 +10,8 @@
 
 AM_CPPFLAGS = \
         -I$(top_builddir)/include \
-        -I$(top_srcdir)/include
+        -I$(top_srcdir)/include \
+	$(HWLOC_LIBXML2_CFLAGS)
 
 bin_PROGRAMS = \
         netloc_draw_to_json
@@ -20,7 +21,7 @@ netloc_draw_to_json_SOURCES = \
 
 netloc_draw_to_json_LDADD = \
         $(top_builddir)/netloc/libnetloc.la \
-        $(top_builddir)/hwloc/libhwloc.la
+        $(HWLOC_LIBXML2_LIBS)
 
 dist_pkgdata_DATA = \
         netloc_draw.html \
