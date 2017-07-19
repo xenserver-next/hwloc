@@ -35,14 +35,6 @@
 #define NETLOC_int int
 #endif
 
-#if defined(HWLOC_HAVE_LIBXML2)
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-#include <libxml/xmlmemory.h>
-#else
-#warning No support available for netloc without libxml2
-#endif /* defined(HWLOC_HAVE_LIBXML2) */
-
 /*
  * "Import" a few things from hwloc
  */
@@ -379,10 +371,10 @@ struct netloc_arch_t {
  * user may destruct the network handle after calling this function and/or reuse
  * the network handle.
  *
- * \returns NETLOC_SUCCESS on success
- * \returns NETLOC_ERROR upon an error.
+ * \returns A newly allocated pointer to the topology information on success.
+ * \returns NULL upon an error.
  */
-netloc_topology_t *netloc_topology_construct(char *path);
+netloc_topology_t *netloc_topology_construct();
 
 /**
  * Destruct a topology handle
@@ -395,7 +387,7 @@ netloc_topology_t *netloc_topology_construct(char *path);
  */
 int netloc_topology_destruct(netloc_topology_t *topology);
 
-int read_from_xml_file(char *path, netloc_topology_t *topology);
+int netloc_topology_find_reverse_edges(netloc_topology_t *topology);
 
 int netloc_topology_read_hwloc(netloc_topology_t *topology, int num_nodes,
                                netloc_node_t **node_list);
@@ -482,34 +474,6 @@ int netloc_node_destruct(netloc_node_t *node);
 
 char *netloc_node_pretty_print(netloc_node_t* node);
 
-#if defined(HWLOC_HAVE_LIBXML2)
-
-/**
- * Load the netloc node as described in the xml file, of which
- * \ref it_node is a valid pointer to a DOM element.
- *
- * The returned element is to be added to the \ref
- * netloc_topology_t. If the \ref netloc_node_t returned has nsubnodes
- * > 0, this means that the node is virtual. The subnodes (contained
- * in the node->subnodes array) have to be added before the virtual
- * node to ease the hashtable liberation.
- *
- * \param it_node A valid XML DOM node pointing to the proper <node> tag
- * \param hwlocpath The path to the directory containing the hwloc topology files
- * \param hwloc_topos A valid pointer to the hwloc_topos field in \ref netloc_topology_t
- *
- * Returns
- *   A newly allocated and initialized pointer to the node information.
- */
-netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
-                                     netloc_hwloc_topology_t **hwloc_topos);
-#else
-netloc_node_t *
-netloc_node_xml_load(void *it_node                         __netloc_attribute_unused,
-                     char *hwlocpath                       __netloc_attribute_unused,
-                     netloc_hwloc_topology_t **hwloc_topos __netloc_attribute_unused);
-#endif /* defined(HWLOC_HAVE_LIBXML2) */
-
 #define netloc_node_get_num_subnodes(node) \
     (node)->nsubnodes
 
@@ -567,32 +531,6 @@ char * netloc_edge_pretty_print(netloc_edge_t* edge);
 
 void netloc_edge_reset_uid(void);
 
-#if defined(HWLOC_HAVE_LIBXML2)
-/**
- * Load the netloc edge as described in the xml file, of which
- * \ref it_edge is a valid pointer to a DOM element.
- *
- * The returned element is to be added to the corresponding \ref
- * netloc_node_t. The node has to be already part of the \ref
- * netloc_topology_t
- *
- * \param it_edge A valid XML DOM node pointing to the proper <connexion> tag
- * \param topology A valid pointer to the current topology being loaded
- * \param partition A valid pointer to the current partition being loaded
- *
- * Returns
- *   A newly allocated and initialized pointer to the edge information.
- */
-netloc_edge_t *
-netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology,
-                     netloc_partition_t *partition);
-#else
-netloc_edge_t *
-netloc_edge_xml_load(void *it_edge                 __netloc_attribute_unused,
-                     netloc_topology_t *topology   __netloc_attribute_unused,
-                     netloc_partition_t *partition __netloc_attribute_unused);
-#endif /* defined(HWLOC_HAVE_LIBXML2) */
-
 int netloc_edge_is_in_partition(netloc_edge_t *edge, netloc_partition_t *partition);
 
 #define netloc_edge_get_num_links(edge) \
@@ -645,30 +583,6 @@ netloc_physical_link_t * netloc_physical_link_deep_copy(netloc_physical_link_t *
 int netloc_physical_link_destruct(netloc_physical_link_t *link);
 
 char * netloc_link_pretty_print(netloc_physical_link_t* link);
-
-#if defined(HWLOC_HAVE_LIBXML2)
-/**
- * Load the netloc physical link as described in the xml file, of which
- * \ref it_link is a valid pointer to a DOM element.
- *
- * The returned element is to be added to the \ref netloc_edge_t.
- *
- * \param it_link A valid XML DOM node pointing to the proper <link> tag
- * \param edge A valid pointer to the current edge being loaded
- * \param partition A valid pointer to the current partition being loaded
- *
- * Returns
- *   A newly allocated and initialized pointer to the physical link information.
- */
-netloc_physical_link_t *
-netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
-                              netloc_partition_t *partition);
-#else
-netloc_physical_link_t *
-netloc_physical_link_xml_load(void *it_link                 __netloc_attribute_unused,
-                              netloc_edge_t *edge           __netloc_attribute_unused,
-                              netloc_partition_t *partition __netloc_attribute_unused);
-#endif /* defined(HWLOC_HAVE_LIBXML2) */
 
 /*************************************************/
 
@@ -814,13 +728,5 @@ int netloc_build_comm_mat(char *filename, int *pn, double ***pmat);
 
 #define STRDUP_IF_NOT_NULL(str) (NULL == (str) ? NULL : strdup(str))
 #define STR_EMPTY_IF_NULL(str) (NULL == (str) ? "" : str)
-
-#if defined(HWLOC_HAVE_LIBXML2)
-xmlDoc *netloc_xml_reader_init(char *path);
-int netloc_xml_reader_clean_and_out(xmlDoc *doc);
-#else
-void *netloc_xml_reader_init(char *path __netloc_attribute_unused);
-int netloc_xml_reader_clean_and_out(void *doc __netloc_attribute_unused);
-#endif /* defined(HWLOC_HAVE_LIBXML2) */
 
 #endif // _NETLOC_PRIVATE_H_

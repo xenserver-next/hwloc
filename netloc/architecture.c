@@ -11,6 +11,7 @@
 
 #define _GNU_SOURCE         /* See feature_test_macros(7) */
 #include <private/netloc.h>
+#include <private/netloc-xml.h>
 #include <netloc.h>
 
 typedef struct netloc_analysis_data_t {
@@ -766,10 +767,11 @@ int netloc_arch_build(netloc_arch_t *arch, int add_slots)
     }
     topopath = strdup(topopath);
 
-    netloc_topology_t *topology = netloc_topology_construct(topopath);
-    if (topology == NULL) {
+    netloc_topology_t *topology;
+    int ret = netloc_topology_xml_load(topopath, &topology);
+    if (NETLOC_SUCCESS != ret) {
         fprintf(stderr, "Error: netloc_topology_construct failed\n");
-        return NETLOC_ERROR;
+        return ret;
     }
 
     arch->topology = topology;
