@@ -32,7 +32,8 @@ sources = \
         path.c \
         architecture.c \
         hwloc.c \
-        mpicomm.c
+        mpicomm.c \
+        xml.c
 
 
 # Installable library

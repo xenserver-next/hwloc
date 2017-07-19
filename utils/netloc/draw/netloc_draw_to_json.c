@@ -18,6 +18,7 @@
 #include <libgen.h>
 
 #include <private/netloc.h>
+#include <private/netloc-xml.h>
 #include "netloc.h"
 
 #define JSON_DRAW_FILE_LINK_ID "id"
@@ -638,10 +639,10 @@ int main(int argc, char **argv)
         asprintf(&topopath, "%s/%s", netlocpath, dir_entry->d_name);
 
         netloc_topology_t *topology;
-        topology = netloc_topology_construct(topopath);
-        if (topology == NULL) {
+        int ret = netloc_topology_xml_load(topopath, &topology);
+        if (NETLOC_SUCCESS != ret) {
             fprintf(stderr, "Error: netloc_topology_construct failed\n");
-            return NETLOC_ERROR;
+            return ret;
         }
 
         netloc_edge_reset_uid();
@@ -654,4 +655,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
