@@ -235,7 +235,6 @@ netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
                     node->nsubnodes, subnode_id);
         }
     }
-
     return node;
 }
 

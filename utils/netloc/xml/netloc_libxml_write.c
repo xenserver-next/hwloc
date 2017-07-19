@@ -110,6 +110,7 @@ static inline void edge_merge_into(node_t *virtual_node, edge_t *virtual_edge,
 static int find_similar_nodes(void)
 {
     int ret;
+    unsigned int npartitions = utarray_len(partitions);
     /* Build edge lists by node */
     int num_nodes = HASH_COUNT(nodes);
     node_t **switch_nodes = (node_t **)malloc(sizeof(node_t *[num_nodes]));
@@ -164,7 +165,6 @@ static int find_similar_nodes(void)
                     get_virtual_id(virtual_node->physical_id);
                     virtual_node->description = strdup(virtual_node->physical_id);
 
-                    unsigned int npartitions = utarray_len(partitions);
                     virtual_node->partitions = calloc(npartitions, sizeof(int));
                     for (unsigned int p = 0; p < npartitions; ++p)
                         virtual_node->partitions[p] |= node1->partitions[p];
@@ -188,7 +188,6 @@ static int find_similar_nodes(void)
                         virtual_edge->partitions = calloc(npartitions, sizeof(int));
                         virtual_edge->total_gbits = 0;
                         utarray_new(virtual_edge->subedges, &ut_ptr_icd);
-
                         utarray_new(virtual_edge->physical_link_idx, &ut_int_icd);
                         HASH_FIND_STR(node1->edges, virtual_edge->dest, edge1);
                         assert(edge1);
@@ -199,6 +198,9 @@ static int find_similar_nodes(void)
 
                 /* add physical_links */
                 utarray_concat(virtual_node->physical_links, node2->physical_links);
+
+                for (unsigned int p = 0; p < npartitions; ++p)
+                    virtual_node->partitions[p] |= node2->partitions[p];
 
                 for (int i = 0; i < num_edges_by_node[nodeCmpIdx]; i++) {
                     edge_t *edge2, *virtual_edge;
@@ -317,6 +319,7 @@ static inline void set_reverse_edges()
             assert(dest_node);
             HASH_FIND_STR(dest_node->edges, node->physical_id, edge->reverse_edge); 
             assert(edge->reverse_edge);
+            assert(!edge->reverse_edge->reverse_edge || edge->reverse_edge->reverse_edge == edge);
         }
     }
 }
@@ -546,11 +549,18 @@ static inline int insert_extra(xmlNodePtr root_node, char *full_hwloc_path)
             insert_xml_edge(crt_node, edge, node);
         }
     }
-    /* Set size */
-    strBuffSize = asprintf(&strBuff, "%u", part_size);
-    if (0 < strBuffSize)
-        set_xml_prop(part_node, BAD_CAST "size", strBuff);
-    free(strBuff); strBuff = NULL;
+    if (!nodes_node->children && !cons_node->children) {
+        /* No extra needed: remove it from the output */
+        xmlUnlinkNode(nodes_node); xmlFree(nodes_node);
+        xmlUnlinkNode(cons_node);  xmlFree(cons_node);
+        xmlUnlinkNode(part_node);  xmlFree(part_node);
+    } else {
+        /* Set size */
+        strBuffSize = asprintf(&strBuff, "%u", part_size);
+        if (0 < strBuffSize)
+            set_xml_prop(part_node, BAD_CAST "size", strBuff);
+        free(strBuff); strBuff = NULL;
+    }
     return NETLOC_SUCCESS;
 }
 

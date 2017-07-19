@@ -19,7 +19,6 @@
 
 #include <private/netloc.h>
 
-static int edges_sort_by_dest(netloc_edge_t *a, netloc_edge_t *b);
 static int find_reverse_edges(netloc_topology_t *topology);
 
 netloc_topology_t *netloc_topology_construct(char *path)
@@ -176,7 +175,7 @@ netloc_topology_t *netloc_topology_construct(char *path)
             if (!buff)
                 buff = BAD_CAST "";
         }
-        if ('/' == *(char *)buff) {
+        if ('/' == *(char *)buff) { /* Exclude /extra+structural/ partition */
             partition = NULL;
         } else {
             partition = netloc_partition_construct(HASH_COUNT(topology->partitions),(char *)buff);
@@ -203,14 +202,19 @@ netloc_topology_t *netloc_topology_construct(char *path)
              it_node;
              it_node = it_node->next && XML_ELEMENT_NODE != it_node->next->type
                  ? it_node->next->next : it_node->next) {
-            netloc_node_t *node_tmp = netloc_node_xml_load(it_node, hwlocpath, &hwloc_topos);
             netloc_node_t *node = NULL;
-            HASH_FIND_STR(topology->nodes, node_tmp->physical_id, node);
-            if (node) {
-                /* The node already exists in the topology (i.e. shared switch) */
-                netloc_node_destruct(node_tmp);
-            } else {
-                node = node_tmp;
+            /* Prefetch physical_id to know if it's worth loading the node */
+            buff = xmlGetProp(it_node, BAD_CAST "mac_addr");
+            if (!buff) {
+                continue;
+            }
+            HASH_FIND_STR(topology->nodes, buff, node);
+            if (!node) {
+                node = netloc_node_xml_load(it_node, hwlocpath, &hwloc_topos);
+                if (!node) {
+                    fprintf(stderr, "WARN: node cannot be loaded. Skipped\n");
+                    continue;
+                }
                 /* Add to the hashtables */
                 for (int n = 0; n < node->nsubnodes; ++n) {
                     HASH_ADD_STR(topology->nodes, physical_id, node->subnodes[n]);
@@ -255,7 +259,7 @@ netloc_topology_t *netloc_topology_construct(char *path)
              it_edge = it_edge->next && XML_ELEMENT_NODE != it_edge->next->type
                  ? it_edge->next->next : it_edge->next) {
             netloc_edge_t *edge = netloc_edge_xml_load(it_edge, topology, partition);
-            if (edge && partition) {
+            if (partition && edge) {
                 utarray_push_back(partition->edges, &edge);
             }
         }
@@ -361,15 +365,10 @@ int netloc_topology_destruct(netloc_topology_t *topology)
     return NETLOC_SUCCESS;
 }
 
-static int edges_sort_by_dest(netloc_edge_t *a, netloc_edge_t *b)
-{
-    return strcmp(a->dest->physical_id, b->dest->physical_id);
-}
-
 static int find_reverse_edges(netloc_topology_t *topology)
 {
     netloc_node_t *node, *node_tmp;
-    HASH_ITER(hh, topology->nodes, node, node_tmp) {
+    netloc_topology_iter_nodes(topology, node, node_tmp) {
         netloc_edge_t *edge, *edge_tmp;
         netloc_node_iter_edges(node, edge, edge_tmp) {
             netloc_node_t *dest = edge->dest;
@@ -386,4 +385,3 @@ static int find_reverse_edges(netloc_topology_t *topology)
     }
     return NETLOC_SUCCESS;
 }
-

@@ -128,9 +128,25 @@ netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology, netloc_parti
         fprintf(stderr, "ERROR: cannot find connexion's destination node.\n");
         goto ERROR;
     }
-    if (partition)
-        utarray_push_back(edge->partitions, &partition);
-    HASH_ADD_PTR(edge->node->edges, dest, edge);
+    /* Add edge to its node if it does not already exists */
+    netloc_edge_t *edge_tmp = NULL;
+    HASH_FIND_PTR(edge->node->edges, &edge->dest, edge_tmp);
+    if (NULL == edge_tmp) {
+        HASH_ADD_PTR(edge->node->edges, dest, edge);
+        /* Set partition */
+        if (partition)
+            utarray_push_back(edge->partitions, &partition);
+    } else {
+        /* Set partition */
+        if (partition) {
+            utarray_push_back(edge_tmp->partitions, &partition);
+            for (unsigned int se = 0; se < edge_tmp->nsubedges; ++se)
+                utarray_push_back(edge_tmp->subnode_edges[se]->partitions, &partition);
+        }
+        /* Edge already created from another partition */
+        netloc_edge_destruct(edge);
+        return edge_tmp;
+    }
 
     if ((buff = xmlGetProp(it_edge, BAD_CAST "virtual"))
         && 0 < (strBuffSize = strlen((char *)buff))

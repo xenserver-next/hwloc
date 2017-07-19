@@ -746,6 +746,7 @@ int read_discover(char *subnet, char *path, char *filename)
                 edge->total_gbits = 0;
                 edge->partitions =  NULL;
                 edge->subedges = NULL;
+                edge->reverse_edge = NULL;
                 utarray_new(edge->physical_link_idx, &ut_int_icd);
                 HASH_ADD_STR(src_node->edges, dest, edge);
             }
