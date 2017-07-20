@@ -600,9 +600,7 @@ int netloc_write_into_xml_file(const char *subnet, const char *path, const char 
     DIR* dir;
     if (hwlocpath && 0 < strlen(hwlocpath)) {
         if ('/' != hwlocpath[0]) {
-            strBuff = strdup(path);
-            asprintf(&full_hwloc_path, "%s/%s", dirname(strBuff), hwlocpath);
-            free(strBuff); strBuff = NULL;
+            asprintf(&full_hwloc_path, "%s/%s", path, hwlocpath);
         } else {
             full_hwloc_path = strdup(hwlocpath);
         }
