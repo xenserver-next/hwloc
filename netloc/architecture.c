@@ -166,7 +166,7 @@ static int get_current_resources(int *pnum_nodes, char ***pnodes, int **pslot_id
 
         checked_fscanf(file, word, "rank number", ERROR);
         rank_list[s] = strtol(word, &end_word, 10);
-        if (*word == '\0' || *end_word != '\0' || rank_list[s] <= 0) {
+        if (*word == '\0' || *end_word != '\0' || rank_list[s] < 0) {
             fprintf(stderr, "Error: incorrect rank number (%d) in \"%s\"\n",
                     rank_list[s], word);
             goto ERROR;
@@ -195,17 +195,15 @@ ERROR:
 int netloc_arch_set_current_resources(netloc_arch_t *arch)
 {
     int ret;
-    int num_nodes;
+    int num_nodes = 0;
     char **nodenames = NULL;
     int *slot_idx  = NULL;
     int *slot_list = NULL;
     int *rank_list = NULL;
 
-    ret = get_current_resources(&num_nodes, &nodenames, &slot_idx, &slot_list,
-            &rank_list);
+    ret = get_current_resources(&num_nodes, &nodenames, &slot_idx, &slot_list, &rank_list);
 
     if (ret != NETLOC_SUCCESS)
-        /* || (num_nodes <= 0) No need for this check : done in get_current_resources */
         assert(0); // XXX
 
     NETLOC_int *current_nodes = NULL;
@@ -535,7 +533,7 @@ int partition_topology_to_tleaf(netloc_topology_t *topology,
     void *userdata;
     netloc_analysis_data *analysis_data;
     netloc_edge_t *edge, *edge_tmp;
-    netloc_iter_nodelist(partition->nodes, pnode) {
+    netloc_partition_iter_nodes(partition, pnode) {
         userdata = (*pnode)->userdata;
         (*pnode)->userdata = (void *)malloc(sizeof(netloc_analysis_data));
         analysis_data = (netloc_analysis_data *)(*pnode)->userdata;
@@ -551,7 +549,7 @@ int partition_topology_to_tleaf(netloc_topology_t *topology,
         }
 
         if (netloc_node_is_host(*pnode)) {
-            utarray_push_back(nodes, *pnode);
+            utarray_push_back(nodes, pnode);
         }
     }
 
