@@ -17,8 +17,7 @@ install-exec-hook:
 
 AM_CPPFLAGS = \
         -I$(top_builddir)/include \
-        -I$(top_srcdir)/include \
-	$(HWLOC_LIBXML2_CFLAGS)
+        -I$(top_srcdir)/include
 
 bin_PROGRAMS = \
         netloc_ib_extract_dats
@@ -28,5 +27,4 @@ netloc_ib_extract_dats_SOURCES = \
 
 netloc_ib_extract_dats_LDADD = \
 	$(top_builddir)/netloc/libnetloc.la \
-	$(top_builddir)/utils/netloc/xml/libnetloc_libxml_write.la \
-	$(HWLOC_LIBXML2_LIBS)
+	$(top_builddir)/utils/netloc/xml/libnetloc_xml_write.la

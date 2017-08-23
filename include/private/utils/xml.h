@@ -51,6 +51,8 @@ struct node_t {
 };
 extern node_t *nodes;
 
+extern UT_array *partitions;
+
 struct physical_link_t {
     unsigned long long int int_id;
     int ports[2];
@@ -66,8 +68,6 @@ struct physical_link_t {
 };
 
 static UT_icd physical_link_icd = { sizeof(physical_link_t), NULL, NULL, NULL };
-
-extern UT_array *partitions;
 
 /* Route tables */
 typedef struct {
@@ -97,8 +97,36 @@ typedef struct {
 } path_source_t;
 extern path_source_t *paths;
 
+static inline int node_is_virtual(node_t *node)
+{
+    return (NULL != node->subnodes);
+}
+
+extern int node_belongs_to_a_partition(node_t *node);
+
+static inline int edge_is_virtual(edge_t *edge)
+{
+    return (NULL != edge->subedges);
+}
+
+extern int edge_belongs_to_a_partition(edge_t *edge);
+
 extern int
-netloc_write_into_xml_file(const char *output, const char *subnet, const char *hwlocpath,
+netloc_write_into_xml_file(const char *subnet, const char *path, const char *hwlocpath,
                            const netloc_network_type_t transportType);
+
+#ifdef HWLOC_HAVE_LIBXML2
+
+extern int
+netloc_libxml_write_xml_file(const char *subnet, const char *path, const char *hwlocpath,
+                             const netloc_network_type_t transportType);
+
+#else
+
+extern int
+netloc_nolibxml_write_xml_file(const char *subnet, const char *path, const char *hwlocpath,
+                               const netloc_network_type_t transportType);
+
+#endif /* HWLOC_HAVE_LIBXML2 */
 
 #endif /* _UTILS_XML_H_ */

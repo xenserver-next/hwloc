@@ -120,4 +120,5 @@ AC_DEFUN([NETLOC_DO_AM_CONDITIONALS], [
     AM_CONDITIONAL([BUILD_NETLOCSCOTCH], [test "x$scotch_found_headers" = "xyes"])
     AM_CONDITIONAL([BUILD_MPITOOLS], [test "x$mpi_found_headers" = "xyes"])
     AM_CONDITIONAL([FOUND_XZ], [test "x$xz" = xyes])
+    AM_CONDITIONAL([NETLOC_HAVE_LIBXML2], [test "x$hwloc_libxml2_happy" = "xyes"])
 ])dnl
