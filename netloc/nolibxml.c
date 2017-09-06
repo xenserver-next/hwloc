@@ -299,10 +299,12 @@ static xml_node_t *xml_node_read_file(char *path)
         free(line); line = NULL;
     }
     free(line);
+    fclose(in);
     return root_node;
     
  ERROR:
     free(line);
+    fclose(in);
     xml_node_destruct(root_node);
     return NULL;
 }
