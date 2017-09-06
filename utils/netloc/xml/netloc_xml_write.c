@@ -345,12 +345,52 @@ int netloc_write_into_xml_file(const char *subnet, const char *path, const char 
     node_t *node, *node_tmp;
     HASH_ITER(hh, nodes, node, node_tmp) {
         if (node->subnodes) {
+            /* Edges */
+            edge_t *edge, *edge_tmp, *reverse_edge;
+            HASH_ITER(hh, node->edges, edge, edge_tmp) {
+                unsigned int i;
+                node_t *dest_node, *src_node;
+                HASH_FIND_STR(nodes, edge->dest, dest_node);
+                assert(dest_node);
+                reverse_edge = edge->reverse_edge;
+                assert(reverse_edge);
+                /* Clean reverse edge */
+                HASH_DEL(dest_node->edges, reverse_edge);
+                utarray_free(reverse_edge->physical_link_idx);
+                /* Unmerge revert subedges */
+                for (i = 0; i < utarray_len(reverse_edge->subedges); ++i) {
+                    edge_t *sub = *(edge_t **) utarray_eltptr(reverse_edge->subedges, i);
+                    HASH_ADD_STR(dest_node->edges, dest, sub);
+                }
+                utarray_free(reverse_edge->subedges);
+                free(reverse_edge->partitions);
+                free(reverse_edge);
+                /* Clean edge */
+                /* Unmerge subedges */
+                for (i = 0; i < utarray_len(edge->subedges); ++i) {
+                    edge_t *sub = *(edge_t **) utarray_eltptr(edge->subedges, i);
+                    assert(sub->reverse_edge);
+                    HASH_FIND_STR(node->subnodes, sub->reverse_edge->dest, src_node);
+                    assert(src_node);
+                    HASH_ADD_STR(src_node->edges, dest, sub);
+                }
+                utarray_free(edge->subedges);
+                utarray_free(edge->physical_link_idx);
+                free(edge->partitions);
+                HASH_DEL(node->edges, edge);
+                free(edge);
+            }
+            /* Nodes */
             node_t *subnode, *subnode_tmp;
             HASH_DEL(nodes, node);
             HASH_ITER(hh, node->subnodes, subnode, subnode_tmp) {
                 HASH_DEL(node->subnodes, subnode);
                 HASH_ADD_STR(nodes, physical_id, subnode);
             }
+            /* Virtual Node */
+            utarray_free(node->physical_links);
+            free(node->partitions);
+            free(node->description);
             free(node);
         }
     }
