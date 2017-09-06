@@ -95,8 +95,6 @@ AC_DEFUN([NETLOC_CHECK_PLATFORM], [
           [$1=no netloc_missing_reason=" (asprintf missing)"])
     AS_IF([test "$hwloc_windows" = "yes"],
           [$1=no netloc_missing_reason=" (Windows platform)"])
-    AS_IF([test "$hwloc_libxml2_happy" != "yes"],
-          [$1=no netloc_missing_reason=" (libxml2 missing)"])
     AC_MSG_RESULT([$$1$netloc_missing_reason])
 
     AC_CHECK_LIB(scotch, SCOTCH_archSub,

@@ -10,8 +10,7 @@
 if BUILD_NETLOC
 AM_CPPFLAGS = \
         $(NETLOC_CPPFLAGS) \
-        $(HWLOC_CPPFLAGS) \
-	$(HWLOC_LIBXML2_CFLAGS)
+        $(HWLOC_CPPFLAGS)
 
 # If we're in standalone mode, build the installable library.
 # Otherwise, build the embedded library.
@@ -35,14 +34,12 @@ sources = \
         mpicomm.c \
         xml.c
 
-
 # Installable library
 
 libnetloc_la_SOURCES = $(sources)
 libnetloc_la_LDFLAGS = $(ldflags) -version-info $(libnetloc_so_version)
 libnetloc_la_LIBADD = \
-        $(top_builddir)/hwloc/libhwloc.la \
-	$(HWLOC_LIBXML2_LIBS)
+        $(top_builddir)/hwloc/libhwloc.la
 
 # Embedded library (note the lack of a .so version number -- that
 # intentionally only appears in the installable library).  Also note
@@ -52,8 +49,27 @@ libnetloc_la_LIBADD = \
 libnetloc_embedded_la_SOURCES = $(sources)
 libnetloc_embedded_la_LDFLAGS = $(ldflags)
 libnetloc_embedded_la_LIBADD = \
-        $(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la \
+        $(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la
+
+# Add the proper xml reader whether LIBXML2 is available or not
+
+if NETLOC_HAVE_LIBXML2
+AM_CPPFLAGS += \
+	$(HWLOC_LIBXML2_CFLAGS)
+libnetloc_la_SOURCES += \
+	libxml.c
+libnetloc_la_LIBADD += \
 	$(HWLOC_LIBXML2_LIBS)
+libnetloc_embedded_la_SOURCES += \
+	libxml.c
+libnetloc_embedded_la_LIBADD += \
+	$(HWLOC_LIBXML2_LIBS)
+else
+libnetloc_la_SOURCES += \
+	nolibxml.c
+libnetloc_embedded_la_SOURCES += \
+	nolibxml.c
+endif
 
 if BUILD_NETLOCSCOTCH
 # If we're in standalone mode, build the installable library.
