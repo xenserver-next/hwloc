@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <private/netloc.h>
-#include <private/utils/xml.h>
+#include <private/utils/netloc.h>
 #include <netloc/uthash.h>
 #include <netloc/utarray.h>
 
@@ -170,11 +170,16 @@ int build_paths(void)
     HASH_ITER(hh, nodes, node_src, node_tmp1) {
         if (node_src->type != NETLOC_NODE_TYPE_HOST)
             continue;
+
+        if (0 == HASH_COUNT(node_src->edges))
+            continue;
+
         char *id_src = node_src->physical_id;
 
         path_source_t *path = (path_source_t *)
             malloc(sizeof(path_source_t));
-        snprintf(path->physical_id, MAX_STR, "%s", id_src);
+        strncpy(path->physical_id, id_src, MAX_STR);
+        path->physical_id[MAX_STR-1] = '\0';
         path->node = node_src;
         path->dest = NULL;
         HASH_ADD_STR(paths, physical_id, path);
@@ -183,9 +188,8 @@ int build_paths(void)
             if (node_dest->type != NETLOC_NODE_TYPE_HOST)
                 continue;
 
-            if (node_dest == node_src) {
+            if (node_dest == node_src)
                 continue;
-            }
 
             UT_array *found_links = NULL;
             utarray_new(found_links, &ut_ptr_icd);
@@ -193,11 +197,14 @@ int build_paths(void)
 
             char *id_dest = node_dest->physical_id;
 
-            physical_link_t *link = (physical_link_t *)
-                utarray_eltptr(node_src->physical_links, 0);
+            /* Don't assert node_src->physical_link[0] is set */
+            unsigned int link_id  = *(int *) utarray_front(node_src->edges->physical_link_idx);
+            physical_link_t *link = (physical_link_t  *)
+                utarray_eltptr(node_src->physical_links, link_id);
             utarray_push_back(found_links, &link);
 
             node_t *node_cur = link->dest;
+            assert(node_cur);
             while (node_cur != node_dest) {
                 route_source_t *route_source;
                 route_dest_t *route_dest;
@@ -223,7 +230,8 @@ int build_paths(void)
             if (completed) {
                 path_dest_t *path_dest = (path_dest_t *)
                     malloc(sizeof(path_dest_t));
-                snprintf(path_dest->physical_id, MAX_STR, "%s", id_dest);
+                strncpy(path_dest->physical_id, id_dest, MAX_STR);
+                path_dest->physical_id[MAX_STR-1] = '\0';
                 path_dest->node = node_dest;
                 path_dest->links = found_links;
                 HASH_ADD_STR(path->dest, physical_id, path_dest);
@@ -235,7 +243,7 @@ int build_paths(void)
     return 0;
 }
 
-/* We suppose the hostname of nodes is like that: ([a-z]*).*
+/* We suppose the hostname of nodes is like that: ([a-z][-a-z]+[a-z]).*
  * while \1 is the name of the partition
  */
 static char *node_find_partition_name(node_t *node)
@@ -250,9 +258,13 @@ static char *node_find_partition_name(node_t *node)
 
     /* Looking for the name of the partition */
     int i = 0;
-    while (i < max_size && (name[i] >= 'a' && name[i] <= 'z')) {
+    while (i < max_size && ((name[i] >= 'a' && name[i] <= 'z') || name[i] == '-')) {
         partition[i] = name[i];
         i++;
+    }
+    while (partition[i-1] == '-' && i > 1) {
+        partition[i-1] = '\0';
+        --i;
     }
     partition[i++] = '\0';
 
@@ -1059,10 +1071,8 @@ int read_routes(char *subnet, char *path, char *route_dirname)
         regfree(&route_filename_regexp);
     }
 
-
     free(route_path);
     closedir(dir);
 
-    return 0;
+    return NETLOC_SUCCESS;
 }
-

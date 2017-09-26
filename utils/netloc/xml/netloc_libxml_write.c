@@ -19,7 +19,7 @@
 #include <private/netloc.h>
 #include <netloc.h>
 
-#include <private/utils/xml.h>
+#include <private/utils/netloc.h>
 #include <netloc/uthash.h>
 #include <netloc/utarray.h>
 #include <dirent.h>

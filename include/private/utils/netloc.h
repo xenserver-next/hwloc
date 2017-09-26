@@ -9,8 +9,8 @@
  * $HEADER$
  */
 
-#ifndef _UTILS_XML_H_
-#define _UTILS_XML_H_
+#ifndef _UTILS_NETLOC_H_
+#define _UTILS_NETLOC_H_
 
 #include <private/autogen/config.h>
 #include <private/netloc.h>
@@ -115,18 +115,4 @@ extern int
 netloc_write_into_xml_file(const char *subnet, const char *path, const char *hwlocpath,
                            const netloc_network_type_t transportType);
 
-#ifdef HWLOC_HAVE_LIBXML2
-
-extern int
-netloc_libxml_write_xml_file(const char *subnet, const char *path, const char *hwlocpath,
-                             const netloc_network_type_t transportType);
-
-#else
-
-extern int
-netloc_nolibxml_write_xml_file(const char *subnet, const char *path, const char *hwlocpath,
-                               const netloc_network_type_t transportType);
-
-#endif /* HWLOC_HAVE_LIBXML2 */
-
-#endif /* _UTILS_XML_H_ */
+#endif /* _UTILS_NETLOC_H_ */
