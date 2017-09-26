@@ -207,6 +207,19 @@ void json_array_add(json_t *array, json_t *child)
     contents_destruct(child_contents);
 }
 
+void json_array_concat(json_t *dest, json_t *src)
+{
+    assert(dest->type == JSON_ARRAY && src->type == JSON_ARRAY);
+
+    free(src->contents->strings[0]);
+    if (src->contents->num > 1) {
+        src->contents->strings[0] = strdup(",");
+        contents_cat(dest->contents, src->contents);
+    }
+    contents_destruct(src->contents);
+    free(src);
+}
+
 json_t *json_string_new(char *value)
 {
     json_t *string = (json_t *)malloc(sizeof(json_t));
@@ -495,6 +508,8 @@ static int write_json(netloc_topology_t *topology, FILE *output)
     json_t *json_root = json_dict_new();
     json_t *json_nodes = json_array_new();
     json_t *json_edges = json_array_new();
+    json_t *json_nodes_extra = json_array_new();
+    json_t *json_edges_extra = json_array_new();
 
     /* Graph type */
     json_dict_add(json_root, JSON_DRAW_FILE_GRAPH_TYPE, json_string_new("tree"));
@@ -511,6 +526,9 @@ static int write_json(netloc_topology_t *topology, FILE *output)
     netloc_node_t *node, *node_tmp;
     HASH_ITER(hh, topology->nodes, node, node_tmp) {
         handle_path(node, json_paths);
+        /* extra+structural nodes */
+        if (!netloc_get_num_partitions(node) && (!node->subnodes || node->nsubnodes))
+            handle_node(node, json_nodes_extra, json_edges_extra, 0);
     }
 
     /* Partitions */
@@ -525,6 +543,8 @@ static int write_json(netloc_topology_t *topology, FILE *output)
         }
     }
 
+    json_array_concat(json_nodes, json_nodes_extra);
+    json_array_concat(json_edges, json_edges_extra);
     json_dict_add(json_root, JSON_DRAW_FILE_NODES, json_nodes);
     json_dict_add(json_root, JSON_DRAW_FILE_EDGES, json_edges);
     json_dict_add(json_root, JSON_DRAW_FILE_LINKS, json_links);

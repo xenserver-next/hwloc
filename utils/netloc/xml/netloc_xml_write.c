@@ -18,12 +18,22 @@
 
 #include <private/netloc.h>
 #include <netloc.h>
-
-#include <private/utils/xml.h>
+#include <private/autogen/config.h>
 #include <netloc/uthash.h>
 #include <netloc/utarray.h>
+#include <private/utils/netloc.h>
 #include <dirent.h>
 #include <libgen.h>
+
+#ifdef HWLOC_HAVE_LIBXML2
+extern int
+netloc_libxml_write_xml_file(const char *subnet, const char *path, const char *hwlocpath,
+                             const netloc_network_type_t transportType);
+#else
+extern int
+netloc_nolibxml_write_xml_file(const char *subnet, const char *path, const char *hwlocpath,
+                               const netloc_network_type_t transportType);
+#endif /* HWLOC_HAVE_LIBXML2 */
 
 node_t *nodes = NULL;
 UT_array *partitions = NULL;
@@ -54,43 +64,60 @@ int edge_belongs_to_a_partition(edge_t *edge) {
     return 0;
 }
 
+/**
+ * Merge \ref edge going from \ref node to \ref dest_node into \ref
+ * virtual_edge going from \ref virtual_node to \ref dest_node .
+ *
+ * At this point, \ref virtual_edge is not part of \ref
+ * virtual_node->edges . \ref node is still part of \ref nodes and
+ * \ref edge is still part of \ref node->edges . \ref node is always
+ * of SW type.
+ */
 static inline void edge_merge_into(node_t *virtual_node, edge_t *virtual_edge,
-                                   node_t *node, edge_t *edge)
+                                   node_t *node, edge_t *edge, node_t *dest_node)
 {
     unsigned int npartitions = utarray_len(partitions);
     /* Change corresponding edge in reverse */
-    node_t *dest_node;
-    edge_t *dest_edge, *reverse_virtual_edge;
-    HASH_FIND_STR(nodes, edge->dest, dest_node);
+    edge_t *reverse_edge, *virtual_reverse_edge;
     assert(dest_node);
-    HASH_FIND_STR(dest_node->edges, node->physical_id, dest_edge);
-    assert(dest_edge);
+    HASH_FIND_STR(dest_node->edges, node->physical_id, reverse_edge);
+    assert(reverse_edge);
+    HASH_DEL(dest_node->edges, reverse_edge);
     /* Check if the virtual_reverse_node is already defined */
-    HASH_FIND_STR(dest_node->edges, virtual_node->physical_id, reverse_virtual_edge);
-    if (!reverse_virtual_edge) { /* No previous reverse_virtual_edge */
-        reverse_virtual_edge = (edge_t *)malloc(sizeof(edge_t));
-        strncpy(reverse_virtual_edge->dest, virtual_node->physical_id, MAX_STR);
-        reverse_virtual_edge->total_gbits = 0;
-        reverse_virtual_edge->reverse_edge = virtual_edge;
-        reverse_virtual_edge->partitions = calloc(npartitions, sizeof(int));
-        utarray_new(reverse_virtual_edge->physical_link_idx, &ut_int_icd);
-        utarray_new(reverse_virtual_edge->subedges, &ut_ptr_icd);
-        HASH_ADD_STR(dest_node->edges, dest, reverse_virtual_edge);
-        virtual_edge->reverse_edge = reverse_virtual_edge;
+    HASH_FIND_STR(dest_node->edges, virtual_node->physical_id, virtual_reverse_edge);
+    if (0 != strncmp("virtual", dest_node->physical_id, 7)) {
+        if (!virtual_reverse_edge) {
+            /* No previous virtual_reverse_edge */
+            virtual_reverse_edge = (edge_t *)malloc(sizeof(edge_t));
+            strncpy(virtual_reverse_edge->dest, virtual_node->physical_id, MAX_STR);
+            virtual_reverse_edge->total_gbits = 0;
+            virtual_reverse_edge->reverse_edge = virtual_edge;
+            virtual_reverse_edge->partitions = calloc(npartitions, sizeof(int));
+            utarray_new(virtual_reverse_edge->physical_link_idx, &ut_int_icd);
+            utarray_new(virtual_reverse_edge->subedges, &ut_ptr_icd);
+            HASH_ADD_STR(dest_node->edges, dest, virtual_reverse_edge);
+            virtual_edge->reverse_edge = virtual_reverse_edge;
+        }
+        /* Merge reverse_edge into virtual_reverse_edge */
+        utarray_push_back(virtual_reverse_edge->subedges, &reverse_edge);
+        /* Merge edge into virtual_edge */
+        utarray_push_back(virtual_edge->subedges, &edge);
+    } else {
+        assert(virtual_reverse_edge);
+        /* Virtual to virtual: less updates to be done */
+        /* Merge into reverse virtual */
+        utarray_concat(virtual_reverse_edge->subedges, reverse_edge->subedges);
+        /* Merge into virtual */
+        utarray_concat(virtual_edge->subedges, edge->subedges);
     }
-    /* Merge into already defined reverse_virtual_edge */
-    utarray_concat(reverse_virtual_edge->physical_link_idx, dest_edge->physical_link_idx);
-    reverse_virtual_edge->total_gbits += dest_edge->total_gbits;
-    HASH_DEL(dest_node->edges, dest_edge);
-    utarray_push_back(reverse_virtual_edge->subedges, &dest_edge);
-    /* Merge into virtual_edge */
+    /* Common merging operations */
+    utarray_concat(virtual_reverse_edge->physical_link_idx, reverse_edge->physical_link_idx);
+    virtual_reverse_edge->total_gbits += reverse_edge->total_gbits;
     virtual_edge->total_gbits += edge->total_gbits;
-    HASH_DEL(node->edges, edge);
-    utarray_push_back(virtual_edge->subedges, &edge);
     /* Set partitions */
     for (unsigned int p = 0; p < npartitions; ++p) {
         virtual_edge->partitions[p] |= edge->partitions[p];
-        reverse_virtual_edge->partitions[p] |= dest_edge->partitions[p];
+        virtual_reverse_edge->partitions[p] |= reverse_edge->partitions[p];
     }
     /* Add offset to each physical_link index */
     unsigned int offset =
@@ -105,13 +132,27 @@ static inline void edge_merge_into(node_t *virtual_node, edge_t *virtual_edge,
         physical_link_t *link = (physical_link_t *)
             utarray_eltptr(virtual_node->physical_links, link_idx);
         assert(0 != *(int*)link);
+        if (dest_node->subnodes) {
+            node_t*subnode;
+            HASH_FIND_STR(dest_node->subnodes, link->parent_edge->dest, subnode);
+            assert(subnode);
+        } else {
+            assert(!strncmp(link->parent_edge->dest, dest_node->physical_id, MAX_STR));
+        }
 #endif /* NETLOC_DEBUG */
+    }
+    if (!strncmp("virtual", dest_node->physical_id, 7)) {
+        /* Destroy now useless reverse edges */
+        utarray_free(reverse_edge->physical_link_idx);
+        utarray_free(reverse_edge->subedges);
+        free(reverse_edge->partitions);
+        free(reverse_edge);
     }
 }
 
-static int find_similar_nodes(void)
+static inline int find_similar_nodes(void)
 {
-    int ret;
+    int ret = NETLOC_ERROR;
     unsigned int npartitions = utarray_len(partitions);
     /* Build edge lists by node */
     int num_nodes = HASH_COUNT(nodes);
@@ -178,24 +219,40 @@ static int find_similar_nodes(void)
                     /* add physical_links */
                     utarray_concat(virtual_node->physical_links, node1->physical_links);
 
-                    HASH_DEL(nodes, node1);
-                    HASH_ADD_STR(virtual_node->subnodes, physical_id, node1);
-                    HASH_ADD_STR(nodes, physical_id, virtual_node);
-
                     /* Initialize destination for virtual edge */
                     for (int i = 0; i < num_edges_by_node[nodeIdx]; i++) {
-                        edge_t *edge1, *virtual_edge = (edge_t *)malloc(sizeof(edge_t));
-                        strncpy(virtual_edge->dest, edgedest_by_node[nodeIdx][i]->physical_id,
-                                MAX_STR);
-                        virtual_edge->partitions = calloc(npartitions, sizeof(int));
-                        virtual_edge->total_gbits = 0;
-                        utarray_new(virtual_edge->subedges, &ut_ptr_icd);
-                        utarray_new(virtual_edge->physical_link_idx, &ut_int_icd);
-                        HASH_FIND_STR(node1->edges, virtual_edge->dest, edge1);
+                        edge_t *edge1, *virtual_edge;
+                        node_t *node_dest = edgedest_by_node[nodeIdx][i];
+                        HASH_FIND_STR(node1->edges, node_dest->physical_id, edge1);
                         assert(edge1);
-                        edge_merge_into(virtual_node, virtual_edge, node1, edge1);
-                        HASH_ADD_STR(virtual_node->edges, dest, virtual_edge);
+                        if (!strncmp("virtual", node_dest->physical_id, 7)) {
+                            /* Reuse already defined virtual edge */
+                            /* Transfert virtual edge */
+                            HASH_DEL(node1->edges, edge1);
+                            HASH_ADD_STR(virtual_node->edges, dest, edge1);
+                            /* Change reverse */
+                            edge1 = edge1->reverse_edge;
+                            HASH_DEL(node_dest->edges, edge1);
+                            strncpy(edge1->dest, virtual_node->physical_id, MAX_STR);
+                            HASH_ADD_STR(node_dest->edges, dest, edge1);
+                        } else {
+                            /* Create new virtual edge */
+                            virtual_edge = (edge_t *)calloc(1, sizeof(edge_t));
+                            strncpy(virtual_edge->dest, node_dest->physical_id, MAX_STR);
+                            virtual_edge->partitions = calloc(npartitions, sizeof(int));
+                            virtual_edge->total_gbits = 0;
+                            utarray_new(virtual_edge->subedges, &ut_ptr_icd);
+                            utarray_new(virtual_edge->physical_link_idx, &ut_int_icd);
+                            edge_merge_into(virtual_node, virtual_edge, node1, edge1, node_dest);
+                            HASH_DEL(node1->edges, edge1);
+                            HASH_ADD_STR(virtual_node->edges, dest, virtual_edge);
+                        }
                     }
+                    /* Remove node from nodes hashtable to add it to the virtual_node subnodes */
+                    HASH_DEL(nodes, node1);
+                    HASH_ADD_STR(virtual_node->subnodes, physical_id, node1);
+                    /* Add virtual_node to nodes hashtable */
+                    HASH_ADD_STR(nodes, physical_id, virtual_node);
                 }
 
                 /* add physical_links */
@@ -206,17 +263,25 @@ static int find_similar_nodes(void)
 
                 for (int i = 0; i < num_edges_by_node[nodeCmpIdx]; i++) {
                     edge_t *edge2, *virtual_edge;
-                    HASH_FIND_STR(virtual_node->edges,
-                                  edgedest_by_node[nodeCmpIdx][i]->physical_id, virtual_edge);
+                    node_t *node_dest = edgedest_by_node[nodeCmpIdx][i];
+                    HASH_FIND_STR(virtual_node->edges, node_dest->physical_id, virtual_edge);
                     assert(virtual_edge);
                     HASH_FIND_STR(node2->edges, virtual_edge->dest, edge2);
                     assert(edge2);
-                    edge_merge_into(virtual_node, virtual_edge, node2, edge2);
+                    edge_merge_into(virtual_node, virtual_edge, node2, edge2, node_dest);
+                    HASH_DEL(node2->edges, edge2);
+                    if (!strncmp("virtual", node_dest->physical_id, 7)) {
+                        /* Destroy previous virtual edge */
+                        utarray_free(edge2->physical_link_idx);
+                        utarray_free(edge2->subedges);
+                        free(edge2->partitions);
+                        free(edge2);
+                    }
                 }
 
                 HASH_DEL(nodes, node2);
-                HASH_ADD_STR(virtual_node->subnodes, physical_id, node2);
                 switch_nodes[nodeCmpIdx] = NULL;
+                HASH_ADD_STR(virtual_node->subnodes, physical_id, node2);
 
                     /* // TODO paths */
 
@@ -258,72 +323,96 @@ static int find_similar_nodes(void)
                     /* HASH_ADD_STR(topology->nodes, physical_id, virtual_node); */
                     /* printf("First node found: %s (%s)\n", node1->description, node1->physical_id); */
             }
+        }
 
-                /* utarray_concat(virtual_node->physical_links, node2->physical_links); */
-                /* utarray_push_back(virtual_node->subnodes, &node2); */
-                /* utarray_concat(virtual_node->partitions, node2->partitions); */
-
-                /* /\* Set edges *\/ */
-                /* netloc_edge_t *edge2, *edge_tmp2; */
-                /* netloc_edge_t *virtual_edge = first_virtual_edge; */
-                /* netloc_node_iter_edges(node2, edge2, edge_tmp2) { */
-                /*     /\* Merge the edges from the physical node into the virtual node *\/ */
-                /*     ret = edge_merge_into(virtual_edge, edge2, 0); */
-                /*     if (ret != NETLOC_SUCCESS) { */
-                /*         goto ERROR; */
-                /*     } */
-
-                /*     /\* Change the reverse edge of the neighbours (reverse nodes) *\/ */
-                /*     netloc_node_t *reverse_node = edge2->dest; */
-                /*     netloc_edge_t *reverse_edge = edge2->other_way; */
-
-                /*     netloc_edge_t *reverse_virtual_edge; */
-                /*     HASH_FIND_PTR(reverse_node->edges, &virtual_node, */
-                /*             reverse_virtual_edge); */
-                /*     ret = edge_merge_into(reverse_virtual_edge, reverse_edge, 1); */
-                /*     if (ret != NETLOC_SUCCESS) { */
-                /*         goto ERROR; */
-                /*     } */
-                /*     HASH_DEL(reverse_node->edges, reverse_edge); */
-
-                /*     /\* Get the next edge *\/ */
-                /*     virtual_edge = virtual_edge->hh.next; */
-                /* } */
-
-                /* /\* We remove the node from the list of nodes *\/ */
-                /* HASH_DEL(topology->nodes, node2); */
-                /* printf("\t node found: %s (%s)\n", node2->description, node2->physical_id); */
-
-                /* nodes[idx2] = NULL; */
-            /* } */
+        /* If virtual_node is not NULL, then there have been a virtual
+           node added. We need to update the entries */
+        if (NULL != virtual_node) {
+            unsigned int num_edges = HASH_COUNT(virtual_node->edges);
+            switch_nodes[nodeIdx] = virtual_node;
+            num_edges_by_node[nodeIdx] = num_edges;
+            edgedest_by_node[nodeIdx] = (node_t **)
+                realloc(edgedest_by_node[nodeIdx], sizeof(node_t *[num_edges]));
+            /* Reset edges destinations */
+            edge_t *edge, *edge_tmp;
+            int edge_idx = 0;
+            HASH_SORT(virtual_node->edges, sort_by_dest);
+            netloc_node_iter_edges(virtual_node, edge, edge_tmp) {
+                HASH_FIND_STR(nodes, edge->dest, edgedest_by_node[nodeIdx][edge_idx]);
+                assert(edgedest_by_node[nodeIdx][edge_idx]);
+                edge_idx++;
+            }
+            for (int idx = nodeIdx + 1; idx < num_nodes; ++idx) {
+                node = switch_nodes[idx];
+                if (node /* SW node that has not yet been virtualized */
+                    && /* linked to a virtualized node -> need to be updated */
+                    (num_edges = HASH_COUNT(node->edges)) < num_edges_by_node[idx]) {
+                    num_edges_by_node[idx] = num_edges;
+                    edgedest_by_node[idx] = (node_t **)
+                        realloc(edgedest_by_node[idx], sizeof(node_t *[num_edges]));
+                    /* Reset edges destinations */
+                    edge_idx = 0;
+                    HASH_SORT(node->edges, sort_by_dest);
+                    netloc_node_iter_edges(node, edge, edge_tmp) {
+                        HASH_FIND_STR(nodes, edge->dest, edgedest_by_node[idx][edge_idx]);
+                        assert(edgedest_by_node[idx][edge_idx]);
+                        edge_idx++;
+                    }
+                }
+            }
         }
     }
 
     ret = NETLOC_SUCCESS;
 ERROR:
-    free(switch_nodes);
     for (int idx = 0; idx < num_nodes; idx++) {
         if (edgedest_by_node[idx])
             free(edgedest_by_node[idx]);
     }
     free(edgedest_by_node);
     free(num_edges_by_node);
+    free(switch_nodes);
     return ret;
 }
 
 static inline void set_reverse_edges()
 {
     node_t *node, *node_tmp, *dest_node;
-    edge_t *edge, *edge_tmp, *reverse_edge;
+    edge_t *edge, *edge_tmp;
     HASH_ITER(hh, nodes, node, node_tmp) {
         HASH_ITER(hh, node->edges, edge, edge_tmp) {
+            if (edge->reverse_edge) {
+                assert(!strncmp(edge->reverse_edge->dest, node->physical_id, MAX_STR));
+                assert(edge->reverse_edge->reverse_edge == edge);
+                continue;
+            }
             HASH_FIND_STR(nodes, edge->dest, dest_node);
             assert(dest_node);
-            HASH_FIND_STR(dest_node->edges, node->physical_id, edge->reverse_edge); 
+            HASH_FIND_STR(dest_node->edges, node->physical_id, edge->reverse_edge);
             assert(edge->reverse_edge);
-            assert(!edge->reverse_edge->reverse_edge || edge->reverse_edge->reverse_edge == edge);
+            assert(!edge->reverse_edge->reverse_edge);
+            edge->reverse_edge->reverse_edge = edge;
         }
     }
+#ifdef NETLOC_DEBUG
+    {
+        /* Check every edge has its reverse_edge set */
+        node_t *node, *node_tmp, *dest_node;
+        edge_t *edge, *edge_tmp, *reverse_edge;
+        unsigned int tutu = 0;
+        HASH_ITER(hh, nodes, node, node_tmp) {
+            HASH_ITER(hh, node->edges, edge, edge_tmp) {
+                ++tutu;
+                if(!edge->reverse_edge) {
+                    HASH_FIND_STR(nodes, edge->dest, dest_node);
+                    assert(dest_node);
+                    HASH_FIND_STR(dest_node->edges, node->physical_id, reverse_edge);
+                }
+                assert(edge->reverse_edge);
+            }
+        }
+    }
+#endif /* NETLOC_DEBUG */
 }
 
 int netloc_write_into_xml_file(const char *subnet, const char *path, const char *hwlocpath,
@@ -346,25 +435,28 @@ int netloc_write_into_xml_file(const char *subnet, const char *path, const char 
     HASH_ITER(hh, nodes, node, node_tmp) {
         if (node->subnodes) {
             /* Edges */
-            edge_t *edge, *edge_tmp, *reverse_edge;
+            edge_t *edge, *edge_tmp;
             HASH_ITER(hh, node->edges, edge, edge_tmp) {
                 unsigned int i;
-                node_t *dest_node, *src_node;
-                HASH_FIND_STR(nodes, edge->dest, dest_node);
-                assert(dest_node);
-                reverse_edge = edge->reverse_edge;
-                assert(reverse_edge);
-                /* Clean reverse edge */
-                HASH_DEL(dest_node->edges, reverse_edge);
-                utarray_free(reverse_edge->physical_link_idx);
-                /* Unmerge revert subedges */
-                for (i = 0; i < utarray_len(reverse_edge->subedges); ++i) {
-                    edge_t *sub = *(edge_t **) utarray_eltptr(reverse_edge->subedges, i);
-                    HASH_ADD_STR(dest_node->edges, dest, sub);
+                node_t *src_node;
+                /* Clean reverse edge if dest is not virtual */
+                if (0 != strncmp("virtual", edge->dest, 7)) {
+                    node_t *dest_node;
+                    HASH_FIND_STR(nodes, edge->dest, dest_node);
+                    assert(dest_node);
+                    edge_t *reverse_edge = edge->reverse_edge;
+                    assert(reverse_edge);
+                    HASH_DEL(dest_node->edges, reverse_edge);
+                    utarray_free(reverse_edge->physical_link_idx);
+                    /* Unmerge revert subedges */
+                    for (i = 0; i < utarray_len(reverse_edge->subedges); ++i) {
+                        edge_t *sub = *(edge_t **) utarray_eltptr(reverse_edge->subedges, i);
+                        HASH_ADD_STR(dest_node->edges, dest, sub);
+                    }
+                    utarray_free(reverse_edge->subedges);
+                    free(reverse_edge->partitions);
+                    free(reverse_edge);
                 }
-                utarray_free(reverse_edge->subedges);
-                free(reverse_edge->partitions);
-                free(reverse_edge);
                 /* Clean edge */
                 /* Unmerge subedges */
                 for (i = 0; i < utarray_len(edge->subedges); ++i) {

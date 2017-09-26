@@ -19,7 +19,7 @@
 #include <private/netloc.h>
 #include <netloc.h>
 
-#include <private/utils/xml.h>
+#include <private/utils/netloc.h>
 #include <netloc/uthash.h>
 #include <netloc/utarray.h>
 #include <dirent.h>
@@ -365,7 +365,7 @@ int netloc_nolibxml_write_xml_file(const char *subnet, const char *path, const c
                                    const netloc_network_type_t transportType)
 {
     char *strBuff = NULL, *full_hwloc_path = NULL;
-    int strBuffSize = 0;
+    int strBuffSize = 0, ret = NETLOC_ERROR;
     /*
      * Add topology definition tag
      */
@@ -474,16 +474,17 @@ int netloc_nolibxml_write_xml_file(const char *subnet, const char *path, const c
     asprintf(&output_path, "%s/IB-%s-nodes.xml", path, subnet);
     FILE *out = fopen(output_path, "w");
     if (!out)
-        return NETLOC_ERROR;
+        goto clean_and_out;
     fprintf(out, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     xml_node_write(out, root_node, 0);
+    ret = NETLOC_SUCCESS;
+ clean_and_out:
     /* Close file, and free path */
     fclose(out);
     free(output_path); free(full_hwloc_path);
     /* Free the XML nodes */
     xml_node_destruct(root_node);
-
-    return NETLOC_SUCCESS;
+    return ret;
 }
 
 #endif

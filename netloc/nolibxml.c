@@ -531,10 +531,10 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
                     continue;
                 }
                 /* Add to the hashtables */
+                HASH_ADD_STR(topology->nodes, physical_id, node);
                 for (int n = 0; n < node->nsubnodes; ++n) {
                     HASH_ADD_STR(topology->nodes, physical_id, node->subnodes[n]);
                 }
-                HASH_ADD_STR(topology->nodes, physical_id, node);
                 if (NETLOC_NODE_TYPE_HOST == node->type && 0 < strlen(node->hostname)) {
                     HASH_ADD_KEYPTR(hh2, topology->nodesByHostname, node->hostname,
                                     strlen(node->hostname), node);
