@@ -131,7 +131,7 @@ static inline void edge_merge_into(node_t *virtual_node, edge_t *virtual_edge,
 #ifdef NETLOC_DEBUG
         physical_link_t *link = (physical_link_t *)
             utarray_eltptr(virtual_node->physical_links, link_idx);
-        assert(0 != *(int*)link);
+        assert(0 != *(int*)(link->dest));
         if (dest_node->subnodes) {
             node_t*subnode;
             HASH_FIND_STR(dest_node->subnodes, link->parent_edge->dest, subnode);
