@@ -706,7 +706,7 @@ int read_discover(char *subnet, char *path, char *filename)
 
             /* Analyse description */
             regex_t desc_re;
-            regcomp(&desc_re, "(.*)" " - " "(.*)", REG_EXTENDED);
+            regcomp(&desc_re, "(.*)" "[[:space:]]+-[[:space:]]+" "(.*)", REG_EXTENDED);
             if (!regexec(&desc_re, link_desc, (size_t)3, pmatch, 0)) {
                 get_match(link_desc, 3, pmatch, matches);
                 src_desc  = matches[1];
@@ -1045,7 +1045,7 @@ int read_routes(char *subnet, char *path, char *route_dirname)
                     else if (!regexec(&route_re, line, (size_t)5, pmatch, 0)) {
                         if (!route) {
                             fprintf(stderr, "Malformed route file %s\n", filename);
-                            exit(-1);
+                            break;
                         }
                         route_dest_t *route_dest;
                         get_match(line, 5, pmatch, matches);
