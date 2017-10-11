@@ -168,10 +168,7 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         hwlocpath = strdup((char *)crt_node->children->content);
     } else {
         fprintf(stderr, "Cannot read hwloc path in %s\n", path);
-        free(subnet);
-        netloc_topology_destruct(topology);
-        topology = NULL;
-        goto clean_and_out;
+        crt_node = crt_node->prev;
     }
 
     if (hwlocpath) {
