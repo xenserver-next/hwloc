@@ -263,7 +263,7 @@ static inline void insert_xml_node(xml_node_t *crt_node, node_t *node, char *hwl
         /* Set name */
         xml_node_attr_add(crt_node, "name", node->hostname);
         /* Set hwloc_path iif node is a host */
-        if (NETLOC_NODE_TYPE_HOST == node->type) {
+        if (NETLOC_NODE_TYPE_HOST == node->type && hwloc_path) {
             FILE *fxml;
             strBuffSize = asprintf(&strBuff, "%s/%s.diff.xml",
                                    hwloc_path, node->hostname);

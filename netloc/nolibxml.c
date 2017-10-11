@@ -437,15 +437,14 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
     }
     /* Retreive hwloc path */
     char *hwlocpath = NULL;
-    if (2 <= root_node->children.num && (crt_node = (xml_node_t *)root_node->children.data[1])
+    size_t hwloc_id = 1;
+    if (hwloc_id <= root_node->children.num &&
+        (crt_node = (xml_node_t *)root_node->children.data[hwloc_id])
         && !strcmp("hwloc_path", crt_node->name) && crt_node->content) {
         hwlocpath = strdup(crt_node->content);
     } else {
         fprintf(stderr, "Cannot read hwloc path in %s\n", path);
-        free(subnet);
-        netloc_topology_destruct(topology);
-        topology = NULL;
-        goto clean_and_out;
+        --hwloc_id;
     }
 
     if (hwlocpath) {
@@ -472,7 +471,7 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
     }
 
     /* Read partitions from file */
-    for (size_t part_id = 2; part_id < root_node->children.num; ++part_id) {
+    for (size_t part_id = hwloc_id + 1; part_id < root_node->children.num; ++part_id) {
         xml_node_t *part = root_node->children.data[part_id];
         if (!part) continue;
 
