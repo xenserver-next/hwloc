@@ -930,7 +930,7 @@ int write_into_file(char *subnet, char *path, char *hwlocpath)
                 fprintf(output, "%s,", link->speed);
                 fprintf(output, "%f,", link->gbits);
                 fprintf(output, "%s,", link->description);
-                fprintf(output, "%d,", link->other_link->int_id);
+                fprintf(output, "%llu,", link->other_link->int_id);
                 char *partition_str = partition_list_to_string(link->partitions);
                 fprintf(output, "%s", partition_str);
                 free(partition_str);

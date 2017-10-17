@@ -396,12 +396,12 @@ int netloc_topology_read_hwloc(netloc_topology_t *topology, int num_nodes,
     HASH_ITER(hh, (topology)->partitions, partition, _tmp)
 
 #define netloc_topology_iter_name_hwloctopos(topology,hwloctoponame)    \
-    for (int __idx = 0; __idx < (topology)->nb_hwloc_topos              \
+    for (unsigned int __idx = 0; __idx < (topology)->nb_hwloc_topos     \
              && ((hwloctoponame) = (topology)->hwlocpaths[__idx]);      \
          (hwloctoponame) = (topology)->hwlocpaths[__idx++])
 
 #define netloc_topology_iter_hwloctopos(topology,hwloctopo)             \
-    for (int __idx = 0; __idx < (topology)->nb_hwloc_topos              \
+    for (unsigned int __idx = 0; __idx < (topology)->nb_hwloc_topos     \
              && ((hwloctopo) = (topology)->hwloc_topos[__idx]);         \
          (hwloctopo) = (topology)->hwloc_topos[__idx++])
 
