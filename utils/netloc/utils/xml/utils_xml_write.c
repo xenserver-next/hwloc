@@ -79,11 +79,13 @@ struct xml_node_t {
 struct xml_doc_t {
     struct xml_node_t *root;
     xml_char *xml_version;
+    xml_char *doctype;
 };
 
 static int xml_node_write(FILE *out, xml_node_ptr node, unsigned int depth);
 
-xml_node_ptr xml_node_new(xml_ns_ptr ns __netloc_attribute_unused, xml_char *type)
+xml_node_ptr xml_node_new(xml_ns_ptr ns __netloc_attribute_unused,
+                          const xml_char *type)
 {
     xml_node_ptr node = (xml_node_ptr)malloc(sizeof(struct xml_node_t));
     if (!node) {
@@ -121,7 +123,7 @@ void xml_node_attr_add(xml_node_ptr node, const xml_char *name,
         fprintf(stderr, "WARN: unable to add attribute named \"%s\"\n", name);
         return;
     }
-    contents_add(&node->attributes, BAD_CAST attr);
+    contents_add(&node->attributes, attr);
 }
 
 void xml_node_child_add(xml_node_ptr node, xml_node_ptr child)
@@ -130,7 +132,7 @@ void xml_node_child_add(xml_node_ptr node, xml_node_ptr child)
 }
 
 xml_node_ptr xml_node_child_new(xml_node_ptr parent, xml_ns_ptr ns,
-                                xml_char *type, xml_char *content)
+                                const xml_char *type, const xml_char *content)
 {
     xml_node_ptr child = xml_node_new(ns, type);
     if (child) {
@@ -168,31 +170,47 @@ static int xml_node_write(FILE *out, xml_node_ptr node, unsigned int depth)
 xml_doc_ptr xml_doc_new(const xml_char *version) {
     xml_doc_ptr ret = (xml_doc_ptr)malloc(sizeof(struct xml_doc_t));
     ret->xml_version = strdup(version);
+    ret->doctype = NULL;
     return ret;
 }
 
 void xml_doc_free(xml_doc_ptr doc) {
     xml_node_free(doc->root);
     free(doc->xml_version);
+    free(doc->doctype);
     free(doc);
 }
 
-void xml_doc_set_root_element(xml_doc_ptr doc, xml_node_ptr node) {
+xml_node_ptr xml_doc_set_root_element(xml_doc_ptr doc, xml_node_ptr node) {
+    xml_node_ptr old = doc->root;
     doc->root = node;
+    return old;
 }
 
-int xml_doc_write(char *outpath, xml_doc_ptr doc, const char *enc,
+int xml_doc_write(const char *outpath, xml_doc_ptr doc, const char *enc,
                   int format __netloc_attribute_unused)
 {
     FILE *out = fopen(outpath, "w");
     if (!out)
         return (fclose(out), -1);
-    int ret = fprintf(out, "<?xml version=\"%s\" encoding=\"%s\"?>\n",
-                      doc->xml_version, enc);
+    int ret = fprintf(out, "<?xml version=\"%s\" encoding=\"%s\"?>\n%s",
+                      doc->xml_version, enc, doc->doctype ? doc->doctype : "");
     ret += xml_node_write(out, doc->root, 0);
     /* Close file */
     fclose(out);
     return ret;
+}
+
+void xml_dtd_subset_create(xml_doc_ptr doc, const xml_char *name,
+                           const xml_char *externalid __netloc_attribute_unused,
+                           const xml_char *systemid)
+{
+    if (doc->doctype) {
+        fprintf(stderr, "WARN: Overwriting previous DTD: \"%s\"\n",
+                doc->doctype);
+    }
+    free(doc->doctype);
+    asprintf(&doc->doctype, "<!DOCTYPE %s SYSTEM \"%s\">\n", name, systemid);
 }
 
 #else /* if defined( HWLOC_HAVE_LIBXML2 ) */
