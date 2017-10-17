@@ -262,7 +262,7 @@ static char *node_find_partition_name(node_t *node)
         partition[i] = name[i];
         i++;
     }
-    while (partition[i-1] == '-' && i > 1) {
+    while (i > 0 && partition[i-1] == '-') {
         partition[i-1] = '\0';
         --i;
     }
