@@ -330,12 +330,17 @@ EOF
         hwloc_config_prefix[utils/lstopo/Makefile]
         hwloc_config_prefix[hwloc.pc]
 
+        hwloc_config_prefix[netloc/Makefile]
         hwloc_config_prefix[utils/netloc/Makefile]
-        hwloc_config_prefix[utils/netloc/xml/Makefile]
-        hwloc_config_prefix[utils/netloc/infiniband/Makefile]
-        hwloc_config_prefix[utils/netloc/draw/Makefile]
-        hwloc_config_prefix[utils/netloc/scotch/Makefile]
-        hwloc_config_prefix[utils/netloc/mpi/Makefile]
+        hwloc_config_prefix[utils/netloc/utils/Makefile]
+        hwloc_config_prefix[utils/netloc/utils/xml/Makefile]
+        hwloc_config_prefix[utils/netloc/hardware/Makefile]
+        hwloc_config_prefix[utils/netloc/hardware/infiniband/Makefile]
+        hwloc_config_prefix[utils/netloc/hardware/explicit/Makefile]
+        hwloc_config_prefix[utils/netloc/export/Makefile]
+        hwloc_config_prefix[utils/netloc/export/draw/Makefile]
+        hwloc_config_prefix[utils/netloc/export/scotch/Makefile]
+        hwloc_config_prefix[utils/netloc/mapping/Makefile]
         hwloc_config_prefix[netloc.pc]
         hwloc_config_prefix[netlocscotch.pc]
    )
@@ -418,6 +423,7 @@ int foo(void) {
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/Makefile]
         hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh]
         hwloc_config_prefix[utils/lstopo/test-lstopo.sh]
+        hwloc_config_prefix[utils/netloc/hardware/infiniband/netloc_ib_gather_raw]
         hwloc_config_prefix[contrib/systemd/Makefile]
         hwloc_config_prefix[contrib/misc/Makefile]
         hwloc_config_prefix[tests/netloc/Makefile]
@@ -442,7 +448,7 @@ chmod +x ]hwloc_config_prefix[tests/hwloc/linux/test-topology.sh \
       ]hwloc_config_prefix[utils/hwloc/test-fake-plugin.sh \
       ]hwloc_config_prefix[utils/hwloc/test-hwloc-dump-hwdata/test-hwloc-dump-hwdata.sh \
       ]hwloc_config_prefix[utils/lstopo/test-lstopo.sh \
-      ]hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw \
+      ]hwloc_config_prefix[utils/netloc/hardware/infiniband/netloc_ib_gather_raw \
       ]hwloc_config_prefix[tests/netloc/tests.sh])
 
     # These links are only needed in standalone mode.  It would

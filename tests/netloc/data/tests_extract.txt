@@ -2,6 +2,6 @@ extract:
   testset: avakas plafrim plafrim2
   copy: %=txz
   needed: %/ib-raw %/hwloc
-  command: mkdir %/netloc; $NETLOC_UTIL_PATH/infiniband/netloc_ib_extract_dats %/ib-raw %/netloc --hwloc-dir ../hwloc
+  command: mkdir %/netloc; $NETLOC_UTIL_PATH/hardware/infiniband/netloc_ib_extract_dats %/ib-raw %/netloc --hwloc-dir ../hwloc
   checkfiles: %/netloc/*xml
 
