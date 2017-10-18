@@ -565,10 +565,10 @@ static int write_json(netloc_topology_t *topology, FILE *output)
 static int netloc_to_json_draw(netloc_topology_t *topology)
 {
     int ret;
-    static FILE *output;
+    FILE *output;
     char *node_uri = topology->topopath;
     int basename_len = strlen(node_uri)-10;
-    char *basename = (char *)malloc((basename_len+1)*sizeof(char));
+    char *basename = (char *)malloc(sizeof(char[basename_len + 1]));
     char *draw;
 
     netloc_topology_read_hwloc(topology, 0, NULL);
