@@ -74,6 +74,7 @@ EOF])
               chmod +x ]hwloc_config_prefix[utils/netloc/hardware/infiniband/netloc_ib_gather_raw
               ]hwloc_config_prefix[utils/netloc/hardware/opa/netloc_opa_parse_snapshot.py
               ]hwloc_config_prefix[utils/netloc/hardware/opa/netloc_opa_parse_topolog.py
+              ]hwloc_config_prefix[utils/netloc/hardware/opa/etloc_opa_gather_raw.sh
               ])
           ])
     AC_SUBST(NETLOC_EMBEDDED_CFLAGS)
@@ -113,6 +114,7 @@ AC_DEFUN([NETLOC_CHECK_PLATFORM], [
             break;])
     AC_CHECK_HEADERS([pmi.h], [pmi_found_headers=yes;break;])
     AC_CHECK_PROG([ib_found_bin],[ibnetdiscover],[yes],[no],[$PATH:/usr/sbin])
+    AC_CHECK_PROG([opa_found_bin],[opareport],[yes],[no],[$PATH:/usr/sbin])
 
     AC_CHECK_PROG([xz],[xz],[yes],[no])
 ])dnl
@@ -123,6 +125,7 @@ AC_DEFUN([NETLOC_DO_AM_CONDITIONALS], [
     AM_CONDITIONAL([BUILD_MPITOOLS], [test "x$mpi_found_headers" = "xyes"])
     AM_CONDITIONAL([BUILD_CRAY], [test "x$mpi_found_headers" = "xyes" -a "x$pmi_found_headers" = "xyes"])
     AM_CONDITIONAL([BUILD_IB], [test "x$ib_found_bin" = "xyes"])
+    AM_CONDITIONAL([BUILD_OPA], [test "x$opa_found_bin" = "xyes"])
     AM_CONDITIONAL([FOUND_XZ], [test "x$xz" = xyes])
     AM_CONDITIONAL([NETLOC_HAVE_LIBXML2], [test "x$hwloc_libxml2_happy" = "xyes"])
 ])dnl
