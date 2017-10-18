@@ -111,6 +111,8 @@ AC_DEFUN([NETLOC_CHECK_PLATFORM], [
             AC_SUBST(MPI_CPPFLAGS)
             AC_SUBST(MPI_LDADD)
             break;])
+    AC_CHECK_HEADERS([pmi.h], [pmi_found_headers=yes;break;])
+    AC_CHECK_PROG([ib_found_bin],[ibnetdiscover],[yes],[no],[$PATH:/usr/sbin])
 
     AC_CHECK_PROG([xz],[xz],[yes],[no])
 ])dnl
@@ -119,6 +121,8 @@ AC_DEFUN([NETLOC_DO_AM_CONDITIONALS], [
     AM_CONDITIONAL([BUILD_NETLOC], [test "$netloc_happy" = "yes"])
     AM_CONDITIONAL([BUILD_NETLOCSCOTCH], [test "x$scotch_found_headers" = "xyes"])
     AM_CONDITIONAL([BUILD_MPITOOLS], [test "x$mpi_found_headers" = "xyes"])
+    AM_CONDITIONAL([BUILD_CRAY], [test "x$mpi_found_headers" = "xyes" -a "x$pmi_found_headers" = "xyes"])
+    AM_CONDITIONAL([BUILD_IB], [test "x$ib_found_bin" = "xyes"])
     AM_CONDITIONAL([FOUND_XZ], [test "x$xz" = xyes])
     AM_CONDITIONAL([NETLOC_HAVE_LIBXML2], [test "x$hwloc_libxml2_happy" = "xyes"])
 ])dnl
