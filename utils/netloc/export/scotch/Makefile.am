@@ -10,14 +10,15 @@ AM_CPPFLAGS = $(HWLOC_CPPFLAGS) \
         -I$(top_srcdir)/include
 AM_LDFLAGS = $(HWLOC_LDFLAGS)
 
-LDADD = $(top_builddir)/netloc/libnetloc.la \
-        $(top_builddir)/netloc/libnetlocscotch.la \
-        -lscotch -lscotcherr -lm -lpthread
+LDADD = $(top_builddir)/netloc/libnetloc.la
 
 if BUILD_NETLOCSCOTCH
 bin_PROGRAMS = \
-        netlocscotch_get_arch
+        netloc_scotch_export_arch
 endif
 
-netlocscotch_get_arch_SOURCES = \
-        netlocscotch_get_arch.c
+netloc_scotch_export_arch_SOURCES = \
+        netloc_scotch_export_arch.c
+netloc_scotch_export_arch_LDADD = \
+        $(top_builddir)/netloc/libnetlocscotch.la \
+        -lscotch -lscotcherr -lm -lpthread

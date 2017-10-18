@@ -12,7 +12,6 @@ bin_SCRIPTS = \
 CLEANFILES = $(bin_SCRIPTS)
 
 install-exec-hook:
-	$(SED) -e 's/HWLOC_top_builddir\/utils\/lstopo/bindir/' -e '/HWLOC_top_builddir/d' $(DESTDIR)$(bindir)/netloc_ib_gather_raw > $(DESTDIR)$(bindir)/netloc_ib_gather_raw.tmp && mv -f $(DESTDIR)$(bindir)/netloc_ib_gather_raw.tmp $(DESTDIR)$(bindir)/netloc_ib_gather_raw
 	chmod +x $(DESTDIR)$(bindir)/netloc_ib_gather_raw
 
 AM_CPPFLAGS = \
@@ -27,4 +26,4 @@ netloc_ib_extract_dats_SOURCES = \
 
 netloc_ib_extract_dats_LDADD = \
 	$(top_builddir)/netloc/libnetloc.la \
-	$(top_builddir)/utils/netloc/xml/libnetloc_xml_write.la
+	$(top_builddir)/utils/netloc/utils/xml/libnetloc_xml_write.la

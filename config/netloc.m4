@@ -69,11 +69,13 @@ EOF])
            NETLOC_EMBEDDED_LDADD='$(HWLOC_top_builddir)/netloc/libnetloc_embedded.la'
            NETLOC_EMBEDDED_LIBS=$NETLOC_LIBS
            NETLOC_LIBS=],
-          [AC_CONFIG_FILES(netloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw])
-	   AC_CONFIG_COMMANDS([chmoding-netloc-scripts], [
-	       chmod +x ]hwloc_config_prefix[utils/netloc/infiniband/netloc_ib_gather_raw
-	     ])
-	  ])
+          [AC_CONFIG_FILES(netloc_config_prefix[utils/netloc/hardware/infiniband/netloc_ib_gather_raw])
+          AC_CONFIG_COMMANDS([chmoding-netloc-scripts], [
+              chmod +x ]hwloc_config_prefix[utils/netloc/hardware/infiniband/netloc_ib_gather_raw
+              ]hwloc_config_prefix[utils/netloc/hardware/opa/netloc_opa_parse_snapshot.py
+              ]hwloc_config_prefix[utils/netloc/hardware/opa/netloc_opa_parse_topolog.py
+              ])
+          ])
     AC_SUBST(NETLOC_EMBEDDED_CFLAGS)
     AC_SUBST(NETLOC_EMBEDDED_CPPFLAGS)
     AC_SUBST(NETLOC_EMBEDDED_LDADD)

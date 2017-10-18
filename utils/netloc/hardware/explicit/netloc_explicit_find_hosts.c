@@ -179,12 +179,12 @@ int main(int argc, char **argv)
 
             /* Find hwloc dir path */
             char *hwloc_path;
-            if (netloc_topology->hwlocpath[0] != '/') {
+            if (netloc_topology->hwloc_dir_path[0] != '/') {
                 char *path_tmp = strdup(netloc_topology->topopath);
-                asprintf(&hwloc_path, "%s/%s", dirname(path_tmp), netloc_topology->hwlocpath);
+                asprintf(&hwloc_path, "%s/%s", dirname(path_tmp), netloc_topology->hwloc_dir_path);
                 free(path_tmp);
             } else {
-                hwloc_path = strdup(netloc_topology->hwlocpath);
+                hwloc_path = strdup(netloc_topology->hwloc_dir_path);
             }
 
             /* Check if already have an hwloc file */

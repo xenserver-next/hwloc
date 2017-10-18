@@ -13,21 +13,11 @@ AM_LDFLAGS = $(HWLOC_LDFLAGS)
 LDADD = $(top_builddir)/netloc/libnetloc.la
 
 if BUILD_MPITOOLS
-bin_PROGRAMS = \
-        netloc_rank_order \
-        netloc_mpi_find_hosts
-
 if BUILD_NETLOCSCOTCH
-bin_PROGRAMS += \
+bin_PROGRAMS = \
         netloc_mpi_rank_file
 endif
 endif
-
-netloc_rank_order_SOURCES = netloc_rank_order.c
-
-netloc_mpi_find_hosts_SOURCES = netloc_mpi_find_hosts.c
-netloc_mpi_find_hosts_CPPFLAGS = $(AM_CPPFLAGS) $(MPI_CPPFLAGS)
-netloc_mpi_find_hosts_LDADD = $(LDADD) $(MPI_LDADD)
 
 if BUILD_NETLOCSCOTCH
 netloc_mpi_rank_file_SOURCES = netloc_mpi_rank_file.c
