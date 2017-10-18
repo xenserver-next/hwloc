@@ -40,33 +40,43 @@ static inline void insert_xml_link(xml_node_ptr links_node,
     xml_char_free(buff); buff = NULL;
     /* Set srcport */
     strBuffSize = asprintf(&strBuff, "%d", link->ports[0]);
-    if (0 < strBuffSize)
+    if (0 < strBuffSize) {
         xml_node_attr_cpy_add(crt_node, BAD_CAST "srcport", strBuff);
-    free(strBuff); strBuff = NULL;
+        free(strBuff);
+    }
+    strBuff = NULL;
     /* Set destport */
     strBuffSize = asprintf(&strBuff, "%d", link->ports[1]);
-    if (0 < strBuffSize)
+    if (0 < strBuffSize) {
         xml_node_attr_cpy_add(crt_node, BAD_CAST "destport", strBuff);
-    free(strBuff); strBuff = NULL;
+        free(strBuff);
+    }
+    strBuff = NULL;
     /* Set speed */
     xml_node_attr_cpy_add(crt_node, BAD_CAST "speed", link->speed);
     /* Set width */
     xml_node_attr_cpy_add(crt_node, BAD_CAST "width", link->width);
     /* Set bandwidth */
     strBuffSize = asprintf(&strBuff, "%f", link->gbits);
-    if (0 < strBuffSize)
+    if (0 < strBuffSize) {
         xml_node_attr_cpy_add(crt_node, BAD_CAST "bandwidth", strBuff);
-    free(strBuff); strBuff = NULL;
+        free(strBuff);
+    }
+    strBuff = NULL;
     /* Set logical_id */
     strBuffSize = asprintf(&strBuff, "%llu", link->int_id);
-    if (0 < strBuffSize)
+    if (0 < strBuffSize) {
         xml_node_attr_cpy_add(crt_node, BAD_CAST "logical_id", strBuff);
-    free(strBuff); strBuff = NULL;
+        free(strBuff);
+    }
+    strBuff = NULL;
     /* Set reverse physical_link->logical_id */
     if (link->other_link
-        && 0 < asprintf(&strBuff, "%llu", link->other_link->int_id))
+        && 0 < asprintf(&strBuff, "%llu", link->other_link->int_id)) {
         xml_node_attr_cpy_add(crt_node, BAD_CAST "reverse_logical_id", strBuff);
-    free(strBuff); strBuff = NULL;
+        free(strBuff);
+    }
+    strBuff = NULL;
 }
 
 static inline void insert_xml_edge(xml_node_ptr con_node, edge_t *edge,
@@ -78,15 +88,19 @@ static inline void insert_xml_edge(xml_node_ptr con_node, edge_t *edge,
     xml_node_ptr links_node;
     /* Set bandwidth */
     strBuffSize = asprintf(&strBuff, "%f", edge->total_gbits);
-    if (0 < strBuffSize)
+    if (0 < strBuffSize) {
         xml_node_attr_cpy_add(con_node, BAD_CAST "bandwidth", strBuff);
-    free(strBuff); strBuff = NULL;
+        free(strBuff);
+    }
+    strBuff = NULL;
     /* Set nblinks */
     unsigned int num_links = utarray_len(edge->physical_link_idx);
     strBuffSize = asprintf(&strBuff, "%u", num_links);
-    if (0 < strBuffSize)
+    if (0 < strBuffSize) {
         xml_node_attr_cpy_add(con_node, BAD_CAST "nblinks", strBuff);
-    free(strBuff); strBuff = NULL;
+        free(strBuff);
+    }
+    strBuff = NULL;
     /* Add src */
     buff = xml_char_strdup(node->physical_id);
     assert(buff);
@@ -106,9 +120,11 @@ static inline void insert_xml_edge(xml_node_ptr con_node, edge_t *edge,
         /* Set size */
         unsigned int num_subedges = utarray_len(edge->subedges);
         strBuffSize = asprintf(&strBuff, "%u", num_subedges);
-        if (0 < strBuffSize)
+        if (0 < strBuffSize) {
             xml_node_attr_cpy_add(subcons_node, BAD_CAST "size", strBuff);
-        free(strBuff); strBuff = NULL;
+            free(strBuff);
+        }
+        strBuff = NULL;
         /* Insert subedges */
         node_t *real_node = NULL;
         for (unsigned int se = 0; se < num_subedges; ++se) {
@@ -157,6 +173,8 @@ static inline void insert_xml_node(xml_node_ptr crt_node, node_t *node,
             FILE *fxml;
             strBuffSize = asprintf(&strBuff, "%s/%s.diff.xml",
                                    hwloc_path, node->hostname);
+            if (0 > strBuffSize)
+                strBuff = NULL;
             if (!(fxml = fopen(strBuff, "r"))) {
                 strBuffSize -= 8;
                 strcpy(&strBuff[strBuffSize], "xml");
@@ -218,8 +236,9 @@ static inline int insert_extra(xml_node_ptr root_node, char *full_hwloc_path)
                                        HASH_COUNT(node->subnodes));
                 if (0 < strBuffSize) {
                     xml_node_attr_cpy_add(crt_node, BAD_CAST "size", strBuff);
+                    free(strBuff);
                 }
-                free(strBuff); strBuff = NULL;
+                strBuff = NULL;
                 /* Add subnodes */
                 xml_node_ptr subnodes_node =
                     xml_node_child_new(crt_node, NULL, BAD_CAST "subnodes", NULL);
@@ -249,9 +268,11 @@ static inline int insert_extra(xml_node_ptr root_node, char *full_hwloc_path)
     } else {
         /* Set size */
         strBuffSize = asprintf(&strBuff, "%u", part_size);
-        if (0 < strBuffSize)
+        if (0 < strBuffSize) {
             xml_node_attr_cpy_add(part_node, BAD_CAST "size", strBuff);
-        free(strBuff); strBuff = NULL;
+            free(strBuff);
+        }
+        strBuff = NULL;
         xml_node_child_add(root_node, part_node);
     }
     return NETLOC_SUCCESS;
@@ -293,7 +314,8 @@ int netloc_write_xml_file(const char *subnet, const char *path,
     DIR* dir;
     if (hwlocpath && 0 < strlen(hwlocpath)) {
         if ('/' != hwlocpath[0]) {
-            asprintf(&full_hwloc_path, "%s/%s", path, hwlocpath);
+            if (0 > asprintf(&full_hwloc_path, "%s/%s", path, hwlocpath))
+                full_hwloc_path = NULL;
         } else {
             full_hwloc_path = strdup(hwlocpath);
         }
@@ -344,8 +366,9 @@ int netloc_write_xml_file(const char *subnet, const char *path,
                                        HASH_COUNT(node->subnodes));
                 if (0 < strBuffSize) {
                     xml_node_attr_cpy_add(crt_node, BAD_CAST "size", strBuff);
+                    free(strBuff);
                 }
-                free(strBuff); strBuff = NULL;
+                strBuff = NULL;
                 /* Add subnodes */
                 xml_node_ptr subnodes_node =
                     xml_node_child_new(crt_node, NULL,
@@ -370,9 +393,11 @@ int netloc_write_xml_file(const char *subnet, const char *path,
         }
         /* Set size */
         strBuffSize = asprintf(&strBuff, "%u", part_size);
-        if (0 < strBuffSize)
+        if (0 < strBuffSize) {
             xml_node_attr_cpy_add(part_node, BAD_CAST "size", strBuff);
-        free(strBuff); strBuff = NULL;
+            free(strBuff);
+        }
+        strBuff = NULL;
         /* Get next partition */
         ppartition = (char **)utarray_next(partitions, ppartition);
     }
@@ -384,7 +409,8 @@ int netloc_write_xml_file(const char *subnet, const char *path,
      * Dumping document to stdio or file
      */
     char *output_path;
-    asprintf(&output_path, "%s/IB-%s-nodes.xml", path, subnet);
+    if (0 > asprintf(&output_path, "%s/IB-%s-nodes.xml", path, subnet))
+        output_path = NULL;
     if (-1 == xml_doc_write(output_path, doc, "UTF-8", 1))
         fprintf(stderr, "Error: Unable to write to file \"%s\"\n", output_path);
     else
