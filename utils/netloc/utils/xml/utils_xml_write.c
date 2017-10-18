@@ -19,6 +19,7 @@
 #include <private/netloc.h>
 #include <netloc.h>
 #include <private/utils/xml.h>
+#include <string.h>
 
 #ifndef HWLOC_HAVE_LIBXML2
 
@@ -43,16 +44,15 @@ static void contents_init(contents_t *contents, size_t allocated)
 static void contents_add(contents_t *contents, void *data)
 {
     if (contents->num == contents->allocated) {
-        if (contents->allocated)
-            {
-                void **new_data = (void **)
-                    realloc(contents->data,
-                            sizeof(void *[2*contents->allocated]));
-                if (!new_data)
-                    return;
-                contents->data = new_data;
-                contents->allocated *= 2;
-            } else {
+        if (contents->allocated) {
+            void **new_data = (void **)
+                realloc(contents->data,
+                        sizeof(void *[2*contents->allocated]));
+            if (!new_data)
+                return;
+            contents->data = new_data;
+            contents->allocated *= 2;
+        } else {
             contents->data = (void **) malloc(sizeof(void *[1]));
             if (!contents->data)
                 return;
@@ -61,6 +61,21 @@ static void contents_add(contents_t *contents, void *data)
     }
     contents->data[contents->num] = data;
     contents->num++;
+}
+
+static void contents_merge(contents_t *dest, const contents_t *src)
+{
+    size_t new_num   = dest->num + src->num;
+    size_t new_alloc = 1 < dest->allocated ? dest->allocated : 1;
+    while (new_num > new_alloc)
+        new_alloc *= 2;
+    void **new_data = (void **) realloc(dest->data, sizeof(void *[new_alloc]));
+    if (!new_data)
+        return;
+    memcpy(&new_data[dest->num], src->data, sizeof(void *[src->num]));
+    dest->data      = new_data;
+    dest->num       = new_num;
+    dest->allocated = new_alloc;
 }
 
 static void contents_end(contents_t *contents)
@@ -99,18 +114,28 @@ xml_node_ptr xml_node_new(xml_ns_ptr ns __netloc_attribute_unused,
     return node;
 }
 
-void xml_node_free(xml_node_ptr node)
+static inline void xml_node_destruct(xml_node_ptr node)
 {
-    size_t i;
     free(node->name);
     free(node->content);
-    for (i = 0; i < node->attributes.num; ++i)
-        free(node->attributes.data[i]);
     contents_end(&node->attributes);
-    for (i = 0; i < node->children.num; ++i)
-        xml_node_free((xml_node_ptr)node->children.data[i]);
     contents_end(&node->children);
     free(node);
+}
+
+static inline void xml_node_empty(xml_node_ptr node)
+{
+    size_t i;
+    for (i = 0; i < node->attributes.num; ++i)
+        free(node->attributes.data[i]);
+    for (i = 0; i < node->children.num; ++i)
+        xml_node_free((xml_node_ptr)node->children.data[i]);
+}
+
+void xml_node_free(xml_node_ptr node)
+{
+    xml_node_empty(node);
+    xml_node_destruct(node);
 }
 
 void xml_node_attr_add(xml_node_ptr node, const xml_char *name,
@@ -140,6 +165,16 @@ xml_node_ptr xml_node_child_new(xml_node_ptr parent, xml_ns_ptr ns,
         xml_node_child_add(parent, child);
     }
     return child;
+}
+
+void xml_node_merge(xml_node_ptr dest, xml_node_ptr src)
+{
+    contents_merge(&dest->attributes, &src->attributes);
+    if (dest->content && src->content)
+        dest->content = strcat(dest->content, src->content);
+    else if (!dest->content)
+        contents_merge(&dest->children, &src->children);
+    xml_node_destruct(src);
 }
 
 int xml_node_has_child(xml_node_ptr node)
@@ -222,10 +257,21 @@ void xml_dtd_subset_create(xml_doc_ptr doc, const xml_char *name,
 void xml_node_attr_cpy_add(xml_node_ptr pnode, const xml_char *name,
                            const char *value)
 {
-    xml_char *buff = xml_char_strdup(value);
+    xmlChar *buff = xmlCharStrdup(value);
     if (buff)
-        xml_node_attr_add(pnode, name, buff);
-    xml_char_free(buff);
+        (void) xmlNewProp(pnode, name, buff);
+    xmlFree(buff);
+}
+
+void xml_node_merge(xml_node_ptr dest, xml_node_ptr src)
+{
+    xmlNodePtr children = src->children;
+    if (children)
+        (void) xmlAddChildList(dest, children);
+    xmlAttrPtr properties = src->properties;
+    if (properties)
+        (void) xmlCopyPropList(dest, properties);
+    xmlFreeNode(src);
 }
 
 #endif

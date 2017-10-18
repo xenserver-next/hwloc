@@ -54,6 +54,7 @@ static inline xml_node_ptr xml_node_child_new(xml_node_ptr p, xml_ns_ptr ns,
 {
     return xmlNewChild(p, ns, n, c);
 }
+extern  void xml_node_merge(xml_node_ptr dest, xml_node_ptr src);
 static inline int xml_node_has_child(xml_node_ptr node) {
     return (NULL != node->children);
 }
@@ -132,6 +133,8 @@ extern xml_node_ptr
 xml_node_child_new(xml_node_ptr parent,
                    xml_ns_ptr namespace __netloc_attribute_unused,
                    const xml_char *type, const xml_char *content);
+
+extern void xml_node_merge(xml_node_ptr dest, xml_node_ptr src);
 
 extern int xml_node_has_child(xml_node_ptr node);
 
