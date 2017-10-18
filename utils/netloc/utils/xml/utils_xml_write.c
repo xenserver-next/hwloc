@@ -205,12 +205,16 @@ void xml_dtd_subset_create(xml_doc_ptr doc, const xml_char *name,
                            const xml_char *externalid __netloc_attribute_unused,
                            const xml_char *systemid)
 {
+    int ret;
     if (doc->doctype) {
         fprintf(stderr, "WARN: Overwriting previous DTD: \"%s\"\n",
                 doc->doctype);
+        free(doc->doctype);
     }
-    free(doc->doctype);
-    asprintf(&doc->doctype, "<!DOCTYPE %s SYSTEM \"%s\">\n", name, systemid);
+    ret = asprintf(&doc->doctype, "<!DOCTYPE %s SYSTEM \"%s\">\n",
+                       name, systemid);
+    if (0 > ret)
+        doc->doctype = NULL;
 }
 
 #else /* if defined( HWLOC_HAVE_LIBXML2 ) */

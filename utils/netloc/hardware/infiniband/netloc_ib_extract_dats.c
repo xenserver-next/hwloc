@@ -466,7 +466,8 @@ int main(int argc, char **argv)
     if (hwlocpath) {
         char *realpath;
         if (hwlocpath[0] != '/') {
-            asprintf(&realpath, "%s/%s", outpath, hwlocpath);
+            if (0 > asprintf(&realpath, "%s/%s", outpath, hwlocpath))
+                realpath = NULL;
         } else {
             realpath = strdup(hwlocpath);
         }
@@ -498,12 +499,15 @@ int main(int argc, char **argv)
             char *discover_filename;
             char *route_filename;
             char *subnet;
-            asprintf(&subnet, "%.19s", filename+10);
+            if (0 > asprintf(&subnet, "%.19s", filename+10))
+                subnet = NULL;
 
             discover_filename = filename;
             read_discover(subnet, inpath, discover_filename);
 
-            asprintf(&route_filename, "%s/ibroutes-%s", inpath, subnet);
+            if (0 > asprintf(&route_filename, "%s/ibroutes-%s", inpath, subnet))
+                route_filename = NULL;
+
             struct stat s;
             int err = stat(route_filename, &s);
             if (-1 == err) {
@@ -516,7 +520,8 @@ int main(int argc, char **argv)
             } else {
                 if (S_ISDIR(s.st_mode)) {
                     char *route_filename;
-                    asprintf(&route_filename, "ibroutes-%s", subnet);
+                    if (0 > asprintf(&route_filename, "ibroutes-%s", subnet))
+                        route_filename = NULL;
                     read_routes(subnet, inpath, route_filename);
                     free(route_filename);
                 } else {
@@ -622,7 +627,8 @@ int read_discover(char *subnet, char *path, char *filename)
     char *discover_path;
     FILE *discover_file;
 
-    asprintf(&discover_path, "%s/%s", path, filename);
+    if (0 > asprintf(&discover_path, "%s/%s", path, filename))
+        discover_path = NULL;
     discover_file = fopen(discover_path, "r");
     free(discover_path);
 
@@ -877,9 +883,10 @@ char *partition_list_to_string(int *partition_list)
 int write_into_file(char *subnet, char *path, char *hwlocpath)
 {
     char *output_path;
-    asprintf(&output_path, "%s/IB-%s-nodes.txt", path, subnet);
-    FILE *output = fopen(output_path, "w");
+    if (0 > asprintf(&output_path, "%s/IB-%s-nodes.txt", path, subnet))
+        output_path = NULL;
 
+    FILE *output = fopen(output_path, "w");
     if (!output) {
         perror("fopen");
         printf("Wrong output_path: %s\n", output_path);
@@ -976,7 +983,8 @@ int read_routes(char *subnet, char *path, char *route_dirname)
     char *route_path;
     DIR *dir;
 
-    asprintf(&route_path, "%s/%s", path, route_dirname);
+    if (0 > asprintf(&route_path, "%s/%s", path, route_dirname))
+        route_path = NULL;
     dir = opendir(route_path);
 
     printf("Read subnet: %s\n", subnet);
@@ -992,9 +1000,10 @@ int read_routes(char *subnet, char *path, char *route_dirname)
 
             if (!(regexec(&route_filename_regexp, filename, 0, NULL, 0))) {
                 char *route_filename;
-                asprintf(&route_filename, "%s/%s", route_path, filename);
-                FILE *route_file = fopen(route_filename, "r");
+                if (0 > asprintf(&route_filename, "%s/%s", route_path, filename))
+                    route_filename = NULL;
 
+                FILE *route_file = fopen(route_filename, "r");
                 if (!route_file) {
                     perror("fopen");
                     exit(-1);
