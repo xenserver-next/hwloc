@@ -103,23 +103,16 @@ int netloc_physical_link_destruct(netloc_physical_link_t *link)
 char * netloc_link_pretty_print(netloc_physical_link_t* link)
 {
     char * str = NULL;
-    const char * tmp_src_str = NULL;
-    const char * tmp_dest_str = NULL;
-
-    tmp_src_str = netloc_node_type_encode(link->src->type);
-    tmp_dest_str = netloc_node_type_encode(link->dest->type);
-
-    asprintf(&str, "%3d (%s) [%23s] %d [<- %s / %s (%f) ->] (%s) [%23s] %d",
+    asprintf(&str, "%5llu (%s) [%23s] %d [<- %s / %s (%f) ->] (%s) [%23s] %d",
              link->id,
-             tmp_src_str,
+             netloc_node_type_encode(link->src->type),
              link->src->physical_id,
              link->ports[0],
              link->speed,
              link->width,
              link->gbits,
-             tmp_dest_str,
+             netloc_node_type_encode(link->dest->type),
              link->dest->physical_id,
              link->ports[1]);
-
     return str;
 }

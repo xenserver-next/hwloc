@@ -85,9 +85,8 @@ static int netloc_xml_reader_clean_and_out(xmlDoc *doc);
 
 int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
 {
-    xmlNode *root_node, *crt_node = NULL, *tmp = NULL;
+    xmlNode *root_node, *crt_node = NULL;
     xmlChar *buff = NULL;
-    size_t buffSize;
     int num_nodes = 0;
     netloc_topology_t *topology = NULL;
     netloc_hwloc_topology_t *hwloc_topos = NULL;
@@ -205,7 +204,6 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         /* Check partition's size */
         long int nnodes = 0;
         char *strBuff;
-        size_t strBuffSize;
         buff = xmlGetProp(part, BAD_CAST "size");
         if (!buff || (!(nnodes = strtol((char *)buff, &strBuff, 10)) && strBuff == (char *)buff)){
             fprintf(stderr, "WARN: cannot read partition's size.\n");
@@ -215,7 +213,6 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
 
         /* Check partition's name */
         netloc_partition_t *partition;
-        char *name = NULL;
         buff = xmlGetProp(part, BAD_CAST "name");
         if (!buff || !strlen((char *)buff)) {
             fprintf(stderr, "WARN: cannot read partition's name.\n");
@@ -255,7 +252,7 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
             if (!buff) {
                 continue;
             }
-            HASH_FIND_STR(topology->nodes, buff, node);
+            HASH_FIND_STR(topology->nodes, (char *)buff, node);
             if (!node) {
                 node = netloc_node_xml_load(it_node, hwlocpath, &hwloc_topos);
                 if (!node) {
@@ -264,7 +261,7 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
                 }
                 /* Add to the hashtables */
                 HASH_ADD_STR(topology->nodes, physical_id, node);
-                for (int n = 0; n < node->nsubnodes; ++n) {
+                for (unsigned int n = 0; n < node->nsubnodes; ++n) {
                     HASH_ADD_STR(topology->nodes, physical_id, node->subnodes[n]);
                 }
                 if (NETLOC_NODE_TYPE_HOST == node->type && 0 < strlen(node->hostname)) {
@@ -274,7 +271,7 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
             }
             /* Add to the partition */
             if (partition) {
-                for (int n = 0; n < node->nsubnodes; ++n) {
+                for (unsigned int n = 0; n < node->nsubnodes; ++n) {
                     utarray_push_back(node->subnodes[n]->partitions, &partition);
                 }
                 utarray_push_back(partition->nodes, &node);
@@ -361,7 +358,7 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
 
 static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
                                             netloc_hwloc_topology_t **hwloc_topos) {
-    xmlNode *tmp = NULL, *crt_node;
+    xmlNode *tmp = NULL;
     xmlChar *buff = NULL;
     char *strBuff = NULL;
     size_t strBuffSize, buffSize;
@@ -476,7 +473,7 @@ static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
             netloc_node_destruct(node);
             return NULL;
         }
-        int subnode_id = 0;
+        unsigned int subnode_id = 0;
         for (xmlNode *it_subnode = (tmp->children
                                     && XML_ELEMENT_NODE != tmp->children->type
                                     ? tmp->children->next : tmp->children);
@@ -658,10 +655,9 @@ static netloc_physical_link_t *
 netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
                               netloc_partition_t *partition)
 {
-    xmlNode *tmp, *crt_node;
+    xmlNode *tmp;
     xmlChar *buff = NULL;
     char *strBuff = NULL;
-    size_t strBuffSize, buffSize;
     netloc_physical_link_t *link = netloc_physical_link_construct();
     /* set ports */
     int tmpport;
@@ -746,7 +742,6 @@ netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
 
 static xmlDoc *netloc_xml_reader_init(char *path)
 {
-    int ret = NETLOC_SUCCESS;
     xmlDoc *doc = NULL;
 
     /*

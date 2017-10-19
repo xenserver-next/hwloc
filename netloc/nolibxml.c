@@ -370,8 +370,7 @@ netloc_physical_link_xml_load(xml_node_t *it_link, netloc_edge_t *edge,
 int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
 {
     char *buff;
-    xml_node_t *root_node, *crt_node = NULL, *tmp = NULL;
-    size_t buffSize;
+    xml_node_t *root_node, *crt_node = NULL;
     int num_nodes = 0;
     netloc_topology_t *topology = NULL;
     netloc_hwloc_topology_t *hwloc_topos = NULL;
@@ -478,7 +477,6 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
         /* Check partition's size */
         long int nnodes = 0;
         char *strBuff;
-        size_t strBuffSize;
         buff = xml_node_attr_get(part, "size");
         if (!buff || (!(nnodes = strtol(buff, &strBuff, 10)) && strBuff == buff)){
             fprintf(stderr, "WARN: cannot read partition's size.\n");
@@ -488,7 +486,6 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
 
         /* Check partition's name */
         netloc_partition_t *partition;
-        char *name = NULL;
         buff = xml_node_attr_get(part, "name");
         if (!buff || !strlen(buff)) {
             fprintf(stderr, "WARN: cannot read partition's name.\n");
@@ -531,7 +528,7 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
                 }
                 /* Add to the hashtables */
                 HASH_ADD_STR(topology->nodes, physical_id, node);
-                for (int n = 0; n < node->nsubnodes; ++n) {
+                for (unsigned int n = 0; n < node->nsubnodes; ++n) {
                     HASH_ADD_STR(topology->nodes, physical_id, node->subnodes[n]);
                 }
                 if (NETLOC_NODE_TYPE_HOST == node->type && 0 < strlen(node->hostname)) {
@@ -541,7 +538,7 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
             }
             /* Add to the partition */
             if (partition) {
-                for (int n = 0; n < node->nsubnodes; ++n) {
+                for (unsigned int n = 0; n < node->nsubnodes; ++n) {
                     utarray_push_back(node->subnodes[n]->partitions, &partition);
                 }
                 utarray_push_back(partition->nodes, &node);
@@ -632,7 +629,7 @@ int netloc_topology_nolibxml_load(char *path, netloc_topology_t **ptopology)
 
 static netloc_node_t * netloc_node_xml_load(xml_node_t *it_node, char *hwlocpath,
                                             netloc_hwloc_topology_t **hwloc_topos) {
-    xml_node_t *tmp = NULL, *crt_node;
+    xml_node_t *tmp = NULL;
     char *strBuff = NULL, *buff = NULL;
     size_t strBuffSize, buffSize;
     netloc_node_t *node = netloc_node_construct();
@@ -748,7 +745,7 @@ static netloc_node_t * netloc_node_xml_load(xml_node_t *it_node, char *hwlocpath
         }
         /* Check we found all the subnodes */
         if (tmp->children.num != node->nsubnodes) {
-            fprintf(stderr, "WARN: expecting %u subnodes, but %u found\n",
+            fprintf(stderr, "WARN: expecting %u subnodes, but %zu found\n",
                     node->nsubnodes, tmp->children.num);
         }
     }
@@ -849,7 +846,7 @@ netloc_edge_xml_load(xml_node_t *it_edge, netloc_topology_t *topology,
             subedge = netloc_edge_xml_load(tmp->children.data[se], topology, partition);
             edge->subnode_edges[se] = subedge;
             if (!subedge) {
-                fprintf(stderr, "WARN: cannot read subconnexion #%u\n", se);
+                fprintf(stderr, "WARN: cannot read subconnexion #%zu\n", se);
                 continue;
             }
             total_gbits -= subedge->total_gbits;
@@ -902,7 +899,6 @@ netloc_physical_link_xml_load(xml_node_t *it_link, netloc_edge_t *edge,
                               netloc_partition_t *partition)
 {
     char *buff = NULL, *strBuff = NULL;
-    size_t strBuffSize, buffSize;
     netloc_physical_link_t *link = netloc_physical_link_construct();
     /* set ports */
     int tmpport;
