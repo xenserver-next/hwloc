@@ -110,11 +110,11 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     }
     
     root_node = xmlDocGetRootElement(doc);
-    if (root_node && XML_ELEMENT_NODE == root_node->type
-        && !strcmp("topology", (char *)root_node->name)) {
+    if (root_node && !strcmp("topology", (char *)root_node->name)) {
         /* Check netloc file version */
         buff = xmlGetProp(root_node, BAD_CAST "version");
-        if (!buff || 0 != strcmp(NETLOC_STR_VERS(NETLOCFILE_VERSION_2_0), (char *)buff)) {
+        if (!buff ||
+            0 != strcmp(NETLOC_STR_VERS(NETLOCFILE_VERSION_2_0),(char *)buff)) {
             fprintf(stderr, "Incorrect version number (\"%s\"), "
                     "please generate your input file again.\n", (char *)buff);
             xmlFree(buff); buff = NULL;
@@ -131,12 +131,13 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     /* Check transport type */
     buff = xmlGetProp(root_node, BAD_CAST "transport");
     if (!buff) {
-        fprintf(stderr, "Transport type not found, please generate your input file again.\n");
+        fprintf(stderr, "Transport type not found, please generate "
+                "your input file again.\n");
         xmlFree(buff); buff = NULL;
         netloc_topology_destruct(topology); topology = NULL;
         goto clean_and_out;
-    } else if (NETLOC_NETWORK_TYPE_INVALID ==
-               (transport_type = netloc_network_type_decode((const char *)buff))) {
+    } else if(NETLOC_NETWORK_TYPE_INVALID ==
+              (transport_type = netloc_network_type_decode((const char*)buff))){
         fprintf(stderr, "Invalid network type (\"%s\"), please generate your "
                 "input file again.\n", (char *)buff);
         xmlFree(buff); buff = NULL;
@@ -146,10 +147,8 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     xmlFree(buff); buff = NULL;
     /* Retreive subnet */
     char *subnet = NULL;
-    if (root_node->children &&
-        ((XML_TEXT_NODE == root_node->children->type && (crt_node = root_node->children->next))
-         || (crt_node = root_node->children))
-        && XML_ELEMENT_NODE == crt_node->type && !strcmp("subnet", (char *)crt_node->name)
+    if (root_node->children && (crt_node = root_node->children)
+        && !strcmp("subnet", (char *)crt_node->name)
         && crt_node->children && crt_node->children->content) {
         subnet = strdup((char *)crt_node->children->content);
     } else {
@@ -159,10 +158,8 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     }
     /* Retreive hwloc path */
     char *hwlocpath = NULL;
-    if (crt_node->next &&
-        ((XML_TEXT_NODE == crt_node->next->type && (crt_node = crt_node->next->next))
-         || (crt_node = crt_node->next))
-        && XML_ELEMENT_NODE == crt_node->type && !strcmp("hwloc_path", (char *)crt_node->name)
+    if ((crt_node = crt_node->next)
+        && !strcmp("hwloc_path", (char *)crt_node->name)
         && crt_node->children && crt_node->children->content) {
         hwlocpath = strdup((char *)crt_node->children->content);
     } else {
@@ -181,7 +178,8 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
             hwlocpath = realhwlocpath;
         }
         if (!(hwlocdir = opendir(hwlocpath))) {
-            fprintf(stderr, "Couldn't open hwloc directory: \"%s\"\n", hwlocpath);
+            fprintf(stderr, "Couldn't open hwloc directory: \"%s\"\n",
+                    hwlocpath);
             perror("opendir");
             free(subnet);
             free(hwlocpath);
@@ -195,17 +193,16 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
 
     /* Read partitions from file */
 
-    for (xmlNode *part = (crt_node->next && XML_TEXT_NODE == crt_node->next->type
-                          ? crt_node->next->next : crt_node->next);
-         part && XML_ELEMENT_NODE == part->type && part->children
-             && !strcmp("partition", (char *)part->name);
-         part = part->next && XML_TEXT_NODE == part->next->type ? part->next->next : part->next) {
+    for (xmlNode *part = crt_node->next;
+         part  && !strcmp("partition", (char *)part->name) && part->children;
+         part = part->next) {
 
         /* Check partition's size */
         long int nnodes = 0;
         char *strBuff;
         buff = xmlGetProp(part, BAD_CAST "size");
-        if (!buff || (!(nnodes = strtol((char *)buff, &strBuff, 10)) && strBuff == (char *)buff)){
+        if (!buff || (!(nnodes = strtol((char *)buff, &strBuff, 10))
+                      && strBuff == (char *)buff)){
             fprintf(stderr, "WARN: cannot read partition's size.\n");
         }
         xmlFree(buff); buff = NULL; strBuff = NULL;
@@ -222,7 +219,9 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         if ('/' == *(char *)buff) { /* Exclude /extra+structural/ partition */
             partition = NULL;
         } else {
-            partition = netloc_partition_construct(HASH_COUNT(topology->partitions),(char *)buff);
+            partition =
+                netloc_partition_construct(HASH_COUNT(topology->partitions),
+                                           (char *)buff);
             HASH_ADD_STR(topology->partitions, name, partition);
         }
         if ('\0' != *(char *)buff)
@@ -232,20 +231,16 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         /* Read nodes from file */
 
         /* Check for <nodes> tag */
-        if (!part->children
-            || !((XML_TEXT_NODE == part->children->type && (crt_node = part->children->next))
-                 || (crt_node = part->children))
-            || XML_ELEMENT_NODE != crt_node->type
+        if (!(crt_node = part->children)
             || 0 != strcmp("nodes", (char *)crt_node->name)
             || (!crt_node->children && 0 < nnodes)) {
-            fprintf(stderr, "WARN: No \"nodes\" tag, but %ld nodes required.\n", nnodes);
+            fprintf(stderr, "WARN: No \"nodes\" tag, but %ld nodes required.\n",
+                    nnodes);
             continue;
         }
-        for (xmlNode *it_node = crt_node->children && XML_ELEMENT_NODE != crt_node->children->type
-                 ? crt_node->children->next : crt_node->children;
+        for (xmlNode *it_node = crt_node->children;
              it_node;
-             it_node = it_node->next && XML_ELEMENT_NODE != it_node->next->type
-                 ? it_node->next->next : it_node->next) {
+             it_node = it_node->next) {
             netloc_node_t *node = NULL;
             /* Prefetch physical_id to know if it's worth loading the node */
             buff = xmlGetProp(it_node, BAD_CAST "mac_addr");
@@ -262,17 +257,21 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
                 /* Add to the hashtables */
                 HASH_ADD_STR(topology->nodes, physical_id, node);
                 for (unsigned int n = 0; n < node->nsubnodes; ++n) {
-                    HASH_ADD_STR(topology->nodes, physical_id, node->subnodes[n]);
+                    HASH_ADD_STR(topology->nodes, physical_id,
+                                 node->subnodes[n]);
                 }
-                if (NETLOC_NODE_TYPE_HOST == node->type && 0 < strlen(node->hostname)) {
-                    HASH_ADD_KEYPTR(hh2, topology->nodesByHostname, node->hostname,
+                if (NETLOC_NODE_TYPE_HOST == node->type
+                    && 0 < strlen(node->hostname)) {
+                    HASH_ADD_KEYPTR(hh2, topology->nodesByHostname,
+                                    node->hostname,
                                     strlen(node->hostname), node);
                 }
             }
             /* Add to the partition */
             if (partition) {
                 for (unsigned int n = 0; n < node->nsubnodes; ++n) {
-                    utarray_push_back(node->subnodes[n]->partitions, &partition);
+                    utarray_push_back(node->subnodes[n]->partitions,
+                                      &partition);
                 }
                 utarray_push_back(partition->nodes, &node);
                 utarray_push_back(node->partitions, &partition);
@@ -288,21 +287,18 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         /* Read edges from file */
 
         /* Check for <connexions> tag */
-        if (!crt_node->next
-            || !((XML_TEXT_NODE == crt_node->next->type && (crt_node = crt_node->next->next))
-                 || (crt_node = crt_node->next))
-            || XML_ELEMENT_NODE != crt_node->type
-            || 0 != strcmp("connexions", (char *)crt_node->name) || !crt_node->children) {
+        if (!(crt_node = crt_node->next)
+            || 0 != strcmp("connexions", (char *)crt_node->name)
+            || !crt_node->children) {
             if (1 < nnodes)
                 fprintf(stderr, "WARN: No \"connexions\" tag.\n");
             continue;
         }
-        for (xmlNode *it_edge = crt_node->children && XML_ELEMENT_NODE != crt_node->children->type
-                 ? crt_node->children->next : crt_node->children;
+        for (xmlNode *it_edge = crt_node->children;
              it_edge;
-             it_edge = it_edge->next && XML_ELEMENT_NODE != it_edge->next->type
-                 ? it_edge->next->next : it_edge->next) {
-            netloc_edge_t *edge = netloc_edge_xml_load(it_edge, topology, partition);
+             it_edge = it_edge->next) {
+            netloc_edge_t *edge =
+                netloc_edge_xml_load(it_edge, topology, partition);
             if (partition && edge) {
                 utarray_push_back(partition->edges, &edge);
             }
@@ -310,13 +306,15 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     }
 
     /* Set topology->physical_links->other_way */
-    netloc_physical_link_t *plink = NULL, *plink_tmp = NULL, *plink_found = NULL;
+    netloc_physical_link_t *plink = NULL,
+        *plink_tmp = NULL,
+        *plink_found = NULL;
     HASH_ITER(hh, topology->physical_links, plink, plink_tmp) {
         HASH_FIND(hh, topology->physical_links, &plink->other_way_id,
                   sizeof(unsigned long long int), plink_found);
         if (NULL == plink_found) {
-            fprintf(stderr, "WARN: Strangely enough, the corresponding reverse physical link "
-                    "seems to be absent...\n");
+            fprintf(stderr, "WARN: Strangely enough, the corresponding reverse "
+                    "physical link seems to be absent...\n");
         } else {
             plink->other_way = plink_found;
             if (NULL == plink->edge->other_way)
@@ -327,7 +325,7 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     /* Change from hashtable to array for hwloc topologies */
     topology->nb_hwloc_topos = HASH_COUNT(hwloc_topos);
     if (0 < topology->nb_hwloc_topos) {
-        topology->hwlocpaths     = malloc(sizeof(char *[topology->nb_hwloc_topos]));
+        topology->hwlocpaths = malloc(sizeof(char *[topology->nb_hwloc_topos]));
         netloc_hwloc_topology_t *ptr, *ptr_tmp;
         HASH_ITER(hh, hwloc_topos, ptr, ptr_tmp) {
             topology->hwlocpaths[ptr->hwloc_topo_idx] = ptr->path;
@@ -356,8 +354,9 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     return NETLOC_SUCCESS;
 }
 
-static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
-                                            netloc_hwloc_topology_t **hwloc_topos) {
+static netloc_node_t *
+netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
+                     netloc_hwloc_topology_t **hwloc_topos) {
     xmlNode *tmp = NULL;
     xmlChar *buff = NULL;
     char *strBuff = NULL;
@@ -394,10 +393,8 @@ static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
         node->type = netloc_node_type_decode((char *)buff);
     xmlFree(buff); buff = NULL;
     /* Set description */
-    if (it_node->children
-        && ((XML_TEXT_NODE == it_node->children->type && (tmp = it_node->children->next))
-            || (tmp = it_node->children))
-        && XML_ELEMENT_NODE == tmp->type && 0 == strcmp("description", (char *)tmp->name)
+    if (it_node->children && (tmp = it_node->children)
+        && 0 == strcmp("description", (char *)tmp->name)
         && tmp->children && tmp->children->content) {
         node->description = strdup((char *)tmp->children->content);
     }
@@ -411,22 +408,25 @@ static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
         if (5 > strBuffSize) { /* bad return from asprintf() */
             fprintf(stderr, "WARN: Invalid topology file \"%s/%s\", or "
                     "memory exhaustion\n", hwlocpath, (char *)buff);
-        } else if (9 < strBuffSize && 0 == strcmp(".diff.xml", &strBuff[strBuffSize-9])) {
+        } else if (9 < strBuffSize
+                   && 0 == strcmp(".diff.xml", &strBuff[strBuffSize-9])) {
             /* hwloc_file point to a diff file */
             hwloc_topology_diff_t diff;
-            if (0 <= hwloc_topology_diff_load_xml(strBuff, &diff, &refname) && refname) {
+            if (0 <= hwloc_topology_diff_load_xml(strBuff, &diff, &refname)
+                && refname) {
                 /* Load diff file to check on refname */
                 hwloc_topology_diff_destroy(diff);
                 free(strBuff);
                 strBuffSize = asprintf(&strBuff, "%s/%s", hwlocpath, refname);
                 free(refname);
             } else {
-                fprintf(stderr, "WARN: no refname for topology file \"%s/%s\"\n",
+                fprintf(stderr,"WARN: no refname for topology file \"%s/%s\"\n",
                         hwlocpath, (char *)buff);
             }
         }
         HASH_FIND(hh, *hwloc_topos, strBuff, (unsigned)strBuffSize, hwloc_topo);
-        if (!hwloc_topo) { /* The topology cannot be retrieved in the hashtable */
+        if (!hwloc_topo) {
+            /* The topology cannot be retrieved in the hashtable */
             size_t hwloc_topo_idx = (size_t)HASH_COUNT(*hwloc_topos);
             hwloc_topo = malloc(sizeof(netloc_hwloc_topology_t));
             hwloc_topo->path = strdup(strBuff);
@@ -447,40 +447,38 @@ static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
         xmlFree(buff); buff = NULL;
         buff = xmlGetProp(it_node, BAD_CAST "size");
         if (1 != sscanf((const char *)buff, "%u", &node->nsubnodes)) {
-            fprintf(stderr, "WARN: Cannot read how many subnodes are included into the "
-                    "virtual node \"%s\"\n", node->physical_id);
+            fprintf(stderr, "WARN: Cannot read how many subnodes are included "
+                    "into the virtual node \"%s\"\n", node->physical_id);
         }
         xmlFree(buff); buff = NULL;
         /* Add subnodes */
         if (!node->description) {
-            tmp = (it_node->children && XML_ELEMENT_NODE != it_node->children->type
-                   ? it_node->children->next : it_node->children);
+            tmp = it_node->children;
             node->description = strndup(node->physical_id, 20);
         } else {
-            tmp = tmp->next && XML_ELEMENT_NODE != tmp->next->type ? tmp->next->next : tmp->next;
+            tmp = tmp->next;
         }
         if (0 != strcmp("subnodes", (char *)tmp->name)) {
-            fprintf(stderr, "WARN: virtual node \"%s\" is empty, and thus, ignored\n",
-                    node->physical_id);
+            fprintf(stderr, "WARN: virtual node \"%s\" is empty, and thus, "
+                    "ignored\n", node->physical_id);
             netloc_node_destruct(node);
             return NULL;
         }
         /* Allocate subnodes array */
         node->subnodes = malloc(sizeof(netloc_node_t *[node->nsubnodes]));
         if (!node->subnodes) {
-            fprintf(stderr, "WARN: unable to allocate the memory for virtual node \"%s\" "
-                    "subnodes. This node is thus ignored\n", node->physical_id);
+            fprintf(stderr, "WARN: unable to allocate the memory for virtual "
+                    "node \"%s\" subnodes. This node is thus ignored\n",
+                    node->physical_id);
             netloc_node_destruct(node);
             return NULL;
         }
         unsigned int subnode_id = 0;
-        for (xmlNode *it_subnode = (tmp->children
-                                    && XML_ELEMENT_NODE != tmp->children->type
-                                    ? tmp->children->next : tmp->children);
+        for (xmlNode *it_subnode = tmp->children;
              it_subnode;
-             it_subnode = it_subnode->next && XML_ELEMENT_NODE != it_subnode->next->type
-                 ? it_subnode->next->next : it_subnode->next) {
-            netloc_node_t *subnode = netloc_node_xml_load(it_subnode, hwlocpath, hwloc_topos);
+             it_subnode = it_subnode->next) {
+            netloc_node_t *subnode =
+                netloc_node_xml_load(it_subnode, hwlocpath, hwloc_topos);
             if (subnode)
                 subnode->virtual_node = node;
             node->subnodes[subnode_id++] = subnode;
@@ -495,7 +493,8 @@ static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
 }
 
 static netloc_edge_t *
-netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology, netloc_partition_t *partition)
+netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology,
+                     netloc_partition_t *partition)
 {
     xmlNode *tmp, *crt_node;
     xmlChar *buff = NULL;
@@ -518,27 +517,24 @@ netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology, netloc_parti
     if (!buff || (1 > sscanf((char *)buff, "%u", &nlinks))) {
         fprintf(stderr, "WARN: cannot read connexion's physical links.\n");
     } else if (0 >= nlinks) {
-        fprintf(stderr, "WARN: less than 1 connexion's physical link required (%u).\n",
-                nlinks);
+        fprintf(stderr, "WARN: less than 1 connexion's physical link required "
+                "(%u).\n", nlinks);
     }
     xmlFree(buff); buff = NULL; strBuff = NULL;
     /* Move tmp to the proper xml node and set src node */
-    if (it_edge->children
-        && ((XML_TEXT_NODE == it_edge->children->type && (tmp = it_edge->children->next))
-            || (tmp = it_edge->children))
-        && XML_ELEMENT_NODE == tmp->type && 0 == strcmp("src", (char *)tmp->name)
+    if ((tmp = it_edge->children) && 0 == strcmp("src", (char *)tmp->name)
         && tmp->children && tmp->children->content) {
-        netloc_topology_find_node(topology, (char *)tmp->children->content, edge->node);
+        netloc_topology_find_node(topology,
+                                  (char *)tmp->children->content, edge->node);
     } else {
         fprintf(stderr, "ERROR: cannot find connexion's source node.\n");
         goto ERROR;
     }
     /* Move tmp to the proper xml node and set dest node */
-    if (tmp->next
-        && ((XML_TEXT_NODE == tmp->next->type && (tmp = tmp->next->next)) || (tmp = tmp->next))
-        && tmp && XML_ELEMENT_NODE == tmp->type && 0 == strcmp("dest", (char *)tmp->name)
+    if ((tmp = tmp->next) && 0 == strcmp("dest", (char *)tmp->name)
         && tmp->children && tmp->children->content) {
-        netloc_topology_find_node(topology, (char *)tmp->children->content, edge->dest);
+        netloc_topology_find_node(topology,
+                                  (char *)tmp->children->content, edge->dest);
     } else {
         fprintf(stderr, "ERROR: cannot find connexion's destination node.\n");
         goto ERROR;
@@ -556,7 +552,8 @@ netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology, netloc_parti
         if (partition) {
             utarray_push_back(edge_tmp->partitions, &partition);
             for (unsigned int se = 0; se < edge_tmp->nsubedges; ++se)
-                utarray_push_back(edge_tmp->subnode_edges[se]->partitions, &partition);
+                utarray_push_back(edge_tmp->subnode_edges[se]->partitions,
+                                  &partition);
         }
         /* Edge already created from another partition */
         netloc_edge_destruct(edge);
@@ -570,11 +567,10 @@ netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology, netloc_parti
         xmlFree(buff); buff = NULL;
         /* Move tmp to the proper xml node */
         unsigned int nsubedges;
-        if (!tmp->next
-            || !((XML_TEXT_NODE == tmp->next->type && (tmp = tmp->next->next))
-                 || (tmp = tmp->next)) || !tmp || XML_ELEMENT_NODE != tmp->type
-            || 0 != strcmp("subconnexions", (char *)tmp->name) || !tmp->children) {
-            fprintf(stderr, "ERROR: cannot find the subedges. Failing to read this connexion\n");
+        if (!(tmp = tmp->next) || 0 != strcmp("subconnexions", (char*)tmp->name)
+            || !tmp->children) {
+            fprintf(stderr, "ERROR: cannot find the subedges. Failing to read "
+                    "this connexion\n");
             goto ERROR;
         }
         buff = xmlGetProp(tmp, BAD_CAST "size");
@@ -585,15 +581,15 @@ netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology, netloc_parti
             fprintf(stderr, "WARN: less than 2 edges (%u).\n", nsubedges);
         }
         edge->nsubedges = nsubedges;
-        edge->subnode_edges = (netloc_edge_t **)malloc(sizeof(netloc_edge_t *[nsubedges]));
+        edge->subnode_edges = (netloc_edge_t **)
+            malloc(sizeof(netloc_edge_t *[nsubedges]));
         xmlFree(buff); buff = NULL; strBuff = NULL;
         unsigned int se = 0;
-        for(xmlNode *it_subedge = tmp->children && XML_ELEMENT_NODE != tmp->children->type
-                    ? tmp->children->next : tmp->children;
+        for(xmlNode *it_subedge = tmp->children;
                 it_subedge;
-                it_subedge = it_subedge->next && XML_ELEMENT_NODE != it_subedge->next->type
-                    ? it_subedge->next->next : it_subedge->next) {
-            netloc_edge_t *subedge = netloc_edge_xml_load(it_subedge, topology, partition);
+                it_subedge = it_subedge->next) {
+            netloc_edge_t *subedge =
+                netloc_edge_xml_load(it_subedge, topology, partition);
             edge->subnode_edges[se++] = subedge;
             if (!subedge) {
                 fprintf(stderr, "WARN: cannot read subconnexion #%u\n", se);
@@ -608,41 +604,39 @@ netloc_edge_xml_load(xmlNode *it_edge, netloc_topology_t *topology, netloc_parti
         /* Read physical links from file */
 
         /* Check for <links> tag */
-        if (!tmp->next
-            || !((XML_TEXT_NODE == tmp->next->type && (crt_node = tmp->next->next))
-                 || (crt_node = tmp->next))
-            || XML_ELEMENT_NODE != crt_node->type
-            || 0 != strcmp("links", (char *)crt_node->name) || !crt_node->children) {
+        if (!(crt_node = tmp->next)
+            || 0 != strcmp("links", (char *)crt_node->name)
+            || !crt_node->children) {
             fprintf(stderr, "ERROR: No \"links\" tag.\n");
             goto ERROR;
         }
         xmlNode *it_link;
         netloc_physical_link_t *link = NULL;
-        for (it_link = crt_node->children && XML_ELEMENT_NODE != crt_node->children->type
-                 ? crt_node->children->next : crt_node->children;
+        for (it_link = crt_node->children;
              it_link;
-             it_link = it_link->next && XML_ELEMENT_NODE != it_link->next->type
-                 ? it_link->next->next : it_link->next) {
+             it_link = it_link->next) {
             link = netloc_physical_link_xml_load(it_link, edge, partition);
             if (link) {
                 total_gbits -= link->gbits;
                 utarray_push_back(edge->node->physical_links, &link);
                 utarray_push_back(edge->physical_links, &link);
-                HASH_ADD(hh, topology->physical_links, id, sizeof(unsigned long long int), link);
+                HASH_ADD(hh, topology->physical_links, id,
+                         sizeof(unsigned long long int), link);
             }
         }
     }
 #ifdef NETLOC_DEBUG
     /* Check proper value for edge->total_gbits */
     if (0 != total_gbits) {
-        fprintf(stderr, "WARN: Erroneous value read from file for edge total bandwidth. "
-                "\"%f\" instead of %f (calculated).\n",
+        fprintf(stderr, "WARN: Erroneous value read from file for edge total "
+                "bandwidth. \"%f\" instead of %f (calculated).\n",
                 edge->total_gbits, edge->total_gbits - total_gbits);
     }
     /* Check proper value for nlinks and utarray_len(edge->physical_links) */
     if (nlinks != utarray_len(edge->physical_links)) {
-        fprintf(stderr, "WARN: Erroneous value read from file for edge count of physical links. "
-                "%u requested, but only %u found\n", nlinks, utarray_len(edge->physical_links));
+        fprintf(stderr, "WARN: Erroneous value read from file for edge count "
+                "of physical links. %u requested, but only %u found\n",
+                nlinks, utarray_len(edge->physical_links));
     }
 #endif /* NETLOC_DEBUG */
     return edge;
@@ -655,7 +649,6 @@ static netloc_physical_link_t *
 netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
                               netloc_partition_t *partition)
 {
-    xmlNode *tmp;
     xmlChar *buff = NULL;
     char *strBuff = NULL;
     netloc_physical_link_t *link = netloc_physical_link_construct();
@@ -663,7 +656,8 @@ netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
     int tmpport;
     buff = xmlGetProp(it_link, BAD_CAST "srcport");
     if (!buff ||
-        (!(tmpport = strtol((char *)buff, &strBuff, 10)) && strBuff == (char *)buff)){
+        (!(tmpport = strtol((char *)buff, &strBuff, 10))
+         && strBuff == (char *)buff)){
         fprintf(stderr, "ERROR: cannot read physical link's source port.\n");
         goto ERROR;
     }
@@ -671,8 +665,10 @@ netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
     link->ports[0] = tmpport;
     buff = xmlGetProp(it_link, BAD_CAST "destport");
     if (!buff ||
-        (!(tmpport = strtol((char *)buff, &strBuff, 10)) && strBuff == (char *)buff)){
-        fprintf(stderr, "ERROR: cannot read physical link's destination port.\n");
+        (!(tmpport = strtol((char *)buff, &strBuff, 10))
+         && strBuff == (char *)buff)){
+        fprintf(stderr,
+                "ERROR: cannot read physical link's destination port.\n");
         goto ERROR;
     }
     xmlFree(buff); buff = NULL;
@@ -697,7 +693,8 @@ netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
     float gbits;
     buff = xmlGetProp(it_link, BAD_CAST "bandwidth");
     if (!buff || 0 >= strlen((char *)buff)
-        || (!(gbits = strtof((char *)buff, &strBuff)) && strBuff == (char *)buff)) {
+        || (!(gbits = strtof((char *)buff, &strBuff))
+            && strBuff == (char *)buff)) {
         fprintf(stderr, "ERROR: cannot read physical link's bandwidth.\n");
         goto ERROR;
     }
@@ -705,7 +702,8 @@ netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
     /* set id */
     unsigned long long int id_read;
     buff = xmlGetProp(it_link, BAD_CAST "logical_id");
-    if (!buff || 0 >= strlen((char *)buff) || 1 > sscanf((char *)buff, "%llu", &id_read)) {
+    if (!buff || 0 >= strlen((char *)buff)
+        || 1 > sscanf((char *)buff, "%llu", &id_read)) {
         fprintf(stderr, "ERROR: cannot read physical link's id.\n");
         goto ERROR;
     }
@@ -713,16 +711,16 @@ netloc_physical_link_xml_load(xmlNode *it_link, netloc_edge_t *edge,
     xmlFree(buff); buff = NULL; strBuff = NULL;
     /* set other_way_id */
     buff = xmlGetProp(it_link, BAD_CAST "reverse_logical_id");
-    if (!buff || 0 >= strlen((char *)buff) || 1 > sscanf((char *)buff, "%llu", &id_read)) {
+    if (!buff || 0 >= strlen((char *)buff)
+        || 1 > sscanf((char *)buff, "%llu", &id_read)) {
         fprintf(stderr, "ERROR: cannot read reverse physical link's id.\n");
         goto ERROR;
     }
     link->other_way_id = id_read;
     xmlFree(buff); buff = NULL; strBuff = NULL;
     /* set description */
-    if (it_link->children
-        && (XML_TEXT_NODE == it_link->children->type && (tmp = it_link->children))) {
-        link->description = strdup((char *)tmp->content);
+    if (it_link->children && it_link->children->content) {
+        link->description = strdup((char *)it_link->children->content);
     }
     /* set src, dest, partition, edge */
     link->src   = edge->node;
@@ -751,7 +749,7 @@ static xmlDoc *netloc_xml_reader_init(char *path)
      */
     LIBXML_TEST_VERSION;
 
-    doc = xmlReadFile(path, "UTF-8", 0);
+    doc = xmlReadFile(path, "UTF-8", XML_PARSE_NOBLANKS);
     if (!doc) {
         fprintf(stderr, "Cannot open topology file %s\n", path);
         perror("xmlReadFile");
