@@ -4,4 +4,5 @@
 SUBDIRS = \
         utils \
         export \
-        hardware
+        hardware \
+        mapping
