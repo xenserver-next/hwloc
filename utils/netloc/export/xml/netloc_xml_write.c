@@ -205,7 +205,7 @@ static inline void insert_xml_node(xml_node_ptr crt_node, node_t *node,
     }
 }
 
-static inline int insert_extra(xml_node_ptr root_node, char *full_hwloc_path)
+static inline int insert_extra(xml_node_ptr network_node, char *full_hwloc_path)
 {
     char *strBuff;
     unsigned int part_size = 0, strBuffSize;
@@ -241,7 +241,8 @@ static inline int insert_extra(xml_node_ptr root_node, char *full_hwloc_path)
                 strBuff = NULL;
                 /* Add subnodes */
                 xml_node_ptr subnodes_node =
-                    xml_node_child_new(crt_node, NULL, BAD_CAST "subnodes", NULL);
+                    xml_node_child_new(crt_node, NULL,
+                                       BAD_CAST "subnodes", NULL);
                 xml_node_ptr subnode_node;
                 HASH_ITER(hh, node->subnodes, subnode, subnode_tmp) {
                     subnode_node = xml_node_child_new(subnodes_node, NULL,
@@ -273,7 +274,7 @@ static inline int insert_extra(xml_node_ptr root_node, char *full_hwloc_path)
             free(strBuff);
         }
         strBuff = NULL;
-        xml_node_child_add(root_node, part_node);
+        xml_node_child_add(network_node, part_node);
     }
     return NETLOC_SUCCESS;
 }
@@ -284,6 +285,7 @@ int netloc_write_xml_file(const char *subnet, const char *path,
 {
     xml_doc_ptr doc = NULL;        /* document pointer */
     xml_node_ptr root_node = NULL; /* root pointer */
+    xml_node_ptr network_node = NULL;
     xml_char *buff = NULL;
     char *strBuff = NULL, *full_hwloc_path = NULL;
     int strBuffSize = 0, ret = NETLOC_ERROR;
@@ -293,23 +295,13 @@ int netloc_write_xml_file(const char *subnet, const char *path,
     /*
      * Add topology definition tag
      */
-    /* Creates a new document, a node and set it as a root node. */
+    /* Creates a new document, a machine node and set it as a root node. */
     doc = xml_doc_new(BAD_CAST "1.0");
-    root_node = xml_node_new(NULL, BAD_CAST "topology");
+    root_node = xml_node_new(NULL, BAD_CAST "machine");
     xml_doc_set_root_element(doc, root_node);
     /* Set version */
     xml_node_attr_add(root_node, BAD_CAST "version",
                       BAD_CAST NETLOC_STR_VERS(NETLOCFILE_VERSION_2_0));
-    /* Set transport */
-    xml_node_attr_add(root_node, BAD_CAST "transport",
-                      BAD_CAST netloc_network_type_encode(transportType));
-    /* Add subnet node */
-    if (subnet && 0 < strlen(subnet)) {
-        buff = xml_char_strdup(subnet);
-        if (buff)
-            xml_node_child_new(root_node, NULL, BAD_CAST "subnet", buff);
-        xml_char_free(buff); buff = NULL;
-    }
     /* Add hwloc_path node */
     DIR* dir;
     if (hwlocpath && 0 < strlen(hwlocpath)) {
@@ -328,6 +320,19 @@ int netloc_write_xml_file(const char *subnet, const char *path,
         xml_char_free(buff); buff = NULL;
         closedir(dir);
     }
+    /* Add a network tag */
+    network_node = xml_node_child_new(root_node, NULL,
+                                      BAD_CAST "network", NULL);
+    /* Set transport */
+    xml_node_attr_add(network_node, BAD_CAST "transport",
+                      BAD_CAST netloc_network_type_encode(transportType));
+    /* Add subnet node */
+    if (subnet && 0 < strlen(subnet)) {
+        buff = xml_char_strdup(subnet);
+        if (buff)
+            xml_node_child_new(network_node, NULL, BAD_CAST "subnet", buff);
+        xml_char_free(buff); buff = NULL;
+    }
     /* Add partitions */
     int npartitions = utarray_len(partitions);
     char **ppartition = (char **)utarray_front(partitions);
@@ -335,7 +340,7 @@ int netloc_write_xml_file(const char *subnet, const char *path,
         unsigned int part_size = 0;
         xml_node_ptr part_node = NULL, crt_node = NULL, nodes_node = NULL,
             cons_node = NULL;
-        part_node = xml_node_child_new(root_node, NULL,
+        part_node = xml_node_child_new(network_node, NULL,
                                        BAD_CAST "partition", NULL);
         /* Set name */
         if (ppartition && 0 < strlen(*ppartition)) {
@@ -404,7 +409,7 @@ int netloc_write_xml_file(const char *subnet, const char *path,
     /*
      * Add structural/extra edges
      */
-    insert_extra(root_node, full_hwloc_path);
+    insert_extra(network_node, full_hwloc_path);
     /*
      * Dumping document to stdio or file
      */

@@ -34,14 +34,17 @@
  * node to ease the hashtable liberation.
  *
  * \param it_node A valid XML DOM node pointing to the proper <node> tag
- * \param hwlocpath The path to the directory containing the hwloc topology files
- * \param hwloc_topos A valid pointer to the hwloc_topos field in \ref netloc_topology_t
+ * \param hwlocpath The path to the directory containing the hwloc 
+ *                  topology files
+ * \param hwloc_topos A valid pointer to the hwloc_topos field in
+ *                    \ref netloc_topology_t
  *
  * Returns
  *   A newly allocated and initialized pointer to the node information.
  */
-static netloc_node_t * netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
-                                            netloc_hwloc_topology_t **hwloc_topos);
+static netloc_node_t *
+netloc_node_xml_load(xmlNode *it_node, char *hwlocpath,
+                     netloc_hwloc_topology_t **hwloc_topos);
 
 /**
  * Load the netloc edge as described in the xml file, of which
@@ -85,7 +88,7 @@ static int netloc_xml_reader_clean_and_out(xmlDoc *doc);
 
 int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
 {
-    xmlNode *root_node, *crt_node = NULL;
+    xmlNode *machine_node, *root_node = NULL, *crt_node = NULL;
     xmlChar *buff = NULL;
     int num_nodes = 0;
     netloc_topology_t *topology = NULL;
@@ -109,10 +112,10 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         return (netloc_topology_destruct(topology), NETLOC_ERROR_NOENT);
     }
     
-    root_node = xmlDocGetRootElement(doc);
-    if (root_node && !strcmp("topology", (char *)root_node->name)) {
+    machine_node = xmlDocGetRootElement(doc);
+    if (machine_node && !strcmp("machine", (char *) machine_node->name)) {
         /* Check netloc file version */
-        buff = xmlGetProp(root_node, BAD_CAST "version");
+        buff = xmlGetProp(machine_node, BAD_CAST "version");
         if (!buff ||
             0 != strcmp(NETLOC_STR_VERS(NETLOCFILE_VERSION_2_0),(char *)buff)) {
             fprintf(stderr, "Incorrect version number (\"%s\"), "
@@ -123,6 +126,44 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         }
         xmlFree(buff); buff = NULL;
     } else {
+        fprintf(stderr, "Cannot read the machine in %s.\n", path);
+        netloc_topology_destruct(topology); topology = NULL;
+        goto clean_and_out;
+    }
+    /* Retreive hwloc path */
+    char *hwlocpath = NULL;
+    if ((crt_node = machine_node->children)
+        && !strcmp("hwloc_path", (char *)crt_node->name)
+        && crt_node->children && crt_node->children->content) {
+        hwlocpath = strdup((char *)crt_node->children->content);
+    } else {
+        fprintf(stderr, "Cannot read hwloc path in %s\n", path);
+        crt_node = crt_node->prev;
+    }
+    if (hwlocpath) {
+        DIR *hwlocdir;
+        char *realhwlocpath;
+        if (hwlocpath[0] != '/') {
+            char *path_tmp = strdup(path);
+            asprintf(&realhwlocpath, "%s/%s", dirname(path_tmp), hwlocpath);
+            free(path_tmp);
+            hwlocpath = realhwlocpath;
+        }
+        if (!(hwlocdir = opendir(hwlocpath))) {
+            fprintf(stderr, "Couldn't open hwloc directory: \"%s\"\n",
+                    hwlocpath);
+            perror("opendir");
+            netloc_topology_destruct(topology);
+            topology = NULL;
+            goto clean_and_out;
+        } else {
+            closedir(hwlocdir);
+        }
+    }
+    /* Retreive network tag */
+    if (!(root_node = (!strcmp((char *)crt_node->name, "hwloc_path")
+                       ? crt_node->next : crt_node))
+        || 0 != strcmp((char *)root_node->name, "network")) {
         fprintf(stderr, "Cannot read the topology in %s.\n", path);
         netloc_topology_destruct(topology); topology = NULL;
         goto clean_and_out;
@@ -155,40 +196,6 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         fprintf(stderr, "Cannot read the subnet in %s\n", path);
         netloc_topology_destruct(topology); topology = NULL;
         goto clean_and_out;
-    }
-    /* Retreive hwloc path */
-    char *hwlocpath = NULL;
-    if ((crt_node = crt_node->next)
-        && !strcmp("hwloc_path", (char *)crt_node->name)
-        && crt_node->children && crt_node->children->content) {
-        hwlocpath = strdup((char *)crt_node->children->content);
-    } else {
-        fprintf(stderr, "Cannot read hwloc path in %s\n", path);
-        crt_node = crt_node->prev;
-    }
-
-    if (hwlocpath) {
-        DIR *hwlocdir;
-        char *realhwlocpath;
-        if (hwlocpath[0] != '/') {
-            char *path_tmp = strdup(path);
-            asprintf(&realhwlocpath, "%s/%s", dirname(path_tmp), hwlocpath);
-            free(path_tmp);
-            free(hwlocpath);
-            hwlocpath = realhwlocpath;
-        }
-        if (!(hwlocdir = opendir(hwlocpath))) {
-            fprintf(stderr, "Couldn't open hwloc directory: \"%s\"\n",
-                    hwlocpath);
-            perror("opendir");
-            free(subnet);
-            free(hwlocpath);
-            netloc_topology_destruct(topology);
-            topology = NULL;
-            goto clean_and_out;
-        } else {
-            closedir(hwlocdir);
-        }
     }
 
     /* Read partitions from file */
@@ -337,8 +344,8 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
     }
 
     topology->topopath       = path;
-    topology->hwloc_dir_path = hwlocpath;
-    topology->subnet_id      = subnet;
+    topology->hwloc_dir_path = strdup(hwlocpath);
+    topology->subnet_id      = strdup(subnet);
     topology->transport_type = transport_type;
 
     if (netloc_topology_find_reverse_edges(topology) != NETLOC_SUCCESS) {
@@ -346,11 +353,13 @@ int netloc_topology_libxml_load(char *path, netloc_topology_t **ptopology)
         topology = NULL;
         goto clean_and_out;
     }
-    *ptopology = topology;
     
  clean_and_out:
+    free(subnet);
+    free(hwlocpath);
     netloc_xml_reader_clean_and_out(doc);
-
+    *ptopology = topology;
+    
     return NETLOC_SUCCESS;
 }
 

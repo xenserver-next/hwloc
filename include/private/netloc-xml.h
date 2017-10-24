@@ -22,7 +22,7 @@
  * On error, *ptopology is not set.
  *
  * \param path A valid path to the XML file describing the requested topology
- * \param ptopology A valid referece to the topology handle
+ * \param ptopology A valid reference to an unitialized topology pointer
  *
  * \returns NETLOC_SUCCESS on success
  * \returns NETLOC_ERROR_NOENT if \ref path is not valid
