@@ -38,10 +38,11 @@ sources = \
 # Installable library
 
 libnetloc_la_SOURCES = $(sources)
-libnetloc_la_LDFLAGS = $(ldflags) -version-info $(libnetloc_so_version)
+libnetloc_la_LDFLAGS = -version-info $(libnetloc_so_version)
 libnetloc_la_LIBADD = \
-        $(top_builddir)/hwloc/libhwloc.la \
-		topos/explicit/libnetloc_topos_explicit.la
+	$(top_builddir)/hwloc/libhwloc.la \
+	topos/explicit/libnetloc_topos_explicit.la
+
 
 # Embedded library (note the lack of a .so version number -- that
 # intentionally only appears in the installable library).  Also note
@@ -49,10 +50,9 @@ libnetloc_la_LIBADD = \
 # HWLOC_EMBEDDED_LIBS).
 
 libnetloc_embedded_la_SOURCES = $(sources)
-libnetloc_embedded_la_LDFLAGS = $(ldflags)
 libnetloc_embedded_la_LIBADD = \
-        $(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la \
-		topos/explicit/libnetloc_topos_explicit.la
+	$(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la \
+	topos/explicit/libnetloc_topos_explicit.la
 
 # Add the proper xml reader whether LIBXML2 is available or not
 
@@ -101,7 +101,6 @@ libnetlocscotch_la_LIBADD = \
 # HWLOC_EMBEDDED_LIBS).
 
 libnetlocscotch_embedded_la_SOURCES = $(scotchsources)
-libnetlocscotch_embedded_la_LDFLAGS =
 libnetlocscotch_embedded_la_LIBADD = \
         $(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la \
         $(HWLOC_top_builddir)/hwloc/libnetloc_embedded.la

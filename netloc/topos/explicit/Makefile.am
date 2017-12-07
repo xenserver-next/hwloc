@@ -20,6 +20,5 @@ sources = \
 	physical_link.c
 
 libnetloc_topos_explicit_la_SOURCES = $(sources)
-libnetloc_topos_explicit_la_LDFLAGS = $(ldflags)
 libnetloc_topos_explicit_la_LIBADD = \
         $(top_builddir)/hwloc/libhwloc.la
