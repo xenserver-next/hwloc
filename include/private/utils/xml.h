@@ -1,6 +1,6 @@
 /* -*- encoding: utf-8 -*- */
 /*
- * Copyright © 2017      Inria.  All rights reserved.
+ * Copyright © 2017-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -39,7 +39,8 @@ typedef xmlDocPtr xml_doc_ptr;
 #define XML_LIB_CHECK_VERSION LIBXML_TEST_VERSION
 
 #else
-/* XML writing is made with netloc/nolibxml.c */
+
+/* XML writing is made with netloc/xml.c and netloc/nolibxml.c */
 
 typedef void * xml_ns_ptr;
 
@@ -63,7 +64,7 @@ xml_node_ptr xml_doc_get_root_element(const xml_doc_ptr doc);
 char *xml_node_get_name(const xml_node_ptr node);
 size_t xml_node_get_num_children(const xml_node_ptr node);
 int xml_node_has_child_data(const xml_node_ptr node);
-xml_node_ptr xml_node_get_child(const xml_node_ptr node, int idx);
+xml_node_ptr xml_node_get_child(const xml_node_ptr node, const unsigned int idx);
 xml_char *xml_node_get_content(const xml_node_ptr node);
 char *xml_node_attr_get(xml_node_ptr node, const char *attrname);
 
@@ -98,18 +99,18 @@ xml_node_child_new(xml_node_ptr parent,
 
 extern void xml_node_merge(xml_node_ptr dest, xml_node_ptr src);
 
-extern int xml_node_has_child(xml_node_ptr node);
+extern int xml_node_has_child(const xml_node_ptr node);
 
 extern xml_doc_ptr xml_doc_new(const xml_char *version);
 
 extern void xml_doc_free(xml_doc_ptr doc);
 
 extern xml_node_ptr xml_doc_set_root_element(xml_doc_ptr doc,
-                                             xml_node_ptr node);
+                                             const xml_node_ptr node);
 
 extern int
-xml_doc_write(const char *outpath, xml_doc_ptr doc, const char *enc,
-              int format __netloc_attribute_unused);
+xml_doc_write(const char *outpath, const xml_doc_ptr doc, const char *enc,
+              const int format __netloc_attribute_unused);
 
 extern void
 xml_dtd_subset_create(xml_doc_ptr doc, const xml_char *name,

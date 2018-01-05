@@ -1,6 +1,6 @@
 /* -*- encoding: utf-8 -*- */
 /*
- * Copyright © 2017      Inria.  All rights reserved.
+ * Copyright © 2017-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -232,7 +232,7 @@ void xml_node_merge(xml_node_ptr dest, xml_node_ptr src)
     xml_node_destruct(src);
 }
 
-int xml_node_has_child(xml_node_ptr node)
+int xml_node_has_child(const xml_node_ptr node)
 {
     return 0 != node->children.num;
 }
@@ -254,7 +254,7 @@ void xml_doc_free(xml_doc_ptr doc)
     free(doc);
 }
 
-xml_node_ptr xml_doc_set_root_element(xml_doc_ptr doc, xml_node_ptr node)
+xml_node_ptr xml_doc_set_root_element(xml_doc_ptr doc, const xml_node_ptr node)
 {
     xml_node_ptr old = doc->root;
     doc->root = node;
@@ -290,7 +290,8 @@ xml_char *xml_char_strdup(const char *c) {
 /* Export */
 /******************************************************************************/
 
-static int xml_node_write(FILE *out, xml_node_ptr node, unsigned int depth)
+static int
+xml_node_write(FILE *out, const xml_node_ptr node, const unsigned int depth)
 {
     int ret = 0;
     size_t i;
@@ -310,8 +311,8 @@ static int xml_node_write(FILE *out, xml_node_ptr node, unsigned int depth)
     return ret;
 }
 
-int xml_doc_write(const char *outpath, xml_doc_ptr doc, const char *enc,
-                  int format __netloc_attribute_unused)
+int xml_doc_write(const char *outpath, const xml_doc_ptr doc, const char *enc,
+                  const int format __netloc_attribute_unused)
 {
     FILE *out = fopen(outpath, "w");
     if (!out)
@@ -367,7 +368,7 @@ int xml_node_has_child_data(const xml_node_ptr node)
 }
 
 
-xml_node_ptr xml_node_get_child(const xml_node_ptr node, int idx)
+xml_node_ptr xml_node_get_child(const xml_node_ptr node, const unsigned int idx)
 {
     if (idx < node->children.num) {
         return node->children.data[idx];
@@ -380,7 +381,6 @@ xml_char *xml_node_get_content(const xml_node_ptr node)
 {
     return node->content;
 }
-
 
 xml_doc_ptr xml_node_read_file(const char *path)
 {
