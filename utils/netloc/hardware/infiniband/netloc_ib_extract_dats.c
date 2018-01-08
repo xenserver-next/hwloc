@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2017 Inria.  All rights reserved.
+ * Copyright © 2016-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -79,6 +79,7 @@ static char *node_find_hostname(utils_node_t *node)
 utils_node_t *get_node(utils_node_t **nodes, char *type, char *lid,
         char *guid, char *subnet, char *desc)
 {
+    static unsigned unknown_node_id = 0;
     utils_node_t *node;
     char *id;
 
@@ -97,6 +98,13 @@ utils_node_t *get_node(utils_node_t **nodes, char *type, char *lid,
         node->edges = NULL;
         node->description = strdup(desc);
         node->hostname = node_find_hostname(node);
+        if (NETLOC_NODE_TYPE_HOST == node->type
+            && 0 == strlen(node->hostname)) {
+            free(node->hostname);
+            asprintf(&node->hostname, "ANONYMOUS-%u", unknown_node_id);
+            unknown_node_id += 1;
+            assert(NULL != node->hostname);
+        }
         node->main_partition = -1;
         node->partitions = NULL;
         node->subnodes = NULL;
@@ -247,6 +255,10 @@ int build_paths(path_source_t **ppaths, utils_node_t *nodes, route_source_t *rou
     return 0;
 }
 
+static inline int proper_partition_name_char(const char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-';
+}
+
 /* We suppose the hostname of nodes is like that: ([a-z][-a-z]+[a-z]).*
  * while \1 is the name of the partition
  */
@@ -262,7 +274,7 @@ static char *node_find_partition_name(utils_node_t *node)
 
     /* Looking for the name of the partition */
     int i = 0;
-    while (i < max_size && ((name[i] >= 'a' && name[i] <= 'z') || name[i] == '-')) {
+    while (i < max_size && proper_partition_name_char(name[i])) {
         partition[i] = name[i];
         i++;
     }
