@@ -1,6 +1,6 @@
 /* -*- encoding: utf-8 -*- */
 /*
- * Copyright © 2017      Inria.  All rights reserved.
+ * Copyright © 2017-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -17,21 +17,19 @@
 #include <private/netloc.h>
 
 /**
- * Load the netloc topology as described in the xml file pointed by \ref path.
+ * Load the netloc machine as described in the xml file pointed by \ref path.
  *
- * On error, *ptopology is not set.
+ * On error, *pmachine is not set.
  *
  * \param path A valid path to the XML file describing the requested topology
- * \param ptopology A valid reference to an unitialized explicit network
- *                  topology pointer
+ * \param pmachine A valid reference to an unitialized machine pointer
  *
  * \returns NETLOC_SUCCESS on success
  * \returns NETLOC_ERROR_NOENT if \ref path is not valid
  * \returns NETLOC_ERROR on error
  */
 extern int
-netloc_network_explicit_xml_load(const char *path,
-                                 netloc_network_explicit_t **ptopology);
+netloc_machine_xml_load(const char *path, netloc_machine_t **pmachine);
 
 /**
  * Check whether warnings and errors should be reported in stderr in

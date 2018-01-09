@@ -1,8 +1,8 @@
 /*
  * Copyright © 2013-2014 University of Wisconsin-La Crosse.
  *                         All rights reserved.
- * Copyright © 2013 Cisco Systems, Inc.  All rights reserved.
- * Copyright © 2015-2017 Inria.  All rights reserved.
+ * Copyright © 2013      Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2015-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -28,26 +28,18 @@ netloc_node_t * netloc_node_construct()
         return NULL;
     }
     memset(node, 0, sizeof(netloc_node_t));
-    node->physical_id[0]  = '\0';
-    node->logical_id      = -1;
-    node->type         = NETLOC_NODE_TYPE_INVALID;
-    utarray_new(node->physical_links, &ut_ptr_icd);
-    node->description  = NULL;
-    node->userdata     = NULL;
-    node->edges        = NULL;
-    utarray_new(node->partitions, &ut_ptr_icd);
-    node->paths        = NULL;
-    node->hostname     = NULL;
-    node->nsubnodes    = 0;
-    node->subnodes     = NULL;
+    node->logical_id = -1;
+    node->type = NETLOC_NODE_TYPE_INVALID;
+    utarray_init(&node->physical_links, &ut_ptr_icd);
+    utarray_init(&node->partitions, &ut_ptr_icd);
 
     return node;
 }
 
 int netloc_node_destruct(netloc_node_t * node)
 {
-    utarray_free(node->physical_links);
-    utarray_free(node->partitions);
+    utarray_done(&node->physical_links);
+    utarray_done(&node->partitions);
 
     /* Description */
     if (node->description)
@@ -91,7 +83,7 @@ char *netloc_node_pretty_print(const netloc_node_t *node)
              node->physical_id,
              node->logical_id,
              node->description,
-             utarray_len(node->physical_links));
+             utarray_len(&node->physical_links));
 
     return str;
 }

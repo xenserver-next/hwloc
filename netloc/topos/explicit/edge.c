@@ -1,8 +1,8 @@
 /*
  * Copyright © 2013-2014 University of Wisconsin-La Crosse.
  *                         All rights reserved.
- * Copyright © 2013 Cisco Systems, Inc.  All rights reserved.
- * Copyright © 2015-2017 Inria.  All rights reserved.
+ * Copyright © 2013      Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2015-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -28,23 +28,12 @@ netloc_edge_t * netloc_edge_construct()
     if( NULL == edge ) {
         return NULL;
     }
-
+    memset(edge, 0, sizeof(netloc_edge_t));
     edge->id = cur_uid;
-    cur_uid++;
+    cur_uid += 1;
 
-    edge->dest = NULL;
-    edge->node = NULL;
-    edge->other_way = NULL;
-
-    utarray_new(edge->partitions, &ut_ptr_icd);
-    utarray_new(edge->physical_links, &ut_ptr_icd);
-
-    edge->total_gbits = 0;
-
-    edge->nsubedges = 0;
-    edge->subnode_edges = NULL;
-
-    edge->userdata = NULL;
+    utarray_init(&edge->partitions, &ut_ptr_icd);
+    utarray_init(&edge->physical_links, &ut_ptr_icd);
 
     return edge;
 }
@@ -56,15 +45,15 @@ char * netloc_edge_pretty_print(const netloc_edge_t *edge)
     asprintf(&str, " [%23s]/[%ld] -- [%23s]/[%ld] (%f gbits, %d links)",
              edge->node->physical_id, edge->node->logical_id,
              edge->dest->physical_id, edge->dest->logical_id,
-             edge->total_gbits, utarray_len(edge->physical_links));
+             edge->total_gbits, utarray_len(&edge->physical_links));
 
     return str;
 }
 
 int netloc_edge_destruct(netloc_edge_t * edge)
 {
-    utarray_free(edge->physical_links);
-    utarray_free(edge->partitions);
+    utarray_done(&edge->physical_links);
+    utarray_done(&edge->partitions);
 
     if (edge->nsubedges)
         free(edge->subnode_edges);

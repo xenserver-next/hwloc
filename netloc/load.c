@@ -1,6 +1,6 @@
 /* -*- encoding: utf-8 -*- */
 /*
- * Copyright © 2017      Inria.  All rights reserved.
+ * Copyright © 2017-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -24,14 +24,12 @@
 #include <libxml/xmlmemory.h>
 
 extern int
-netloc_network_explicit_libxml_load(const char *path,
-                                    netloc_network_explicit_t **ptopology);
+netloc_machine_libxml_load(const char *path, netloc_machine_t **pmachine);
 
 #else
 
 extern int
-netloc_network_explicit_nolibxml_load(const char *path,
-                                      netloc_network_explicit_t **ptopology);
+netloc_machine_nolibxml_load(const char *path, netloc_machine_t **pmachine);
 
 #endif /* defined(HWLOC_HAVE_LIBXML2) */
 
@@ -54,18 +52,16 @@ int netloc__xml_verbose(void)
 
 #if defined(HWLOC_HAVE_LIBXML2)
 
-int netloc_network_explicit_xml_load(const char *path,
-                                     netloc_network_explicit_t **ptopology)
+int netloc_machine_xml_load(const char *path, netloc_machine_t **pmachine)
 {
-    return netloc_network_explicit_libxml_load(path, ptopology);
+    return netloc_machine_libxml_load(path, pmachine);
 }
 
 #else
 
-int netloc_network_explicit_xml_load(const char *path,
-                                     netloc_network_explicit_t **ptopology)
+int netloc_machine_xml_load(const char *path, netloc_machine_t **pmachine)
 {
-    return netloc_network_explicit_nolibxml_load(path, ptopology);
+    return netloc_machine_nolibxml_load(path, pmachine);
 }
 
 #endif /* defined(HWLOC_HAVE_LIBXML2) */

@@ -1,7 +1,7 @@
-# Copyright © 2017 Inria.  All rights reserved.
+# Copyright © 2017-2018 Inria.  All rights reserved.
 # See COPYING in top-level directory.
 
-SUBDIRS = draw xml
+SUBDIRS = xml draw
 
 if BUILD_NETLOCSCOTCH
 SUBDIRS += scotch

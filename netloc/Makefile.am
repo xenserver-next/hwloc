@@ -10,7 +10,7 @@
 
 if BUILD_NETLOC
 
-SUBDIRS = topos
+SUBDIRS = topos hardware
 
 AM_CPPFLAGS = \
         $(NETLOC_CPPFLAGS) \
@@ -26,6 +26,8 @@ noinst_LTLIBRARIES = libnetloc_embedded.la
 endif
 
 sources = \
+        cleaner.c \
+        machine.c \
         support.c \
         path.c \
         architecture.c \
@@ -41,7 +43,7 @@ libnetloc_la_SOURCES = $(sources)
 libnetloc_la_LDFLAGS = -version-info $(libnetloc_so_version)
 libnetloc_la_LIBADD = \
 	$(top_builddir)/hwloc/libhwloc.la \
-	topos/explicit/libnetloc_topos_explicit.la
+	$(top_builddir)/netloc/hardware/libnetloc_hardware.la
 
 
 # Embedded library (note the lack of a .so version number -- that
@@ -52,7 +54,7 @@ libnetloc_la_LIBADD = \
 libnetloc_embedded_la_SOURCES = $(sources)
 libnetloc_embedded_la_LIBADD = \
 	$(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la \
-	topos/explicit/libnetloc_topos_explicit.la
+	$(top_builddir)/netloc/hardware/libnetloc_hardware.la
 
 # Add the proper xml reader whether LIBXML2 is available or not
 
@@ -93,7 +95,7 @@ libnetlocscotch_la_SOURCES = $(scotchsources)
 libnetlocscotch_la_LDFLAGS = -version-info $(libnetloc_so_version)
 libnetlocscotch_la_LIBADD = \
         $(top_builddir)/hwloc/libhwloc.la \
-        libnetloc.la
+        $(top_builddir)/netloc/libnetloc.la
 
 # Embedded library (note the lack of a .so version number -- that
 # intentionally only appears in the installable library).  Also note
@@ -103,7 +105,7 @@ libnetlocscotch_la_LIBADD = \
 libnetlocscotch_embedded_la_SOURCES = $(scotchsources)
 libnetlocscotch_embedded_la_LIBADD = \
         $(HWLOC_top_builddir)/hwloc/libhwloc_embedded.la \
-        $(HWLOC_top_builddir)/hwloc/libnetloc_embedded.la
+        $(HWLOC_top_builddir)/netloc/libnetloc_embedded.la
 
 else !BUILD_NETLOCSCOTCH
 EXTRA_DIST = $(scotchsources)

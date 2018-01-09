@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2017 Inria.  All rights reserved.
+ * Copyright © 2016-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -20,31 +20,31 @@
 
 static UT_icd topos_icd = {sizeof(hwloc_topology_t), NULL, NULL, NULL};
 
-int netloc_network_explicit_read_hwloc(netloc_network_explicit_t *topology,
-                                       int num_nodes, netloc_node_t **node_list)
+int netloc_machine_read_hwloc(netloc_machine_t *machine,
+                              int num_nodes, netloc_node_t **node_list)
 {
     int ret = NETLOC_ERROR, all = 0, num_topos = 0, n = 0;
 
-    if (!topology->hwlocpaths) {
-        fprintf(stderr, "WARN: No hwloc files recorded in the topology\n");
+    if (!machine->hwlocpaths) {
+        fprintf(stderr, "WARN: No hwloc files recorded in the machine\n");
         goto ERROR;
     }
 
-    if (!topology->hwloc_topos &&
-        !(topology->hwloc_topos = calloc(topology->nb_hwloc_topos, sizeof(hwloc_topology_t)))) {
+    if (!machine->hwloc_topos &&
+        !(machine->hwloc_topos = calloc(machine->nb_hwloc_topos, sizeof(hwloc_topology_t)))) {
         fprintf(stderr, "ERROR: list of hwloc topologies cannot be allocated\n");
         goto ERROR;
     }
 
     if (!num_nodes) {
         netloc_node_t *pnode, *ptmp;
-        num_nodes = HASH_COUNT(topology->nodes);
+        num_nodes = HASH_COUNT(machine->network->nodes);
         node_list = malloc(sizeof(netloc_node_t *[num_nodes]));
         if (!node_list) {
             fprintf(stderr, "ERROR: node_list cannot be allocated\n");
             goto ERROR;
         }
-        netloc_network_explicit_iter_nodes(topology, pnode, ptmp) {
+        netloc_network_iter_nodes(machine->network, pnode, ptmp) {
             node_list[n++] = pnode;
         }
         all = 1;
@@ -54,36 +54,36 @@ int netloc_network_explicit_read_hwloc(netloc_network_explicit_t *topology,
     size_t node_id;
     for (int n = 0; n < num_nodes; ++n) {
         node_id = node_list[n]->hwloc_topo_idx;
-        if (!topology->hwloc_topos[node_id]) {
-            hwloc_topology_init(&topology->hwloc_topos[node_id]);
-            hwloc_topology_set_flags(topology->hwloc_topos[node_id],
+        if (!machine->hwloc_topos[node_id]) {
+            hwloc_topology_init(&machine->hwloc_topos[node_id]);
+            hwloc_topology_set_flags(machine->hwloc_topos[node_id],
                                      HWLOC_TOPOLOGY_FLAG_WHOLE_SYSTEM);
 
-            ret = hwloc_topology_set_xml(topology->hwloc_topos[node_id],
-                                         topology->hwlocpaths[node_id]);
+            ret = hwloc_topology_set_xml(machine->hwloc_topos[node_id],
+                                         machine->hwlocpaths[node_id]);
             if (ret == -1) {
                 fprintf(stderr, "WARN: no topology for %s\n",
-                        topology->hwlocpaths[node_id]);
-                hwloc_topology_destroy(topology->hwloc_topos[node_id]);
-                topology->hwloc_topos[node_id] = NULL;
+                        machine->hwlocpaths[node_id]);
+                hwloc_topology_destroy(machine->hwloc_topos[node_id]);
+                machine->hwloc_topos[node_id] = NULL;
                 continue;
             }
 
-            ret = hwloc_topology_set_all_types_filter(topology->hwloc_topos[node_id],
+            ret = hwloc_topology_set_all_types_filter(machine->hwloc_topos[node_id],
                                                       HWLOC_TYPE_FILTER_KEEP_STRUCTURE);
             if (ret == -1) {
                 fprintf(stderr, "hwloc_topology_set_all_types_filter failed\n");
                 goto ERROR;
             }
 
-            ret = hwloc_topology_set_io_types_filter(topology->hwloc_topos[node_id],
+            ret = hwloc_topology_set_io_types_filter(machine->hwloc_topos[node_id],
                                                      HWLOC_TYPE_FILTER_KEEP_NONE);
             if (ret == -1) {
                 fprintf(stderr, "hwloc_topology_set_all_types_filter failed\n");
                 goto ERROR;
             }
 
-            ret = hwloc_topology_load(topology->hwloc_topos[node_id]);
+            ret = hwloc_topology_load(machine->hwloc_topos[node_id]);
             if (ret == -1) {
                 fprintf(stderr, "hwloc_topology_load failed\n");
                 goto ERROR;
@@ -94,9 +94,9 @@ int netloc_network_explicit_read_hwloc(netloc_network_explicit_t *topology,
     }
 
     printf("%d hwloc topolog%s found:\n", num_topos, num_topos > 1 ? "ies":"y");
-    for (unsigned int p = 0; p < topology->nb_hwloc_topos; p++) {
-        if (topology->hwloc_topos[p])
-            printf("\t'%s'\n", topology->hwlocpaths[p]);
+    for (unsigned int p = 0; p < machine->nb_hwloc_topos; p++) {
+        if (machine->hwloc_topos[p])
+            printf("\t'%s'\n", machine->hwlocpaths[p]);
     }
 
     ret = NETLOC_SUCCESS;
@@ -111,10 +111,10 @@ ERROR:
 
 /* Set the info from hwloc of the node in the correspondig arch */
 int netloc_arch_node_get_hwloc_info(netloc_arch_node_t *arch_node,
-                                    netloc_network_explicit_t *nettopology)
+                                    netloc_machine_t *machine)
 {
     hwloc_topology_t topology;
-    topology = nettopology->hwloc_topos[arch_node->node->hwloc_topo_idx];
+    topology = machine->hwloc_topos[arch_node->node->hwloc_topo_idx];
 
     hwloc_obj_t root = hwloc_get_root_obj(topology);
 

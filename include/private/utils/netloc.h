@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017      Inria.  All rights reserved.
+ * Copyright © 2017-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -48,10 +48,10 @@ struct utils_edge_t {
     UT_hash_handle hh;         /* makes this structure hashable */
     char dest[MAX_STR];        /* key */
     float total_gbits;
-    UT_array *physical_link_idx;
+    UT_array physical_link_idx;
     int *partitions;
     utils_edge_t *reverse_edge;
-    UT_array *subedges; /* Hash table of subedges */
+    UT_array subedges; /* Hash table of subedges */
 };
 
 struct utils_node_t {
@@ -64,14 +64,14 @@ struct utils_node_t {
     int main_partition;
     char *hostname;
     int *partitions;
-    UT_array *physical_links;
+    UT_array physical_links;
     utils_node_t *subnodes; /* Hash table of subnodes */
 };
 
 struct utils_partition_t {
     char *name;
     netloc_arch_t *arch;  /* Abstract topology */
-    UT_array *nodes;
+    UT_array nodes;
 };
 
 struct utils_physical_link_t {
@@ -88,7 +88,7 @@ struct utils_physical_link_t {
     utils_node_t *parent_node;
 };
 
-static UT_icd utils_physical_link_icd =
+static UT_icd utils_physical_link_icd __netloc_attribute_unused =
     { sizeof(utils_physical_link_t), NULL, NULL, NULL };
 
 /* Route tables */
@@ -108,7 +108,7 @@ typedef struct {
     UT_hash_handle hh;         /* makes this structure hashable */
     char physical_id[MAX_STR]; /* key */
     utils_node_t *node;
-    UT_array *links;
+    UT_array links;
 } path_dest_t;
 typedef struct {
     UT_hash_handle hh;         /* makes this structure hashable */
@@ -124,11 +124,11 @@ static inline int node_is_virtual(const utils_node_t *node)
 
 static inline int edge_is_virtual(const utils_edge_t *edge)
 {
-    return (NULL != edge->subedges);
+    return (0 < utarray_len(&edge->subedges));
 }
 
 extern int
-netloc_write_into_xml_file(utils_node_t *nodes, UT_array *partitions,
+netloc_write_into_xml_file(utils_node_t **nodes, UT_array *partitions,
                            const char *subnet, const char *path,
                            const char *hwlocpath,
                            const netloc_network_type_t transportType);

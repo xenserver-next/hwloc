@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2017 Inria.  All rights reserved.
+ * Copyright © 2016-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -42,50 +42,11 @@ netloc_physical_link_t * netloc_physical_link_construct(void)
     physical_link->edge = NULL;
     physical_link->other_way = NULL;
 
-    utarray_new(physical_link->partitions, &ut_ptr_icd);
+    utarray_init(&physical_link->partitions, &ut_ptr_icd);
 
     physical_link->gbits = -1;
 
     physical_link->description = NULL;
-
-    return physical_link;
-}
-
-netloc_physical_link_t * netloc_physical_link_deep_copy(netloc_physical_link_t *origin)
-{
-    netloc_physical_link_t *physical_link = NULL;
-
-    if (NULL == origin) {
-        return NULL;
-    }
-
-    physical_link = (netloc_physical_link_t*)
-        malloc(sizeof(netloc_physical_link_t));
-    if( NULL == physical_link ) {
-        return NULL;
-    }
-
-    physical_link->id = cur_uid;
-    cur_uid++;
-
-    physical_link->src = origin->src;
-    physical_link->dest = origin->dest;
-
-    physical_link->ports[0] = origin->ports[0];
-    physical_link->ports[1] = origin->ports[1];
-
-    physical_link->width = strdup(origin->width);
-    physical_link->speed = strdup(origin->speed);
-
-    physical_link->edge = origin->edge;
-    physical_link->other_way = origin->other_way;
-
-    utarray_new(physical_link->partitions, &ut_ptr_icd);
-    utarray_concat(physical_link->partitions, origin->partitions);
-
-    physical_link->gbits = origin->gbits;
-
-    physical_link->description = strdup(origin->description);
 
     return physical_link;
 }
@@ -95,7 +56,7 @@ int netloc_physical_link_destruct(netloc_physical_link_t *link)
     free(link->width);
     free(link->description);
     free(link->speed);
-    utarray_free(link->partitions);
+    utarray_done(&link->partitions);
     free(link);
     return NETLOC_SUCCESS;
 }

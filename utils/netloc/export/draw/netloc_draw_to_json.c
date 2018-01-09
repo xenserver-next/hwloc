@@ -1,5 +1,5 @@
 /*
- * Copyright © 2016-2017 Inria.  All rights reserved.
+ * Copyright © 2016-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -18,6 +18,7 @@
 
 #include <private/netloc.h>
 #include <private/netloc-xml.h>
+#include <private/utils/cleaner.h>
 #include "netloc.h"
 
 #define JSON_DRAW_FILE_LINK_ID "id"
@@ -497,8 +498,8 @@ static int handle_path(netloc_node_t *node, json_t *json_paths)
                 json_string_new(path->dest_id));
 
         json_t *json_links = json_array_new();
-        netloc_physical_link_t **plink;
-        netloc_path_iter_links(path,plink) {
+        /* plink is the variable name defined and used in the macro */
+        netloc_path_iter_links(path, plink) {
             json_array_add(json_links, json_int_new((*plink)->id));
         }
         json_dict_add(json_node_path, JSON_DRAW_FILE_PATH_LINKS,
@@ -519,10 +520,10 @@ static int handle_partitions(netloc_partition_t *partition,
     return NETLOC_SUCCESS;
 }
 
-static int handle_topos(netloc_network_explicit_t *topology, json_t *json_topos)
+static int handle_topos(netloc_machine_t *machine, json_t *json_topos)
 {
     char *ptopo, *basename_topo;
-    netloc_network_explicit_iter_name_hwloctopos(topology, ptopo) {
+    netloc_machine_iter_name_hwloctopos(machine, ptopo) {
         basename_topo = basename(ptopo);
         /* Not a diff file, so extension must be .xml */
         ptopo    = strrchr(basename_topo, '.');
@@ -532,7 +533,7 @@ static int handle_topos(netloc_network_explicit_t *topology, json_t *json_topos)
     return NETLOC_SUCCESS;
 }
 
-static int write_json(netloc_network_explicit_t *topology, FILE *output)
+static int write_json(netloc_machine_t *machine, FILE *output)
 {
     json_t *json_root = json_dict_new();
     json_t *json_nodes = json_array_new();
@@ -547,14 +548,14 @@ static int write_json(netloc_network_explicit_t *topology, FILE *output)
     /* Physical links */
     json_t *json_links = json_array_new();
     netloc_physical_link_t *link, *link_tmp;
-    HASH_ITER(hh, topology->physical_links, link, link_tmp) {
+    netloc_network_iter_links(machine->network, link, link_tmp) {
         handle_link(link, json_links);
     }
 
     /* Paths */
     json_t *json_paths = json_array_new();
     netloc_node_t *node, *node_tmp;
-    HASH_ITER(hh, topology->nodes, node, node_tmp) {
+    netloc_network_iter_nodes(machine->network, node, node_tmp) {
         handle_path(node, json_paths);
         /* extra+structural nodes */
         if (!netloc_get_num_partitions(node)
@@ -565,7 +566,7 @@ static int write_json(netloc_network_explicit_t *topology, FILE *output)
     /* Partitions */
     json_t *json_partitions = json_array_new();
     netloc_partition_t *partition, *partition_tmp __netloc_attribute_unused;
-    netloc_network_explicit_iter_partitions(topology, partition, partition_tmp) {
+    netloc_network_iter_partitions(machine->network, partition, partition_tmp) {
         handle_partitions(partition, json_partitions);
         /* Nodes */
         netloc_partition_iter_nodes(partition, pnode) {
@@ -584,7 +585,7 @@ static int write_json(netloc_network_explicit_t *topology, FILE *output)
 
     /* Hwloc topologies */
     json_t *json_topos = json_array_new();
-    handle_topos(topology, json_topos);
+    handle_topos(machine, json_topos);
     json_dict_add(json_root, JSON_DRAW_FILE_HWLOCTOPOS, json_topos);
 
     json_write(output, json_root);
@@ -593,35 +594,41 @@ static int write_json(netloc_network_explicit_t *topology, FILE *output)
     return NETLOC_SUCCESS;
 }
 
-static int netloc_to_json_draw(netloc_network_explicit_t *topology)
+static int netloc_to_json_draw(netloc_machine_t *machine)
 {
-    int ret;
+    netloc_cleaner_init();
+    int ret = NETLOC_ERROR;
     FILE *output;
-    char *node_uri = topology->topopath;
+    char *draw;
+    char *node_uri = machine->topopath;
     int basename_len = strlen(node_uri)-10;
     char *basename = (char *)malloc(sizeof(char[basename_len + 1]));
-    char *draw;
+    if (NULL == basename) {
+        goto ERROR;
+    }
+    netloc_cleaner_add(basename, free);
 
-    netloc_network_explicit_read_hwloc(topology, 0, NULL);
+    netloc_machine_read_hwloc(machine, 0, NULL);
 
     strncpy(basename, node_uri, basename_len);
     basename[basename_len] = '\0';
 
-    if (0 > asprintf(&draw, "%s-%s.json", basename, "draw"))
-        draw = NULL;
-    output = fopen(draw, "w");
-    free(draw);
-    if (output == NULL) {
-        perror("fopen: ");
-        ret = NETLOC_ERROR;
+    if (0 > asprintf(&draw, "%s-%s.json", basename, "draw")) {
         goto ERROR;
     }
+    netloc_cleaner_add(draw, free);
 
-    ret = write_json(topology, output);
+    output = fopen(draw, "w");
+    if (output == NULL) {
+        perror("fopen: ");
+        goto ERROR;
+    }
+    netloc_cleaner_add(output, fclose);
 
-    fclose(output);
+    ret = write_json(machine, output);
+
 ERROR:
-    free(basename);
+    netloc_cleaner_done();
 
     return ret;
 }
@@ -691,20 +698,19 @@ int main(int argc, char **argv)
         if (0 > asprintf(&topopath, "%s/%s", netlocpath, dir_entry->d_name))
             topopath = NULL;
 
-        netloc_network_explicit_t *topology;
-        int ret = netloc_network_explicit_xml_load(topopath, &topology);
+        netloc_machine_t *machine;
+        int ret = netloc_machine_xml_load(topopath, &machine);
         free(topopath);
         if (NETLOC_SUCCESS != ret) {
-            fprintf(stderr, "Error: netloc_network_explicit_construct "
-                    "failed\n");
+            fprintf(stderr, "Error: netloc_machine_construct failed\n");
             return ret;
         }
 
         netloc_edge_reset_uid();
 
-        netloc_to_json_draw(topology);
+        netloc_to_json_draw(machine);
 
-        netloc_network_explicit_destruct(topology);
+        netloc_machine_destruct(machine);
     }
     closedir(netlocdir);
 

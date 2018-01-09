@@ -1,9 +1,9 @@
 /* -*- encoding: utf-8 -*- */
 /*
- * Copyright © 2014 Cisco Systems, Inc.  All rights reserved.
+ * Copyright © 2014      Cisco Systems, Inc.  All rights reserved.
  * Copyright © 2013-2014 University of Wisconsin-La Crosse.
- *                         All rights reserved.
- * Copyright © 2015-2017 Inria.  All rights reserved.
+ *                       All rights reserved.
+ * Copyright © 2015-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -118,8 +118,11 @@ typedef struct netloc_hwloc_topology_t netloc_hwloc_topology_t;
 
 struct netloc_network_t;
 typedef struct netloc_network_t netloc_network_t;
-/* To be changed in order to create a type to be derived */
-typedef void netloc_topology_t;
+struct netloc_network_ib_t;
+typedef struct netloc_network_ib_t netloc_network_ib_t;
+struct netloc_topology_t;
+typedef struct netloc_topology_t netloc_topology_t;
+typedef struct netloc_topology_t netloc_arch_t; /* TO BE REMOVED */
 
 struct netloc_arch_tree_t;
 typedef struct netloc_arch_tree_t netloc_arch_tree_t;
@@ -127,8 +130,6 @@ struct netloc_arch_node_t;
 typedef struct netloc_arch_node_t netloc_arch_node_t;
 struct netloc_arch_node_slot_t;
 typedef struct netloc_arch_node_slot_t netloc_arch_node_slot_t;
-struct netloc_arch_t;
-typedef struct netloc_arch_t netloc_arch_t;
 
 struct netloc_allocation_t;
 typedef struct netloc_allocation_t netloc_allocation_t;
@@ -144,8 +145,14 @@ struct netloc_machine_t {
     /** Topology path */
     char *topopath;
 
-    /** Partition List */
-    netloc_partition_t *partitions; /* Hash table of partitions by name */
+    /** Hwloc topology List */
+    char *hwloc_dir_path;
+    unsigned int nb_hwloc_topos;
+    char **hwlocpaths;
+    hwloc_topology_t *hwloc_topos;
+
+    /** machine interconnection network. Should be unique */
+    netloc_network_t *network;
 
     /** current user's allocation */
     netloc_allocation_t *allocation;
@@ -158,12 +165,12 @@ struct netloc_machine_t {
  * This data structure represents the partition, i.e., a set of nodes.
  */
 struct netloc_partition_t {
-    UT_hash_handle hh;    /* makes this structure hashable with name */
-    unsigned int id;      /* rank in hashtable linked list */
-    char *name;           /* Partition's name */
-    netloc_arch_t *arch;  /* Abstract topology */
-    UT_array *nodes;      /* Array of partition nodes */
-    UT_array *edges;      /* Array of partition edges */
+    UT_hash_handle hh;        /* makes this structure hashable with name */
+    char *name;               /* Partition's name */
+    unsigned int id;          /* rank in hashtable linked list *//* usefull ??? */
+    unsigned int size;        /* Number of host nodes in partition */
+    netloc_topology_t *topo;  /* Abstract topology */
+    netloc_network_explicit_t *desc; /* Description of each nodes/edges ; may be NULL */
 };
 
 /**
@@ -172,7 +179,7 @@ struct netloc_partition_t {
  *
  * This the common parts for each kind of netloc topologies.
  *
- * \note Must be initialized within the specific network constructor function.
+ * \note Should not be instanciated
  */
 struct netloc_network_t {
     /** Type of the graph */
@@ -180,6 +187,30 @@ struct netloc_network_t {
 
     /* Physical Transport Type */
     netloc_network_type_t transport_type;
+
+    /** Partition List */
+    netloc_partition_t *partitions; /* Hash table of partitions by name */
+
+    /** Array of partition nodes */
+    netloc_node_t *nodes;
+
+    /** Physical Link List */
+    netloc_physical_link_t *physical_links; /* Hash table with physical links */
+};
+
+/**
+ * \struct netloc_network_ib_t
+ * \brief Infiniband Netloc Network Description
+ *
+ * This the common parts for each kind of infiniband based netloc topologies.
+ *
+ * \note Must be initialized within the specific network constructor function.
+ */
+struct netloc_network_ib_t {
+    netloc_network_t super;
+
+    /** Subnet ID */
+    char *subnet_id;
 };
 
 /**
@@ -188,32 +219,12 @@ struct netloc_network_t {
  *
  * An opaque data structure used to reference a network explicit topology.
  *
- * \note Must be initialized with \ref netloc_network_explicit_construct()
+ * \note Must be initialized with \ref netloc_network_explicit_init()
  */
 struct netloc_network_explicit_t {
-    netloc_network_t parent;
-
-    /** Topology path */
-    char *topopath; /* To be removed */
-
-    /** Partition List */
-    netloc_partition_t *partitions; /* Hash table of partitions by name */
-
-    /** Subnet ID */
-    char *subnet_id;
-
     /** Node List */
-    netloc_node_t *nodes; /* Hash table of nodes by physical_id */
     netloc_node_t *nodesByHostname; /* Hash table of nodes by hostname */
-
-    /** Physical Link List */
-    netloc_physical_link_t *physical_links; /* Hash table with physical links */
-
-    /** Hwloc topology List */
-    char *hwloc_dir_path;
-    unsigned int nb_hwloc_topos;
-    char **hwlocpaths;
-    hwloc_topology_t *hwloc_topos;
+    UT_array nodes;
 };
 
 /**
@@ -237,10 +248,10 @@ struct netloc_node_t {
     netloc_node_type_t type;
 
     /** Pointer to physical_links */
-    UT_array *physical_links;
+    UT_array physical_links;
 
     /** Array of partitions this node is part of */
-    UT_array *partitions;
+    UT_array partitions;
 
     /** Description information from discovery (if any) */
     char *description;
@@ -295,13 +306,13 @@ struct netloc_edge_t {
     int id;
 
     /** Array of partitions this edge is part of **/
-    UT_array *partitions;
+    UT_array partitions;
 
     /** Pointers to the parent node */
     netloc_node_t *node;
 
     /** Pointer to physical_links */
-    UT_array *physical_links;
+    UT_array physical_links;
 
     /** total gbits of the links */
     float total_gbits;
@@ -340,7 +351,7 @@ struct netloc_physical_link_t {
     char *description;
 
     /** Array of partitions this physical_link is part of */
-    UT_array *partitions;
+    UT_array partitions;
 };
 
 struct netloc_path_t {
@@ -389,10 +400,14 @@ struct netloc_arch_node_t {
     char *name; /* Hash key */
     netloc_node_t *node; /* Corresponding node */
     int idx_in_topo; /* idx with ghost hosts to have complete topo */
+
+    /* HOST node informations */
     int num_slots; /* it is not the real number of slots but the maximum slot idx */
     int *slot_idx; /* corresponding idx in slot_tree */
     int *slot_os_idx; /* corresponding os index for each leaf in tree */
     netloc_arch_tree_t *slot_tree; /* Tree built from hwloc */
+
+    /* slots in node as part of the global tree */
     int num_current_slots; /* Number of PUs */
     NETLOC_int *current_slots; /* indices in the complete tree */
     int *slot_ranks; /* corresponding MPI rank for each leaf in tree */
@@ -403,13 +418,13 @@ struct netloc_arch_node_slot_t {
     int slot;
 };
 
-struct netloc_arch_t {
-    netloc_network_explicit_t *topology;
+struct netloc_topology_t {
+    netloc_machine_t *machine;
     int has_slots; /* if slots are included in the architecture */
     netloc_arch_type_t type;
     union {
-        netloc_arch_tree_t *node_tree;
-        netloc_arch_tree_t *global_tree;
+        netloc_arch_tree_t *node_tree;   /* without hwloc topology */
+        netloc_arch_tree_t *global_tree; /* with hwloc topology */
     } arch;
     netloc_arch_node_t *nodes_by_name;
     netloc_arch_node_slot_t *node_slot_by_idx; /* node_slot by index in complete topo */
@@ -421,12 +436,135 @@ struct netloc_arch_t {
  * Topology Functions
  **********************************************************************/
 /**
- * Allocate a topology handle.
+ * Allocate a machine handle.
  *
- * User is responsible for calling \ref netloc_detach on the topology
- * handle.  The network parameter information is deep copied into the
- * topology handle, so the user may destruct the network handle after
- * calling this function and/or reuse the network handle.
+ * User is responsible for calling \ref netloc_machine_destruct on the
+ * machine handle.  The network parameter information is deep copied
+ * into the machine handle, so the user may destruct the machine
+ * handle after calling this function and/or reuse the machine handle.
+ *
+ * \returns A newly allocated pointer to the machine information on
+ *          success.
+ * \returns NULL upon an error.
+ */
+extern netloc_machine_t *netloc_machine_construct();
+
+/**
+ * Destruct a machine handle
+ *
+ * \param machine A valid pointer to a \ref netloc_machine_t
+ * handle created from a prior call to \ref
+ * netloc_machine_construct.
+ *
+ * \returns NETLOC_SUCCESS on success
+ * \returns NETLOC_ERROR upon an error.
+ */
+extern int netloc_machine_destruct(netloc_machine_t *machine);
+
+int netloc_machine_read_hwloc(netloc_machine_t *machine,
+                              int num_nodes, netloc_node_t **node_list);
+
+#define netloc_machine_iter_partitions(machine,partition,_tmp)  \
+    netloc_network_iter_partitions((machine)->network, partition, _tmp)
+
+#define netloc_machine_iter_name_hwloctopos(machine,hwloctoponame)  \
+    for (unsigned int __idx = 0; __idx < (machine)->nb_hwloc_topos  \
+             && ((hwloctoponame) = (machine)->hwlocpaths[__idx]);   \
+         (hwloctoponame) = (machine)->hwlocpaths[__idx++])
+
+#define netloc_machine_iter_hwloctopos(machine,hwloctopo)           \
+    for (unsigned int __idx = 0; __idx < (machine)->nb_hwloc_topos  \
+             && ((hwloctopo) = (machine)->hwloc_topos[__idx]);      \
+         (hwloctopo) = (machine)->hwloc_topos[__idx++])
+
+/*************************************************/
+/**
+ * Initialized the common part of every network handle.
+ *
+ * \param network A valid pointer to a \ref netloc_network_t
+ *
+ * \returns NETLOC_SUCCESS on success.
+ * \returns NETLOC_ERROR upon an error.
+ */
+extern int netloc_network_init(netloc_network_t *topo);
+
+/**
+ * Destruct a network handle
+ *
+ * \param network A valid pointer to a \ref netloc_network_t handle
+ * created from a prior call to any \ref netloc_network_*_construct
+ *
+ * \returns NETLOC_SUCCESS on success
+ * \returns NETLOC_ERROR upon an error.
+ */
+extern int netloc_network_destruct(netloc_network_t *topo);
+
+#define netloc_network_find_node(network,node_id,node)  \
+    HASH_FIND_STR((network)->nodes, node_id, node)
+
+#define netloc_network_iter_nodes(network,node,_tmp)    \
+    HASH_ITER(hh, (network)->nodes, node, _tmp)
+
+#define netloc_network_iter_partitions(network,part,_tmp)   \
+    HASH_ITER(hh, (network)->partitions, part, _tmp)
+
+#define netloc_network_iter_links(network,link,_tmp)        \
+    HASH_ITER(hh, (network)->physical_links, link, _tmp)
+
+#define netloc_network_num_nodes(network)       \
+    HASH_COUNT((network)->nodes)
+
+/*************************************************/
+/**
+ * Allocate a network handle.
+ *
+ * User is responsible for calling \ref netloc_network_destruct on the
+ * network handle.  The network parameter information is deep copied
+ * into the network handle, so the user may destruct the network
+ * handle after calling this function and/or reuse the network handle.
+ *
+ * \param subnet A pointer to the subnet id string
+ *
+ * \returns A newly allocated pointer to the network information on
+ *          success.
+ * \returns NULL upon an error.
+ */
+extern netloc_network_ib_t *netloc_network_ib_construct(const char *subnet);
+
+/**
+ * Initialized a network handle.
+ *
+ * \param subnet A pointer to the subnet id string
+ * \param network A valid pointer to a \ref netloc_network_ib_t
+ *
+ * \returns NETLOC_SUCCESS on success.
+ * \returns NETLOC_ERROR upon an error.
+ */
+extern int
+netloc_network_ib_init(const char *subnet, netloc_network_ib_t *network);
+
+/**
+ * Destruct a network handle
+ *
+ * \param network A valid pointer to a \ref netloc_network_ib_t handle
+ * created from a prior call to \ref netloc_network_construct
+ *
+ * \returns NETLOC_SUCCESS on success
+ * \returns NETLOC_ERROR upon an error.
+ */
+extern int netloc_network_ib_destruct(netloc_network_ib_t *network);
+
+int netloc_network_find_reverse_edges(netloc_network_t *network);
+
+/*************************************************/
+/**
+ * Allocate ant initialize a topology handle.
+ *
+ * User is responsible for calling \ref
+ * netloc_network_explicit_destruct on the topology handle.  The
+ * network parameter information is deep copied into the topology
+ * handle, so the user may destruct the network handle after calling
+ * this function and/or reuse the network handle.
  *
  * \returns A newly allocated pointer to the topology information on
  *          success.
@@ -447,34 +585,16 @@ netloc_network_explicit_construct();
  */
 int netloc_network_explicit_destruct(netloc_network_explicit_t *topology);
 
-int
-netloc_network_explicit_find_reverse_edges(netloc_network_explicit_t *topology);
+#define netloc_network_explicit_add_node(topology, node)    \
+    HASH_ADD(hh2, (topology)->nodesByHostname, hostname[0], \
+             (unsigned int)strlen((node)->hostname), node)
 
-int netloc_network_explicit_read_hwloc(netloc_network_explicit_t *topology,
-                                   int num_nodes, netloc_node_t **node_list);
-
-#define netloc_network_explicit_iter_partitions(topology,partition,_tmp) \
-    HASH_ITER(hh, (topology)->partitions, partition, _tmp)
-
-#define netloc_network_explicit_iter_name_hwloctopos(topology,hwloctoponame) \
-    for (unsigned int __idx = 0; __idx < (topology)->nb_hwloc_topos     \
-             && ((hwloctoponame) = (topology)->hwlocpaths[__idx]);      \
-         (hwloctoponame) = (topology)->hwlocpaths[__idx++])
-
-#define netloc_network_explicit_iter_hwloctopos(topology,hwloctopo) \
-    for (unsigned int __idx = 0; __idx < (topology)->nb_hwloc_topos \
-             && ((hwloctopo) = (topology)->hwloc_topos[__idx]);     \
-         (hwloctopo) = (topology)->hwloc_topos[__idx++])
-
-#define netloc_network_explicit_find_node(topology,node_id,node)    \
-    HASH_FIND_STR((topology)->nodes, node_id, node)
+#define netloc_network_explicit_find_node(topology,node)    \
+    HASH_FIND(hh2, (topology)->nodesByHostname, hostname,   \
+              (unsigned)strlen(hostname), node)
 
 #define netloc_network_explicit_iter_nodes(topology,node,_tmp)  \
-    HASH_ITER(hh, (topology)->nodes, node, _tmp)
-
-#define netloc_network_explicit_num_nodes(topology) \
-    HASH_COUNT((topology)->nodes)
-
+    HASH_ITER(hh2, (topology)->nodesByHostname, node, _tmp)
 
 /*************************************************/
 
@@ -505,11 +625,9 @@ netloc_partition_t *netloc_partition_construct(const unsigned int id,
  */
 int netloc_partition_destruct(netloc_partition_t *partition);
 
-#define netloc_partition_iter_nodes(partition, pnode)                   \
-    netloc_iter_nodelist((partition)->nodes, pnode)
-
-#define netloc_partition_iter_edges(partition, pedge)                   \
-    netloc_iter_edgelist((partition)->edges, pedge)
+#define netloc_partition_iter_nodes(partition, pnode)           \
+    if (NULL != (partition)->desc)                              \
+        netloc_iter_nodelist(&(partition)->desc->nodes, pnode)
 
 /*************************************************/
 
@@ -537,28 +655,40 @@ int netloc_node_destruct(netloc_node_t *node);
 
 char *netloc_node_pretty_print(const netloc_node_t *node);
 
-#define netloc_node_get_num_subnodes(node) \
+#define netloc_node_get_num_subnodes(node)      \
     (node)->nsubnodes
 
-#define netloc_node_get_subnode(node,i) \
+#define netloc_node_get_subnode(node,i)         \
     (node)->subnodes[(i)]
 
-#define netloc_node_get_num_edges(node) \
-    utarray_len((node)->edges)
+#define netloc_node_iter_subnodes(node,subnode)                     \
+    for (unsigned int __idx = 0;                                    \
+         __idx < netloc_node_get_num_subnodes(node)                 \
+             && (subnode = netloc_node_get_subnode(node, __idx));   \
+         __idx += 1)
 
-#define netloc_node_get_edge(node,i) \
-    (*(netloc_edge_t **)utarray_eltptr((node)->edges, (i)))
+#define netloc_node_get_num_edges(node)         \
+    utarray_len(&(node)->edges)
 
-#define netloc_node_iter_edges(node,edge,_tmp) \
+#define netloc_node_get_edge(node,i)                            \
+    (*(netloc_edge_t **)utarray_eltptr(&(node)->edges, (i)))
+
+#define netloc_node_iter_edges(node,edge,_tmp)  \
     HASH_ITER(hh, (node)->edges, edge, _tmp)
 
-#define netloc_node_iter_paths(node,path,_tmp) \
+#define netloc_node_iter_paths(node,path,_tmp)  \
     HASH_ITER(hh, (node)->paths, path, _tmp)
 
-#define netloc_node_is_host(node) \
+#define netloc_node_is_virtual(node)            \
+    (0 < (node)->nsubnodes)
+
+#define netloc_node_is_subnode(node)                                \
+    (!netloc_node_is_virtual(node) && NULL != (node)->virtual_node)
+
+#define netloc_node_is_host(node)               \
     ((node)->type == NETLOC_NODE_TYPE_HOST)
 
-#define netloc_node_is_switch(node) \
+#define netloc_node_is_switch(node)             \
     ((node)->type == NETLOC_NODE_TYPE_SWITCH)
 
 #define netloc_node_iter_paths(node, path,_tmp) \
@@ -597,16 +727,19 @@ void netloc_edge_reset_uid(void);
 int netloc_edge_is_in_partition(const netloc_edge_t *edge,
                                 const netloc_partition_t *partition);
 
-#define netloc_edge_get_num_links(edge) \
-    utarray_len((edge)->physical_links)
+#define netloc_edge_is_virtual(edge)            \
+    (0 < (edge)->nsubedges)
 
-#define netloc_edge_get_link(edge,i) \
-    (*(netloc_physical_link_t **)utarray_eltptr((edge)->physical_links, (i)))
+#define netloc_edge_get_num_links(edge)         \
+    utarray_len(&(edge)->physical_links)
 
-#define netloc_edge_get_num_subedges(edge) \
+#define netloc_edge_get_link(edge,i)                                    \
+    (*(netloc_physical_link_t **)utarray_eltptr(&(edge)->physical_links, (i)))
+
+#define netloc_edge_get_num_subedges(edge)      \
     ((edge)->nsubedges)
 
-#define netloc_edge_get_subedge(edge,i) \
+#define netloc_edge_get_subedge(edge,i)         \
     ((edge)->subnode_edges[(i)])
 
 /*************************************************/
@@ -621,21 +754,6 @@ int netloc_edge_is_in_partition(const netloc_edge_t *edge,
  *   A newly allocated pointer to the physical link information.
  */
 netloc_physical_link_t * netloc_physical_link_construct(void);
-
-
-/**
- * Copy constructor for netloc_physical_link_t
- *
- * User is responsible for calling the destructor on the handle.  The
- * newly allocated physical link has the same informations as \ref
- * origin.  All strings and \ref UT_array attributes are dupplicated.
- *
- * \param origin A valid physical link to be copied
- *
- * Returns
- *   A newly allocated pointer to the physical link information.
- */
-netloc_physical_link_t * netloc_physical_link_deep_copy(netloc_physical_link_t *origin);
 
 /**
  * Destructor for netloc_physical_link_t
@@ -672,11 +790,7 @@ int netloc_arch_set_current_resources(netloc_arch_t *arch);
 int netloc_arch_set_global_resources(netloc_arch_t *arch);
 
 int netloc_arch_node_get_hwloc_info(netloc_arch_node_t *arch,
-                                    netloc_network_explicit_t *topology);
-
-void netloc_arch_tree_complete(netloc_arch_tree_t *tree,
-                               UT_array **down_degrees_by_level,
-                               int num_hosts, int **parch_idx);
+                                    netloc_machine_t *machine);
 
 NETLOC_int netloc_arch_tree_num_leaves(netloc_arch_tree_t *tree);
 
@@ -686,10 +800,13 @@ NETLOC_int netloc_arch_tree_num_leaves(netloc_arch_tree_t *tree);
  **********************************************************************/
 
 #define netloc_get_num_partitions(object) \
-    utarray_len((object)->partitions)
+    utarray_len(&(object)->partitions)
 
 #define netloc_get_partition_id(object,i) \
-    ((*(netloc_partition_t **)utarray_eltptr((object)->partitions, (i)))->id)
+    ((*(netloc_partition_t **)utarray_eltptr(&(object)->partitions, (i)))->id)
+
+#define netloc_get_partition(object,i)                                  \
+    (*(netloc_partition_t **)utarray_eltptr(&(object)->partitions, (i)))
 
 #define netloc_path_iter_links(path,link)                               \
     for(netloc_physical_link_t **link = (netloc_physical_link_t **)     \
@@ -792,10 +909,6 @@ netloc_node_type_decode(const char * node_type_str) {
         return NETLOC_NODE_TYPE_INVALID;
     }
 }
-
-ssize_t netloc_line_get(char **lineptr, size_t *n, FILE *stream);
-
-char *netloc_line_get_next_token(char **string, char c);
 
 int netloc_build_comm_mat(char *filename, int *pn, double ***pmat);
 

@@ -109,7 +109,7 @@ utils_node_t *get_node(utils_node_t **nodes, char *type, char *lid,
         node->partitions = NULL;
         node->subnodes = NULL;
         
-        utarray_new(node->physical_links, &utils_physical_link_icd);
+        utarray_init(&node->physical_links, &utils_physical_link_icd);
 
         HASH_ADD_STR(*nodes, physical_id, node);  /* guid: name of key field */
     }
@@ -125,7 +125,7 @@ find_other_physical_link(utils_physical_link_t *link)
     unsigned int dest_port = link->ports[1];
 
     utils_physical_link_t *other_link = (utils_physical_link_t *)
-        utarray_eltptr(dest->physical_links, dest_port-1);
+        utarray_eltptr(&dest->physical_links, dest_port-1);
 
     return other_link;
 }
@@ -201,18 +201,18 @@ int build_paths(path_source_t **ppaths, utils_node_t *nodes, route_source_t *rou
             if (node_dest == node_src)
                 continue;
 
-            UT_array *found_links = NULL;
-            utarray_new(found_links, &ut_ptr_icd);
+            UT_array found_links;
+            utarray_init(&found_links, &ut_ptr_icd);
             int completed = 1;
 
             char *id_dest = node_dest->physical_id;
 
             /* Don't assert node_src->physical_link[0] is set */
             unsigned int link_id = *(int *)
-                utarray_front(node_src->edges->physical_link_idx);
+                utarray_front(&node_src->edges->physical_link_idx);
             utils_physical_link_t *link = (utils_physical_link_t  *)
-                utarray_eltptr(node_src->physical_links, link_id);
-            utarray_push_back(found_links, &link);
+                utarray_eltptr(&node_src->physical_links, link_id);
+            utarray_push_back(&found_links, &link);
 
             utils_node_t *node_cur = link->dest;
             assert(node_cur);
@@ -233,8 +233,8 @@ int build_paths(path_source_t **ppaths, utils_node_t *nodes, route_source_t *rou
 
                 unsigned int port = route_dest->port;
                 link = (utils_physical_link_t *)
-                    utarray_eltptr(node_cur->physical_links, port-1);
-                utarray_push_back(found_links, &link);
+                    utarray_eltptr(&node_cur->physical_links, port-1);
+                utarray_push_back(&found_links, &link);
                 node_cur = link->dest;
             }
 
@@ -247,7 +247,7 @@ int build_paths(path_source_t **ppaths, utils_node_t *nodes, route_source_t *rou
                 path_dest->links = found_links;
                 HASH_ADD_STR(path->dest, physical_id, path_dest);
             } else {
-                utarray_free(found_links);
+                utarray_done(&found_links);
             }
         }
     }
@@ -317,8 +317,8 @@ netloc_network_explicit_find_partitions(utils_node_t *nodes,
         partition_names[n] = (utils_partition_t *)
             malloc(sizeof(utils_partition_t));
         partition_names[n]->name = node_find_partition_name(node);
-        utarray_new(partition_names[n]->nodes, &ut_ptr_icd);
-        utarray_push_back(partition_names[n]->nodes, &node);
+        utarray_init(&partition_names[n]->nodes, &ut_ptr_icd);
+        utarray_push_back(&partition_names[n]->nodes, &node);
         hosts[n] = node;
         n++;
     }
@@ -340,10 +340,10 @@ netloc_network_explicit_find_partitions(utils_node_t *nodes,
                 continue;
 
             if (!strcmp(partition_names[n1]->name, partition_names[n2]->name)) {
-                utarray_concat(partition_names[n1]->nodes,
-                               partition_names[n2]->nodes);
+                utarray_concat(&partition_names[n1]->nodes,
+                               &partition_names[n2]->nodes);
                 free(partition_names[n2]->name);
-                utarray_free(partition_names[n2]->nodes);
+                utarray_done(&partition_names[n2]->nodes);
                 free(partition_names[n2]);
                 partition_names[n2] = NULL;
                 hosts[n2]->main_partition = num_partitions;
@@ -397,9 +397,9 @@ netloc_network_explicit_set_partitions(utils_node_t *nodes,
             if (node_dest->main_partition != partition)
                 continue;
 
-            for (unsigned int l = 0; l < utarray_len(path_dest->links); l++) {
+            for (unsigned int l = 0; l < utarray_len(&path_dest->links); l++) {
                 utils_physical_link_t *link = *(utils_physical_link_t **)
-                    utarray_eltptr(path_dest->links, l);
+                    utarray_eltptr(&path_dest->links, l);
                 if (!link->partitions) {
                     link->partitions = (int *)
                         calloc(utarray_len(partitions), sizeof(int));
@@ -567,7 +567,7 @@ int main(int argc, char **argv)
             netloc_network_explicit_set_partitions(nodes, &partitions, paths);
 
             /* Write the XML file */
-            netloc_write_into_xml_file(nodes, &partitions, subnet, outpath,
+            netloc_write_into_xml_file(&nodes, &partitions, subnet, outpath,
                                        hwlocpath,
                                        NETLOC_NETWORK_TYPE_INFINIBAND);
 
@@ -583,7 +583,7 @@ int main(int argc, char **argv)
                 utils_edge_t *edge, *edge_tmp;
                 HASH_ITER(hh, node->edges, edge, edge_tmp) {
                     HASH_DEL(node->edges, edge);
-                    utarray_free(edge->physical_link_idx);
+                    utarray_done(&edge->physical_link_idx);
                     free(edge->partitions);
                     free(edge);
                 }
@@ -592,15 +592,15 @@ int main(int argc, char **argv)
                 free(node->partitions);
 
                 /* Physical links */
-                for (unsigned l=0; l < utarray_len(node->physical_links); l++) {
+                for (unsigned l=0; l < utarray_len(&node->physical_links); l++) {
                     utils_physical_link_t *link = (utils_physical_link_t *)
-                        utarray_eltptr(node->physical_links, l);
+                        utarray_eltptr(&node->physical_links, l);
                     free(link->width);
                     free(link->speed);
                     free(link->description);
                     free(link->partitions);
                 }
-                utarray_free(node->physical_links);
+                utarray_done(&node->physical_links);
 
                 free(node);
             }
@@ -612,7 +612,7 @@ int main(int argc, char **argv)
                  ppartition = (utils_partition_t **)
                      utarray_next(&partitions, ppartition)) {
                 free((*ppartition)->name);
-                utarray_free((*ppartition)->nodes);
+                utarray_done(&(*ppartition)->nodes);
                 free(*ppartition);
             }
             utarray_done(&partitions);
@@ -638,7 +638,7 @@ int main(int argc, char **argv)
                 path_dest_t *pathd, *pathd_tmp;
                 HASH_ITER(hh, path->dest, pathd, pathd_tmp) {
                     HASH_DEL(path->dest, pathd);
-                    utarray_free(pathd->links);
+                    utarray_done(&pathd->links);
                     free(pathd);
                 }
                 free(path);
@@ -803,22 +803,22 @@ int read_discover(char *subnet, char *path,
                 edge = (utils_edge_t *) malloc(sizeof(utils_edge_t));
                 strcpy(edge->dest, dest_node->physical_id);
                 edge->total_gbits = 0;
-                edge->partitions =  NULL;
-                edge->subedges = NULL;
+                edge->partitions = NULL;
                 edge->reverse_edge = NULL;
-                utarray_new(edge->physical_link_idx, &ut_int_icd);
+                utarray_init(&edge->subedges, &ut_ptr_icd);
+                utarray_init(&edge->physical_link_idx, &ut_int_icd);
                 HASH_ADD_STR(src_node->edges, dest, edge);
             }
 
             /* Creation of the physical link */
             utils_physical_link_t link[1];
             link->int_id = global_link_idx++;
-            link->ports[0] =  atoi(src_port_id);
-            link->ports[1] =  atoi(dest_port_id);
+            link->ports[0] = atoi(src_port_id);
+            link->ports[1] = atoi(dest_port_id);
             link->width = strdup(width);
             link->speed = strdup(speed);
-            link->dest = dest_node;
             link->gbits = gbits;
+            link->dest = dest_node;
             edge->total_gbits += gbits;
             link->description = strdup(link_desc);
             link->partitions = NULL;
@@ -828,15 +828,15 @@ int read_discover(char *subnet, char *path,
 
             unsigned int port_idx = link->ports[0]-1;
             /* NB: there is no function to set a specific index */
-            if (port_idx+1 > utarray_len(src_node->physical_links)) {
-                utarray_insert(src_node->physical_links, link, port_idx);
+            if (port_idx+1 > utarray_len(&src_node->physical_links)) {
+                utarray_insert(&src_node->physical_links, link, port_idx);
             } else {
                 utils_physical_link_t *dest_link = (utils_physical_link_t *)
-                    utarray_eltptr(src_node->physical_links, port_idx);
+                    utarray_eltptr(&src_node->physical_links, port_idx);
                 memcpy(dest_link, link, sizeof(utils_physical_link_t));
             }
 
-            utarray_push_back(edge->physical_link_idx, &port_idx);
+            utarray_push_back(&edge->physical_link_idx, &port_idx);
 
             free(src_desc);
             free(dest_desc);
@@ -877,20 +877,20 @@ int read_discover(char *subnet, char *path,
         if (node->subnodes) {
             utils_node_t*subnode, *subnode_tmp;
             HASH_ITER(hh, node->subnodes, subnode, subnode_tmp) {
-                unsigned int num_links = utarray_len(subnode->physical_links);
+                unsigned int num_links = utarray_len(&subnode->physical_links);
                 for (unsigned int i = 0; i < num_links; i++) {
                     utils_physical_link_t *link = (utils_physical_link_t *)
-                        utarray_eltptr(subnode->physical_links, i);
+                        utarray_eltptr(&subnode->physical_links, i);
                     if (!link->dest)
                         continue;
                     link->other_link = find_other_physical_link(link);
                 }
             }
         } else {
-            unsigned int num_links = utarray_len(node->physical_links);
+            unsigned int num_links = utarray_len(&node->physical_links);
             for (unsigned int i = 0; i < num_links; i++) {
                 utils_physical_link_t *link = (utils_physical_link_t *)
-                    utarray_eltptr(node->physical_links, i);
+                    utarray_eltptr(&node->physical_links, i);
                 if (!link->dest)
                     continue;
                 link->other_link = find_other_physical_link(link);

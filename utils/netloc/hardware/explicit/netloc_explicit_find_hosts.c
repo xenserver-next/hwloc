@@ -1,5 +1,5 @@
 /*
- * Copyright © 2017 Inria.  All rights reserved.
+ * Copyright © 2017-2018 Inria.  All rights reserved.
  *
  * $COPYRIGHT$
  *
@@ -15,6 +15,7 @@
 #include <mpi.h>
 #include <hwloc.h>
 #include <private/netloc.h>
+#include <private/netloc-xml.h>
 
 typedef struct {
     UT_hash_handle hh; /* Makes this structure hashable */
@@ -162,35 +163,38 @@ int main(int argc, char **argv)
         MPI_Recv (&master, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
     }
 
+    /* No more MPI call to be done */
+    MPI_Finalize();
+
     /* In charge of writing hwloc file */
     if (master) {
         /* Get the Netloc topology to find hwloc path */
-        char *topopath = getenv("NETLOC_TOPOFILE");
+        const char *topopath = getenv("NETLOC_TOPOFILE");
         if (!topopath) {
             fprintf(stderr, "Error: you need to set NETLOC_TOPOFILE in your "
                     "environment.\n");
         } else {
-            topopath = strdup(topopath);
-            netloc_network_explicit_t *netloc_topology;
-            netloc_topology = netloc_network_explicit_construct();
-            if (netloc_topology == NULL) {
-                fprintf(stderr, "Error: netloc_network_explicit_construct "
+            netloc_machine_t *netloc_machine;
+            int ret = netloc_machine_xml_load(topopath, &netloc_machine);
+            if (NETLOC_SUCCESS == ret) {
+                fprintf(stderr, "Error: netloc_machine_construct "
                         "failed\n");
-                free(topopath);
                 return NETLOC_ERROR;
             }
-            netloc_topology->topopath = strdup(topopath);
 
             /* Find hwloc dir path */
             char *hwloc_path;
-            if (netloc_topology->hwloc_dir_path[0] != '/') {
-                char *path_tmp = strdup(netloc_topology->topopath);
+            if (netloc_machine->hwloc_dir_path[0] != '/') {
+                char *path_tmp = strdup(netloc_machine->topopath);
                 asprintf(&hwloc_path, "%s/%s", dirname(path_tmp),
-                         netloc_topology->hwloc_dir_path);
+                         netloc_machine->hwloc_dir_path);
                 free(path_tmp);
             } else {
-                hwloc_path = strdup(netloc_topology->hwloc_dir_path);
+                hwloc_path = strdup(netloc_machine->hwloc_dir_path);
             }
+
+            /* No need for netloc_machine anymore */
+            netloc_machine_destruct(netloc_machine);
 
             /* Check if already have an hwloc file */
             /* We try to find a diff file */
@@ -215,9 +219,8 @@ int main(int argc, char **argv)
             /* if there is no hwloc file, let's write one */
             if (hwloc_file) {
                 if (hwloc_topology_export_xml(topology, hwloc_file, 0) == -1) {
-                    fprintf(stderr, "Error: netloc_network_explicit_construct "
+                    fprintf(stderr, "Error: hwloc_topology_export_xml "
                             "failed\n");
-                    free(topopath);
                     return NETLOC_ERROR;
                 }
                 free(hwloc_path);
@@ -225,8 +228,6 @@ int main(int argc, char **argv)
             }
         }
     }
-
-    MPI_Finalize();
 
     return EXIT_SUCCESS;
 }
