@@ -17,9 +17,7 @@
 #include <dirent.h>
 
 #include <private/netloc.h>
-#include <private/netloc-xml.h>
-#include <private/utils/cleaner.h>
-#include "netloc.h"
+#include <netloc.h>
 
 #define JSON_DRAW_FILE_LINK_ID "id"
 #define JSON_DRAW_FILE_LINK_SRC "from"
@@ -358,9 +356,9 @@ static int handle_link(netloc_physical_link_t *link, json_t *json_links)
 
     json_t *json_partitions = json_array_new();
 
-    for (unsigned int p = 0; p < netloc_get_num_partitions(link); p++)
+    for (unsigned int p = 0; p < link->nparts; p++)
     {
-        unsigned int partition = netloc_get_partition_id(link, p);
+        unsigned int partition = link->partitions[p];
         json_array_add(json_partitions, json_uint_new(partition));
     }
     json_dict_add(json_link, JSON_DRAW_FILE_LINK_PARTITIONS, json_partitions);
@@ -396,18 +394,18 @@ static int handle_edge(netloc_edge_t *edge, json_t *json_edges)
 
     /* Partition list */
     json_t *json_partitions = json_array_new();
-    for (unsigned int p = 0; p < netloc_get_num_partitions(edge); p++)
+    for (unsigned int p = 0; p < edge->nparts; p++)
     {
-        unsigned int partition = netloc_get_partition_id(edge, p);
+        unsigned int partition = edge->partitions[p];
         json_array_add(json_partitions, json_uint_new(partition));
     }
     json_dict_add(json_edge, JSON_DRAW_FILE_EDGE_PARTITIONS, json_partitions);
 
     /* Subnode edges */
     json_t *json_subedges = json_array_new();
-    for (unsigned int s = 0; s < netloc_edge_get_num_subedges(edge); s++)
+    for (unsigned int s = 0; s < edge->nsubedges; s++)
     {
-        netloc_edge_t *subedge = netloc_edge_get_subedge(edge, s);
+        netloc_edge_t *subedge = edge->subnode_edges[s];
         json_array_add(json_subedges, json_int_new(subedge->id));
         /* The subedges are already added to the dictionnary. We just need ids */
     }
@@ -437,9 +435,9 @@ static int handle_node(netloc_node_t *node, json_t *json_nodes,
 
     /* Subnodes */
     json_t *json_subnodes = json_array_new();
-    for (unsigned int s = 0; s < netloc_node_get_num_subnodes(node); s++)
+    for (unsigned int s = 0; s < node->nsubnodes; s++)
     {
-        netloc_node_t *subnode = netloc_node_get_subnode(node, s);
+        netloc_node_t *subnode = node->subnodes[s];
         handle_node(subnode, json_nodes, json_edges, 1);
         json_array_add(json_subnodes, json_string_new(subnode->physical_id));
     }
@@ -456,9 +454,9 @@ static int handle_node(netloc_node_t *node, json_t *json_nodes,
 
     /* Partitions */
     json_t *json_partitions = json_array_new();
-    for (unsigned int p = 0; p < netloc_get_num_partitions(node); p++)
+    for (unsigned int p = 0; p < node->nparts; p++)
     {
-        unsigned int partition = netloc_get_partition_id(node, p);
+        unsigned int partition = node->partitions[p];
         json_array_add(json_partitions, json_uint_new(partition));
     }
     json_dict_add(json_node, JSON_DRAW_FILE_NODE_PARTITIONS, json_partitions);
@@ -482,41 +480,42 @@ static int handle_node(netloc_node_t *node, json_t *json_nodes,
     return NETLOC_SUCCESS;
 }
 
-static int handle_path(netloc_node_t *node, json_t *json_paths)
-{
-    char *id = node->physical_id;
-
-    json_t *json_node_paths = json_dict_new();
-    json_dict_add(json_node_paths, JSON_DRAW_FILE_PATH_ID, json_string_new(id));
-
-    /* Paths */
-    json_t *json_path_list = json_array_new();
-    netloc_path_t *path, *path_tmp;
-    netloc_node_iter_paths(node, path, path_tmp) {
-        json_t *json_node_path = json_dict_new();
-        json_dict_add(json_node_path, JSON_DRAW_FILE_PATH_ID,
-                json_string_new(path->dest_id));
-
-        json_t *json_links = json_array_new();
-        /* plink is the variable name defined and used in the macro */
-        netloc_path_iter_links(path, plink) {
-            json_array_add(json_links, json_int_new((*plink)->id));
-        }
-        json_dict_add(json_node_path, JSON_DRAW_FILE_PATH_LINKS,
-                json_links);
-        json_array_add(json_path_list, json_node_path);
-    }
-    json_dict_add(json_node_paths, JSON_DRAW_FILE_PATHS, json_path_list);
-
-    json_array_add(json_paths, json_node_paths);
-
-    return NETLOC_SUCCESS;
-}
+// TODO
+//static int handle_path(netloc_node_t *node, json_t *json_paths)
+//{
+//    char *id = node->physical_id;
+//
+//    json_t *json_node_paths = json_dict_new();
+//    json_dict_add(json_node_paths, JSON_DRAW_FILE_PATH_ID, json_string_new(id));
+//
+//    /* Paths */
+//    json_t *json_path_list = json_array_new();
+//    netloc_path_t *path, *path_tmp;
+//    netloc_node_iter_paths(node, path, path_tmp) {
+//        json_t *json_node_path = json_dict_new();
+//        json_dict_add(json_node_path, JSON_DRAW_FILE_PATH_ID,
+//                json_string_new(path->dest_id));
+//
+//        json_t *json_links = json_array_new();
+//        /* plink is the variable name defined and used in the macro */
+//        netloc_path_iter_links(path, plink) {
+//            json_array_add(json_links, json_int_new((*plink)->id));
+//        }
+//        json_dict_add(json_node_path, JSON_DRAW_FILE_PATH_LINKS,
+//                json_links);
+//        json_array_add(json_path_list, json_node_path);
+//    }
+//    json_dict_add(json_node_paths, JSON_DRAW_FILE_PATHS, json_path_list);
+//
+//    json_array_add(json_paths, json_node_paths);
+//
+//    return NETLOC_SUCCESS;
+//}
 
 static int handle_partitions(netloc_partition_t *partition,
                              json_t *json_partitions)
 {
-    json_array_add(json_partitions, json_string_new(partition->name));
+    json_array_add(json_partitions, json_string_new(partition->partition_name));
     return NETLOC_SUCCESS;
 }
 
@@ -552,16 +551,16 @@ static int write_json(netloc_machine_t *machine, FILE *output)
         handle_link(link, json_links);
     }
 
-    /* Paths */
-    json_t *json_paths = json_array_new();
-    netloc_node_t *node, *node_tmp;
-    netloc_network_iter_nodes(machine->network, node, node_tmp) {
-        handle_path(node, json_paths);
-        /* extra+structural nodes */
-        if (!netloc_get_num_partitions(node)
-            && (!node->subnodes || node->nsubnodes))
-            handle_node(node, json_nodes_extra, json_edges_extra, 0);
-    }
+    /* TODO Paths */
+    //json_t *json_paths = json_array_new();
+    //netloc_node_t *node, *node_tmp;
+    //netloc_network_iter_nodes(machine->network, node, node_tmp) {
+    //    handle_path(node, json_paths);
+    //    /* extra+structural nodes */
+    //    if (!netloc_get_num_partitions(node)
+    //        && (!node->subnodes || node->nsubnodes))
+    //        handle_node(node, json_nodes_extra, json_edges_extra, 0);
+    //}
 
     /* Partitions */
     json_t *json_partitions = json_array_new();
@@ -710,7 +709,8 @@ int main(int argc, char **argv)
 
         netloc_to_json_draw(machine);
 
-        netloc_machine_destruct(machine);
+        // TODO
+        //netloc_machine_destruct(machine);
     }
     closedir(netlocdir);
 

@@ -12,10 +12,8 @@
 #ifndef _UTILS_NETLOC_H_
 #define _UTILS_NETLOC_H_
 
-#include <private/autogen/config.h>
-#include <private/netloc.h>
-#include <netloc/uthash.h>
-#include <netloc/utarray.h>
+#include "utils/uthash.h"
+#include "utils/utarray.h"
 
 #define MAX_STR 20
 
@@ -27,20 +25,6 @@ struct utils_edge_t;
 typedef struct utils_edge_t utils_edge_t;
 struct utils_physical_link_t;
 typedef struct utils_physical_link_t utils_physical_link_t;
-
-/******************************************************************************/
-/* New abstract datatype for netloc */
-
-struct netloc_new_partition_t;
-typedef struct netloc_new_partition_t netloc_new_partition_t;
-
-struct netloc_new_partition_t {
-    /* Topology description */
-    netloc_topology_t *topology;
-
-    /* Complete topology, containing every nodes and edges */
-    netloc_network_explicit_t *full_topo;
-};
 
 /******************************************************************************/
 
@@ -132,5 +116,40 @@ netloc_write_into_xml_file(utils_node_t **nodes, UT_array *partitions,
                            const char *subnet, const char *path,
                            const char *hwlocpath,
                            const netloc_network_type_t transportType);
+
+
+
+// XXX TODO WIP
+netloc_machine_t *utils_to_netloc_machine(
+        utils_node_t *nodes, const UT_array *partitions, char *subnet,
+        char *outpath, const char *hwlocpath, netloc_network_type_t type);
+
+void set_reverse_edges(utils_node_t *nodes);
+int find_similar_nodes(utils_node_t **pnodes,
+                       const unsigned int nparts);
+
+
+static void idx_to_coords(int index, int ndims, int *dims, int *coords)
+{
+    for (int d = ndims-1; d >= 0; d--) {
+        coords[d] = index%dims[d];
+        index /= dims[d];
+    }
+}
+
+static int find_partition_number(int nparts, int *partitions, int partition)
+{
+    /* No need to do dichotomy, array is very small */
+    for (int p = 0; p < nparts; p++) {
+        if (partitions[p] == partition)
+            return p;
+
+        if (partitions[p] > partition)
+            break;
+    }
+    return -1;
+}
+
+int netloc_arch_build(netloc_machine_t *machine);
 
 #endif /* _UTILS_NETLOC_H_ */

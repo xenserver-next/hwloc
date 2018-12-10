@@ -13,9 +13,11 @@
 #include <stdio.h>
 #include <libgen.h>
 #include <mpi.h>
+
 #include <hwloc.h>
+
+#include <netloc.h>
 #include <private/netloc.h>
-#include <private/netloc-xml.h>
 
 typedef struct {
     UT_hash_handle hh; /* Makes this structure hashable */
@@ -169,13 +171,13 @@ int main(int argc, char **argv)
     /* In charge of writing hwloc file */
     if (master) {
         /* Get the Netloc topology to find hwloc path */
-        const char *topopath = getenv("NETLOC_TOPOFILE");
+        char *topopath = getenv("NETLOC_TOPOFILE");
         if (!topopath) {
             fprintf(stderr, "Error: you need to set NETLOC_TOPOFILE in your "
                     "environment.\n");
         } else {
             netloc_machine_t *netloc_machine;
-            int ret = netloc_machine_xml_load(topopath, &netloc_machine);
+            int ret = netloc_read_xml(&netloc_machine, topopath);
             if (NETLOC_SUCCESS == ret) {
                 fprintf(stderr, "Error: netloc_machine_construct "
                         "failed\n");
@@ -194,7 +196,8 @@ int main(int argc, char **argv)
             }
 
             /* No need for netloc_machine anymore */
-            netloc_machine_destruct(netloc_machine);
+            // TODO
+            // netloc_machine_destruct(netloc_machine);
 
             /* Check if already have an hwloc file */
             /* We try to find a diff file */

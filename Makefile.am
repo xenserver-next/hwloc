@@ -22,7 +22,7 @@ if HWLOC_BUILD_STANDALONE
 if BUILD_NETLOC
 SUBDIRS += netloc
 endif
-SUBDIRS += utils tests contrib/systemd contrib/misc
+SUBDIRS += . utils tests contrib/systemd contrib/misc
 # We need doc/ if HWLOC_BUILD_DOXYGEN, or during make install if HWLOC_INSTALL_DOXYGEN.
 # There's no INSTALL_SUBDIRS, so always enter doc/ and check HWLOC_BUILD/INSTALL_DOXYGEN there
 SUBDIRS += doc
@@ -31,11 +31,6 @@ endif
 # Do not let automake automatically add the non-standalone dirs to the
 # distribution tarball if we're building in embedded mode.
 DIST_SUBDIRS = $(SUBDIRS)
-if HWLOC_BUILD_STANDALONE
-if !BUILD_NETLOC
-DIST_SUBDIRS += netloc
-endif
-endif
 
 # Only install the pkg file if we're building in standalone mode (and not on Windows)
 if HWLOC_BUILD_STANDALONE

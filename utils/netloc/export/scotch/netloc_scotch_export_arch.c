@@ -1,4 +1,4 @@
-#include <stdio.h> // for scotch
+#include <stdio.h>
 #include <stdint.h>
 #include <scotch.h>
 #include <netloc.h>
@@ -6,7 +6,7 @@
 
 void help(char *name, FILE *f)
 {
-    fprintf(f, "Usage: %s <archfile> [subarchfile]\n"
+    fprintf(f, "Usage: %s <topofile> <archfile>\n"
             "\t%s --help\n", name, name);
 }
 
@@ -16,8 +16,8 @@ int main(int argc, char **argv)
     SCOTCH_Arch arch;
     SCOTCH_Arch subarch;
 
+    char *topo_filename = NULL;
     char *arch_filename = NULL;
-    char *subarch_filename = NULL;
 
     if (argc == 1 || argc > 3) {
         help(argv[0], stdout);
@@ -29,31 +29,28 @@ int main(int argc, char **argv)
             help(argv[0], stdout);
             return 0;
         } else {
-            arch_filename = argv[1];
+            help(argv[0], stdout);
+            return 1;
         }
     } else if (argc == 3) {
-        arch_filename = argv[1];
-        subarch_filename = argv[2];
+        topo_filename = argv[1];
+        arch_filename = argv[2];
     }
 
-    ret = netlocscotch_build_global_arch(&arch);
+    netloc_machine_t *machine;
+    ret = netloc_machine_load(&machine, topo_filename);
     if( NETLOC_SUCCESS != ret ) {
         return ret;
     }
+
+    ret = netlocscotch_export_topology(machine, NULL, &arch, NULL);
+    if( NETLOC_SUCCESS != ret ) {
+        return ret;
+    }
+
     FILE *arch_file = fopen(arch_filename, "w");
     SCOTCH_archSave(&arch, arch_file);
     fclose(arch_file);
-
-    if (subarch_filename) {
-        ret = netlocscotch_build_current_arch(&arch, &subarch);
-        if( NETLOC_SUCCESS != ret ) {
-            return ret;
-        }
-        FILE *subarch_file = fopen(subarch_filename, "w");
-        SCOTCH_archSave(&subarch, subarch_file);
-        fclose(subarch_file);
-        SCOTCH_archExit(&subarch);
-    }
 
     SCOTCH_archExit(&arch);
 

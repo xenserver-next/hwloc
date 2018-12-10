@@ -1,56 +1,67 @@
-/*
- * Copyright © 2013-2014 Cisco Systems, Inc.  All rights reserved.
- * Copyright © 2013-2014 University of Wisconsin-La Crosse.
- *                         All rights reserved.
- * Copyright © 2015-2016 Inria.  All rights reserved.
- *
- * $COPYRIGHT$
- *
- * Additional copyrights may follow
- * See COPYING in top-level directory.
- *
- * $HEADER$
- */
-
-#ifndef _NETLOC_H_
-#define _NETLOC_H_
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE // for asprintf
-#endif
-
-#include <hwloc/autogen/config.h>
+#ifndef _WIP_H
+#define _WIP_H
+#include "utils/uthash.h"
+#include "utils/utarray.h"
 
 #include <hwloc.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//#include "netloc-utils.h"
 
-/** \defgroup netloc_api Netloc API
- * @{
- */
-/**
- * Return codes
- */
+// TODO scotch int
+#define NETLOC_INT int
+
 enum {
-    NETLOC_SUCCESS         =  0, /**< Success */
-    NETLOC_ERROR           = -1, /**< Error: General condition */
-    NETLOC_ERROR_NOTDIR    = -2, /**< Error: URI is not a directory */
-    NETLOC_ERROR_NOENT     = -3, /**< Error: URI is invalid, no such entry */
-    NETLOC_ERROR_EMPTY     = -4, /**< Error: No networks found */
-    NETLOC_ERROR_MULTIPLE  = -5, /**< Error: Multiple matching networks found */
-    NETLOC_ERROR_NOT_IMPL  = -6, /**< Error: Interface not implemented */
-    NETLOC_ERROR_EXISTS    = -7, /**< Error: If the entry already exists when trying to add to a lookup table */
-    NETLOC_ERROR_NOT_FOUND = -8, /**< Error: No path found */
-    NETLOC_ERROR_MAX       = -9  /**< Error: Enum upper bound marker. No errors less than this number Will not be returned externally. */
+    NETLOC_SUCCESS         =  0, /** Success */
+    /* Errors */
+    NETLOC_ERROR,              /** General condition */
+    NETLOC_ERROR_BADMACHINE,   /** Bad machine */
+    NETLOC_ERROR_NODENOTFOUND, /** Node not found */
+    NETLOC_ALRD_IN_RESTRICT,   /** Node already in restriction */
+    NETLOC_ERROR_NOENT,        /** URI is invalid, no such entry */
 };
 
+/**
+ * Enumerated type for the various types of supported topologies
+ */
+typedef enum {
+    NETLOC_TOPOLOGY_TYPE_INVALID  = 0,  /**< Invalid */
+    NETLOC_TOPOLOGY_TYPE_RANDOM   = 1,  /**< Random */
+    NETLOC_TOPOLOGY_TYPE_RING     = 2,  /**< Ring */
+    NETLOC_TOPOLOGY_TYPE_GRID     = 3,  /**< Grid */
+    NETLOC_TOPOLOGY_TYPE_ALL2ALL  = 4,  /**< All2All */
+    NETLOC_TOPOLOGY_TYPE_TREE     = 5,  /**< Tree */
+    NETLOC_TOPOLOGY_TYPE_TORUS    = 6,  /**< Torus */
+} netloc_topology_type_t;
 
-#ifdef __cplusplus
-} /* extern "C" */
+
+/* Pre declarations to avoid inter dependency problems */
+/** \cond IGNORE */
+struct netloc_machine_t;
+typedef struct netloc_machine_t netloc_machine_t;
+struct netloc_arch_t;
+typedef struct netloc_arch_t netloc_arch_t;
+struct netloc_node_t;
+typedef struct netloc_node_t netloc_node_t;
+struct netloc_filter_t;
+typedef struct netloc_filter_t netloc_filter_t;
+/** \endcond */
+
+/******************************************************************************/
+/* PUBLIC API */
+/******************************************************************************/
+int netloc_machine_load(netloc_machine_t **pmachine, char *path);
+int netloc_machine_save(netloc_machine_t *machine, char *path);
+
+int netloc_topology_get(netloc_machine_t *machine, netloc_filter_t *filter,
+        int *nlevels, int *ncoords, int **dims, netloc_topology_type_t **types,
+        int **levelidx,  int **costs);
+
+int netloc_node_find(netloc_machine_t *machine, char *name, netloc_node_t **node);
+int netloc_node_current(netloc_machine_t *machine, netloc_node_t **node);
+int netloc_node_get_coords(netloc_machine_t *machine, netloc_filter_t *filter,
+        netloc_node_t *node, int *coords);
+int netloc_node_get_partition(netloc_machine_t *machine, netloc_filter_t *filter,
+        netloc_node_t *node, int *partition);
+
+int netloc_restriction_add_node(netloc_machine_t *machine, netloc_node_t *node);
 #endif
-
-/** @} */
-
-#endif // _NETLOC_H_
