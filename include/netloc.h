@@ -1,56 +1,58 @@
-/*
- * Copyright © 2013-2014 Cisco Systems, Inc.  All rights reserved.
- * Copyright © 2013-2014 University of Wisconsin-La Crosse.
- *                         All rights reserved.
- * Copyright © 2015-2016 Inria.  All rights reserved.
- *
- * $COPYRIGHT$
- *
- * Additional copyrights may follow
- * See COPYING in top-level directory.
- *
- * $HEADER$
- */
-
-#ifndef _NETLOC_H_
-#define _NETLOC_H_
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE // for asprintf
-#endif
-
-#include <hwloc/autogen/config.h>
+#ifndef _WIP_H
+#define _WIP_H
+#include "uthash.h"
+#include "utarray.h"
 
 #include <hwloc.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//#include "netloc-utils.h"
 
-/** \defgroup netloc_api Netloc API
- * @{
- */
-/**
- * Return codes
- */
+#define NETLOC_int int // XXX TODO
+
 enum {
-    NETLOC_SUCCESS         =  0, /**< Success */
-    NETLOC_ERROR           = -1, /**< Error: General condition */
-    NETLOC_ERROR_NOTDIR    = -2, /**< Error: URI is not a directory */
-    NETLOC_ERROR_NOENT     = -3, /**< Error: URI is invalid, no such entry */
-    NETLOC_ERROR_EMPTY     = -4, /**< Error: No networks found */
-    NETLOC_ERROR_MULTIPLE  = -5, /**< Error: Multiple matching networks found */
-    NETLOC_ERROR_NOT_IMPL  = -6, /**< Error: Interface not implemented */
-    NETLOC_ERROR_EXISTS    = -7, /**< Error: If the entry already exists when trying to add to a lookup table */
-    NETLOC_ERROR_NOT_FOUND = -8, /**< Error: No path found */
-    NETLOC_ERROR_MAX       = -9  /**< Error: Enum upper bound marker. No errors less than this number Will not be returned externally. */
+    NETLOC_SUCCESS         =  0, /** Success */
+    /* Errors */
+    NETLOC_ERROR           = 1, /**  General condition */
+    NETLOC_ERROR_NOTDIR    = 2, /** URI is not a directory */
+    NETLOC_ERROR_NOENT     = 3, /** URI is invalid, no such entry */
+    NETLOC_ERROR_EMPTY     = 4, /** No networks found */
+    NETLOC_ERROR_MULTIPLE  = 5, /** Multiple matching networks found */
+    NETLOC_ERROR_NOT_IMPL  = 6, /** Interface not implemented */
+    NETLOC_ERROR_EXISTS    = 7, /** Entry already exists in a lookup table */
+    NETLOC_ERROR_NOT_FOUND = 8, /** No path found */
 };
 
 
-#ifdef __cplusplus
-} /* extern "C" */
+
+/* Pre declarations to avoid inter dependency problems */
+/** \cond IGNORE */
+struct netloc_arch_t;
+typedef struct netloc_arch_t netloc_arch_t;
+/** \endcond */
+
+
+struct netloc_arch_t {
+};
+
+
+int netloc_arch_build(netloc_machine_t *machine);
+
+typedef enum {
+    NETLOC_ARCH_TREE    =  0,  /* Fat tree */
+} netloc_arch_type_t;
+
+
+/******************************************************************************/
+/* PUBLIC API */
+/******************************************************************************/
+int netloc_machine_build(netloc_machine_t *machine);
+
+int netloc_get_local_coords(int *nlevels, int **types, int **ndims,
+        int **dims, int **coords, int **costs);
+
+/* Scotch functions: TODO import */
+
+/* TODO functions to get nodes (neighbour with distance,..) */
+
+
 #endif
-
-/** @} */
-
-#endif // _NETLOC_H_

@@ -10,7 +10,7 @@
 
 if BUILD_NETLOC
 
-SUBDIRS = topos hardware
+SUBDIRS = xml
 
 AM_CPPFLAGS = \
         $(NETLOC_CPPFLAGS) \
@@ -26,16 +26,7 @@ noinst_LTLIBRARIES = libnetloc_embedded.la
 endif
 
 sources = \
-        cleaner.c \
-        machine.c \
-        support.c \
-        path.c \
-        architecture.c \
-        partition.c \
-        hwloc.c \
-        load.c \
-        mpicomm.c \
-        xml.c
+        datatypes.c
 
 # Installable library
 

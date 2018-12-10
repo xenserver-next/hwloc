@@ -14,20 +14,19 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <private/netloc.h>
-#include <private/utils/netloc.h>
-#include <netloc/uthash.h>
-#include <netloc/utarray.h>
-
-#include <libgen.h> // for dirname
 
 #include <errno.h>
+#include <libgen.h> // for dirname
 #include <sys/types.h>
 #include <dirent.h>
 #include <regex.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
+
+#include "include/netloc-utils.h"
+#include "include/netloc-wip.h"
+#include "include/netloc-datatypes.h"
 
 static int read_routes(route_source_t **proutes, char *subnet, char *path,
         char *route_dirname);
@@ -108,7 +107,7 @@ utils_node_t *get_node(utils_node_t **nodes, char *type, char *lid,
         node->main_partition = -1;
         node->partitions = NULL;
         node->subnodes = NULL;
-        
+
         utarray_init(&node->physical_links, &utils_physical_link_icd);
 
         HASH_ADD_STR(*nodes, physical_id, node);  /* guid: name of key field */
@@ -214,6 +213,7 @@ int build_paths(path_source_t **ppaths, utils_node_t *nodes, route_source_t *rou
                 utarray_eltptr(&node_src->physical_links, link_id);
             utarray_push_back(&found_links, &link);
 
+            assert(link);
             utils_node_t *node_cur = link->dest;
             assert(node_cur);
             while (node_cur != node_dest) {
@@ -235,6 +235,7 @@ int build_paths(path_source_t **ppaths, utils_node_t *nodes, route_source_t *rou
                 link = (utils_physical_link_t *)
                     utarray_eltptr(&node_cur->physical_links, port-1);
                 utarray_push_back(&found_links, &link);
+                assert(link);
                 node_cur = link->dest;
             }
 
@@ -492,15 +493,13 @@ int main(int argc, char **argv)
     if (!outdir) {
         fprintf(stderr, "Couldn't open output directory: \"%s\"\n", outpath);
         perror("opendir");
-        closedir(outdir);
         return 2;
     }
 
     if (hwlocpath) {
         char *realpath;
         if (hwlocpath[0] != '/') {
-            if (0 > asprintf(&realpath, "%s/%s", outpath, hwlocpath))
-                realpath = NULL;
+            asprintf(&realpath, "%s/%s", outpath, hwlocpath);
         } else {
             realpath = strdup(hwlocpath);
         }
@@ -538,8 +537,7 @@ int main(int argc, char **argv)
             discover_filename = filename;
             read_discover(subnet, inpath, discover_filename, &nodes);
 
-            if (0 > asprintf(&route_filename, "%s/ibroutes-%s", inpath, subnet))
-                route_filename = NULL;
+            asprintf(&route_filename, "%s/ibroutes-%s", inpath, subnet);
 
             struct stat s;
             int err = stat(route_filename, &s);
@@ -566,10 +564,20 @@ int main(int argc, char **argv)
             build_paths(&paths, nodes, routes);
             netloc_network_explicit_set_partitions(nodes, &partitions, paths);
 
+            set_reverse_edges(nodes);
+            find_similar_nodes(&nodes, utarray_len(&partitions));
+
             /* Write the XML file */
-            netloc_write_into_xml_file(&nodes, &partitions, subnet, outpath,
-                                       hwlocpath,
-                                       NETLOC_NETWORK_TYPE_INFINIBAND);
+            netloc_machine_t *machine =
+                netloc_machine_construct(subnet);
+
+
+            utils_to_netloc_machine(machine, nodes, &partitions, subnet, outpath,
+                                              hwlocpath,
+                                              NETLOC_NETWORK_TYPE_INFINIBAND);
+
+            netloc_arch_build(machine);
+            netloc_machine_to_xml(machine);
 
             /* Free node hash table */
             utils_node_t *node, *node_tmp;

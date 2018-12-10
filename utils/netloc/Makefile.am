@@ -3,6 +3,6 @@
 
 SUBDIRS = \
         export \
-		topology \
+        topology \
         hardware \
         mapping

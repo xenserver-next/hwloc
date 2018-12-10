@@ -10,28 +10,334 @@
  */
 
 /*
- * This file provides general function to generate XML topology files
- * after reworking the explicit graph in order to merge into virtual
- * nodes when possible.
+ * This file provides general function to translate from utils_*_t
+ * datatypes to netloc_*_t.
  */
 
 #define _GNU_SOURCE         /* See feature_test_macros(7) */
+#include <stdio.h>
 
-#include <dirent.h>
-#include <libgen.h>
+#include "include/netloc-utils.h"
+#include "include/netloc-wip.h"
+#include "include/netloc-datatypes.h"
 
-#include <private/netloc.h>
-#include <netloc.h>
-#include <private/autogen/config.h>
-#include <private/utils/netloc.h>
+extern int netloc_topo_set_tree_topology(netloc_partition_t *partition);
 
-#include <netloc/uthash.h>
-#include <netloc/utarray.h>
+static netloc_hwloc_topology_t *hwloc_topologies;
+void flag_array_to_array(int size, int *flags, int *pnum, int **pvalues);
 
-extern int
-netloc_write_xml_file(netloc_machine_t *);
-extern int create_netloc_machine(netloc_machine_t *, const utils_node_t *,
-                                 const UT_array *);
+void flag_array_to_array(int size, int *flags, int *pnum, int **pvalues)
+{
+    int num = 0;
+    int *values = (int *)malloc(sizeof(int[size])); /* maximal size */
+
+    for (int i = 0; i < size; i++) {
+        if (flags[i]) {
+            values[num] = i;
+            num++;
+        }
+    }
+
+    *pnum = num;
+    *pvalues = values;
+}
+
+static void set_hwloc_topology(netloc_node_t *node, netloc_machine_t *machine)
+{
+    char *buff;
+    int buffSize;
+    FILE *fxml;
+    /* If "ANONYMOUS-1" there can't be any topology file */
+    if (0 == strncmp("ANONYMOUS", node->hostname, 9)) return;
+    /* Check if file exists */
+    buffSize = asprintf(&buff, "%s/%s.diff.xml",
+                        machine->hwloc_dir_path, node->hostname);
+    if (0 > buffSize)
+        buff = NULL;
+    if (!(fxml = fopen(buff, "r"))) {
+        buffSize -= 8;
+        strcpy(&buff[buffSize], "xml");
+        if (!(fxml = fopen(buff, "r"))) {
+            fprintf(stderr, "Hwloc file absent: %s\n", buff);
+            buffSize = 0;
+        } else
+            fclose(fxml);
+    } else
+        fclose(fxml);
+    /* If file exists */
+    if (0 < buffSize) {
+        /* Check if already defined hwloc_topo */
+        netloc_hwloc_topology_t *hwloc_topo;
+        char *topo_name = strdup(1 + strrchr(buff, '/'));
+        HASH_FIND_STR(hwloc_topologies, topo_name, hwloc_topo);
+        if (!hwloc_topo) {
+            hwloc_topo = (netloc_hwloc_topology_t *)
+                malloc(sizeof(netloc_hwloc_topology_t));
+            hwloc_topo->hwloc_topo_idx = HASH_COUNT(hwloc_topologies);
+            hwloc_topo->path = topo_name;
+            HASH_ADD_STR(hwloc_topologies, path, hwloc_topo);
+        }
+        node->hwloc_topo_idx = 1 + hwloc_topo->hwloc_topo_idx;
+    }
+    free(buff); buff = NULL;
+}
+
+static netloc_node_t *
+create_node(const utils_node_t *node, netloc_machine_t *machine)
+{
+    netloc_node_t *topo_node = netloc_node_construct();
+    assert(topo_node);
+
+    /* Copy attributes */
+    topo_node->type = node->type;
+    topo_node->logical_id = node->logical_id;
+    strncpy(topo_node->physical_id, node->physical_id, 20);
+
+    /* Copy partitions */
+    flag_array_to_array(machine->npartitions, node->partitions,
+            &topo_node->nparts, &topo_node->newpartitions);
+
+    /* Hostname */
+    if (node->hostname && 0 < strlen(node->hostname)) {
+        topo_node->hostname = strdup(node->hostname);
+        /* Set hwloc_path if node is a host */
+        if (NETLOC_NODE_TYPE_HOST == node->type) {
+            set_hwloc_topology(topo_node, machine);
+        }
+    } else if (NETLOC_NODE_TYPE_HOST == node->type) {
+        fprintf(stderr, "WARN: Host node with address %s has no hostname\n",
+                node->physical_id);
+    }
+
+    if (node->description) {
+        topo_node->description = strdup(node->description);
+    }
+
+    /* Add the node to the network */
+    printf("%p\n", machine->explicit->nodes);
+    printf("%p\n", topo_node);
+    HASH_ADD_STR(machine->explicit->nodes, physical_id, topo_node);
+
+    /* Add potential subnodes */
+    unsigned int nsubnodes = HASH_COUNT(node->subnodes);
+    if (nsubnodes) {
+        unsigned int i = 0;
+        utils_node_t *subnode, *subnode_tmp;
+        topo_node->nsubnodes = nsubnodes;
+        topo_node->subnodes =
+            (netloc_node_t **) malloc(sizeof(netloc_node_t *[nsubnodes]));
+        HASH_ITER(hh, node->subnodes, subnode, subnode_tmp) {
+            netloc_node_t *topo_subnode = create_node(subnode, machine);
+            topo_subnode->virtual_node = topo_node;
+            topo_node->subnodes[i] = topo_subnode;
+            i += 1;
+        }
+    }
+
+    return topo_node;
+}
+
+static netloc_edge_t *
+create_edges(const utils_edge_t *edge, netloc_machine_t *machine)
+{
+    netloc_edge_t *topo_edge = netloc_edge_construct();
+    if (!topo_edge)
+        return NULL;
+
+    /* Copy attributes */
+    topo_edge->total_gbits = edge->total_gbits;
+    assert(edge->reverse_edge);
+    HASH_FIND_STR(machine->explicit->nodes, edge->dest, topo_edge->dest);
+    assert(topo_edge->dest);
+    HASH_FIND_STR(machine->explicit->nodes, edge->reverse_edge->dest,
+            topo_edge->node);
+    assert(topo_edge->node);
+
+    /* Add partition */
+    if (edge->partitions) {
+        flag_array_to_array(machine->npartitions, edge->partitions,
+                &topo_edge->nparts, &topo_edge->newpartitions);
+    }
+
+    /* Add topo_edge to its topo_node */
+    HASH_ADD_STR(topo_edge->node->edges, dest->physical_id, topo_edge);
+
+    /* Check if reverse edge is already defined */
+    HASH_FIND_STR(topo_edge->dest->edges, topo_edge->node->physical_id,
+                  topo_edge->other_way);
+
+    if (topo_edge->other_way)
+        topo_edge->other_way->other_way = topo_edge;
+
+    unsigned int nsubedges =
+        edge_is_virtual(edge) ? utarray_len(&edge->subedges) : (unsigned) 0;
+
+    if (nsubedges) {
+        topo_edge->nsubedges = nsubedges;
+        topo_edge->subnode_edges =
+            (netloc_edge_t **) malloc(sizeof(netloc_edge_t *[nsubedges]));
+        assert(topo_edge->subnode_edges);
+
+        for (unsigned int i = 0; i < utarray_len(&edge->subedges); ++i) {
+            utils_edge_t *subedge =
+                *(utils_edge_t **) utarray_eltptr(&edge->subedges, i);
+            netloc_edge_t *topo_subedge =
+                create_edges(subedge, machine);
+            assert(topo_subedge);
+
+            topo_edge->subnode_edges[i] = topo_subedge;
+        }
+    }
+
+    return topo_edge;
+}
+
+static inline netloc_physical_link_t *
+create_physical_link(const utils_physical_link_t *link,
+                     netloc_machine_t *machine)
+{
+    netloc_physical_link_t *topo_link = netloc_physical_link_construct();
+    if (!topo_link)
+        return NULL;
+    /* Copy attributes */
+    topo_link->id = link->int_id;
+    topo_link->gbits = link->gbits;
+    topo_link->width = strdup(link->width);
+    topo_link->speed = strdup(link->speed);
+    topo_link->description = strdup(link->description);
+    topo_link->other_way_id = link->other_link->int_id;
+    memcpy(topo_link->ports, link->ports, sizeof(int[2]));
+
+    /* Find out src and dest nodes */
+    HASH_FIND_STR(machine->explicit->nodes, link->parent_node->physical_id,
+                  topo_link->src);
+    assert(topo_link->src);
+    HASH_FIND_STR(machine->explicit->nodes, link->dest->physical_id, topo_link->dest);
+    assert(topo_link->dest);
+
+    /* Find out edge */
+    HASH_FIND_STR(topo_link->src->edges, link->parent_edge->dest,
+                  topo_link->edge);
+    assert(topo_link->edge);
+
+    HASH_FIND(hh, machine->explicit->physical_links, &topo_link->other_way_id,
+              sizeof(unsigned long long int), topo_link->other_way);
+    if (topo_link->other_way)
+        topo_link->other_way->other_way = topo_link;
+    /* Add link to the proper structures */
+    HASH_ADD(hh, machine->explicit->physical_links, id, sizeof(unsigned long long int),
+             topo_link);
+    utarray_push_back(&topo_link->src->physical_links, &topo_link);
+    if (topo_link->src->nsubnodes) {
+        /* Add link to the parent virtual node in case of a subnode */
+        utarray_push_back(&topo_link->src->virtual_node->physical_links,
+                          &topo_link);
+    }
+    utarray_push_back(&topo_link->edge->physical_links, &topo_link);
+
+    return topo_link;
+}
+
+
+int utils_to_netloc_machine(netloc_machine_t *machine, utils_node_t *nodes, const UT_array *partitions,
+                        char *subnet, char *outpath, const char *hwlocpath,
+                        netloc_network_type_t type)
+{
+    /* Sanity check */
+    if (NULL == machine) return NETLOC_ERROR;
+
+    /* Create partitions */
+    unsigned int num_partitions = utarray_len(partitions);
+    machine->npartitions = num_partitions;
+    machine->partitions = (netloc_partition_t *)
+        malloc(sizeof(netloc_partition_t[num_partitions]));
+    for (int p = 0; p < num_partitions; p++) {
+        utils_partition_t *u_partition = (*(utils_partition_t **)
+                utarray_eltptr(partitions, p));
+        machine->partitions[p].partition_name = strdup(u_partition->name);
+        machine->partitions[p].subnet = strdup(subnet);
+        machine->partitions[p].idx = p;
+        machine->partitions[p].topology = NULL;
+
+    }
+
+    /* Add explicit */
+    machine->explicit = (netloc_explicit_t *)calloc(1, sizeof(netloc_explicit_t));
+    /* Add nodes */
+    const utils_node_t *node, *node_tmp;
+    HASH_ITER(hh, nodes, node, node_tmp) {
+        create_node(node, machine);
+    }
+
+    /* Add edges */
+    HASH_ITER(hh, nodes, node, node_tmp) {
+        utils_edge_t *edge, *edge_tmp;
+        HASH_ITER(hh, node->edges, edge, edge_tmp) {
+            create_edges(edge, machine);
+        }
+    }
+
+    /* Add physical links */
+    HASH_ITER(hh, nodes, node, node_tmp) {
+        utils_edge_t *edge, *edge_tmp;
+        HASH_ITER(hh, node->edges, edge, edge_tmp) {
+            for (unsigned i = 0; i<utarray_len(&edge->physical_link_idx); ++i) {
+                unsigned int id = *(unsigned int *)
+                    utarray_eltptr(&edge->physical_link_idx, i);
+                utils_physical_link_t *link = (utils_physical_link_t *)
+                    utarray_eltptr(&node->physical_links, id);
+                netloc_physical_link_t *topo_link =
+                    create_physical_link(link, machine);
+                /* Add partition */
+                if (link->partitions) {
+                    flag_array_to_array(machine->npartitions, link->partitions,
+                            &topo_link->nparts, &topo_link->newpartitions);
+                }
+            }
+        }
+    }
+
+    /* Add physical links to virtual edges */
+    netloc_node_t *topo_node, *topo_node_tmp;
+    HASH_ITER(hh, machine->explicit->nodes, topo_node, topo_node_tmp) {
+        netloc_edge_t *topo_edge, *topo_edge_tmp;
+        HASH_ITER(hh, topo_node->edges, topo_edge, topo_edge_tmp) {
+            for (unsigned i = 0; i < topo_edge->nsubedges; ++i)
+                utarray_concat(&topo_edge->physical_links,
+                               &topo_edge->subnode_edges[i]->physical_links);
+        }
+    }
+
+    /* Change from netloc_hwloc_topology_t hashtable to array */
+    machine->nb_hwloc_topos = HASH_COUNT(hwloc_topologies);
+    if (machine->nb_hwloc_topos) {
+        machine->hwlocpaths =
+            (char **) malloc(sizeof(char *[machine->nb_hwloc_topos]));
+        netloc_hwloc_topology_t *hwtopo, *hwtopo_tmp;
+        HASH_ITER(hh, hwloc_topologies, hwtopo, hwtopo_tmp) {
+            machine->hwlocpaths[hwtopo->hwloc_topo_idx] = hwtopo->path;
+            HASH_DEL(hwloc_topologies, hwtopo);
+            free(hwtopo);
+        }
+        /* Check reset global variable */
+        assert(NULL == hwloc_topologies);
+    }
+
+    // TODO
+    ///* Compute the topology if any specific */
+    //netloc_partition_t *part, *part_tmp;
+    //netloc_machine_iter_partitions(machine, part, part_tmp) {
+    //    int ret = netloc_topo_set_tree_topology(part);
+    //    if (NETLOC_SUCCESS == ret) {
+    //        fprintf(stderr, "%s is a tree\n", part->name);
+    //    } else {
+    //        fprintf(stderr, "%s is not a tree\n", part->name);
+    //    }
+    //}
+
+    return NETLOC_SUCCESS;
+}
+
 
 static int get_virtual_id(char *id)
 {
@@ -139,7 +445,7 @@ static inline void edge_merge_into(utils_node_t *virtual_node,
     }
 }
 
-static inline int find_similar_nodes(utils_node_t **pnodes,
+int find_similar_nodes(utils_node_t **pnodes,
                                      const unsigned int nparts)
 {
     int ret = NETLOC_ERROR;
@@ -169,7 +475,7 @@ static inline int find_similar_nodes(utils_node_t **pnodes,
         utils_edge_t *edge, *edge_tmp;
         int edge_idx = 0;
         HASH_SORT(node->edges, sort_by_dest);
-        netloc_node_iter_edges(node, edge, edge_tmp) {
+        HASH_ITER(hh, node->edges, edge, edge_tmp) {
             HASH_FIND_STR(*pnodes, edge->dest, edgedest_by_node[idx][edge_idx]);
             assert(edgedest_by_node[idx][edge_idx]);
             edge_idx++;
@@ -313,7 +619,7 @@ static inline int find_similar_nodes(utils_node_t **pnodes,
             utils_edge_t *edge, *edge_tmp;
             int edge_idx = 0;
             HASH_SORT(virtual_node->edges, sort_by_dest);
-            netloc_node_iter_edges(virtual_node, edge, edge_tmp) {
+            HASH_ITER(hh, virtual_node->edges, edge, edge_tmp) {
                 HASH_FIND_STR(*pnodes, edge->dest,
                               edgedest_by_node[nodeIdx][edge_idx]);
                 assert(edgedest_by_node[nodeIdx][edge_idx]);
@@ -331,7 +637,7 @@ static inline int find_similar_nodes(utils_node_t **pnodes,
                     /* Reset edges destinations */
                     edge_idx = 0;
                     HASH_SORT(node->edges, sort_by_dest);
-                    netloc_node_iter_edges(node, edge, edge_tmp) {
+                    HASH_ITER(hh, node->edges, edge, edge_tmp) {
                         HASH_FIND_STR(*pnodes, edge->dest,
                                       edgedest_by_node[idx][edge_idx]);
                         assert(edgedest_by_node[idx][edge_idx]);
@@ -354,7 +660,7 @@ ERROR:
     return ret;
 }
 
-static inline void set_reverse_edges(utils_node_t *nodes)
+void set_reverse_edges(utils_node_t *nodes)
 {
     utils_node_t *node, *node_tmp, *dest_node;
     utils_edge_t *edge, *edge_tmp;
@@ -397,110 +703,3 @@ static inline void set_reverse_edges(utils_node_t *nodes)
 #endif /* NETLOC_DEBUG */
 }
 
-int netloc_write_into_xml_file(utils_node_t **pnodes, UT_array *partitions,
-                               const char *subnet, const char *path,
-                               const char *hwlocpath,
-                               const netloc_network_type_t transportType)
-{
-    int ret = NETLOC_ERROR;
-
-    set_reverse_edges(*pnodes);
-    find_similar_nodes(pnodes, utarray_len(partitions));
-
-    /* Create a netloc machine to ease the dump */
-    netloc_machine_t *machine = netloc_machine_construct();
-    /* Compute absolute hwloc_dir_path */
-    char *full_hwloc_path = NULL;
-    if (hwlocpath && 0 < strlen(hwlocpath)) {
-        if ('/' != hwlocpath[0]) {
-            if (0 > asprintf(&full_hwloc_path, "%s/%s", path, hwlocpath))
-                full_hwloc_path = NULL;
-        } else {
-            full_hwloc_path = strdup(hwlocpath);
-        }
-    }
-    /* Add hwloc_dir_path if it exists */
-    DIR* dir;
-    if (full_hwloc_path && 0 < strlen(full_hwloc_path)
-        && (dir = opendir(full_hwloc_path))) {
-        machine->hwloc_dir_path = full_hwloc_path;
-        closedir(dir);
-    }
-    /* Initialize network */
-    if (NETLOC_NETWORK_TYPE_INFINIBAND == transportType) {
-        netloc_network_ib_t *network_ib = netloc_network_ib_construct(subnet);
-        machine->network = &network_ib->super;
-        asprintf(&machine->topopath, "%s/IB-%s-nodes.xml", path, subnet);
-    }
-    assert(machine->network);
-    ret = create_netloc_machine(machine, *pnodes, partitions);
-    machine->hwloc_dir_path = strdup(hwlocpath);
-    free(full_hwloc_path);
-
-    /* Dump XML file */
-    ret = netloc_write_xml_file(machine);
-
-    /* Free netloc structures */
-    netloc_machine_destruct(machine);
-
-    /* Untangle similar nodes so the virtualization is transparent */
-    utils_node_t *node, *node_tmp;
-    HASH_ITER(hh, *pnodes, node, node_tmp) {
-        if (node->subnodes) {
-            /* Edges */
-            utils_edge_t *edge, *edge_tmp;
-            HASH_ITER(hh, node->edges, edge, edge_tmp) {
-                unsigned int i;
-                utils_node_t *src_node;
-                /* Clean reverse edge if dest is not virtual */
-                if (0 != strncmp("virtual", edge->dest, 7)) {
-                    utils_node_t *dest_node;
-                    HASH_FIND_STR(*pnodes, edge->dest, dest_node);
-                    assert(dest_node);
-                    utils_edge_t *reverse_edge = edge->reverse_edge;
-                    assert(reverse_edge);
-                    HASH_DEL(dest_node->edges, reverse_edge);
-                    utarray_done(&reverse_edge->physical_link_idx);
-                    /* Unmerge revert subedges */
-                    for (i = 0; i < utarray_len(&reverse_edge->subedges); ++i) {
-                        utils_edge_t *sub = *(utils_edge_t **)
-                            utarray_eltptr(&reverse_edge->subedges, i);
-                        HASH_ADD_STR(dest_node->edges, dest, sub);
-                    }
-                    utarray_done(&reverse_edge->subedges);
-                    free(reverse_edge->partitions);
-                    free(reverse_edge);
-                }
-                /* Clean edge */
-                /* Unmerge subedges */
-                for (i = 0; i < utarray_len(&edge->subedges); ++i) {
-                    utils_edge_t *sub =
-                        *(utils_edge_t **) utarray_eltptr(&edge->subedges, i);
-                    assert(sub->reverse_edge);
-                    HASH_FIND_STR(node->subnodes, sub->reverse_edge->dest,
-                                  src_node);
-                    assert(src_node);
-                    HASH_ADD_STR(src_node->edges, dest, sub);
-                }
-                utarray_done(&edge->subedges);
-                utarray_done(&edge->physical_link_idx);
-                free(edge->partitions);
-                HASH_DEL(node->edges, edge);
-                free(edge);
-            }
-            /* Nodes */
-            utils_node_t *subnode, *subnode_tmp;
-            HASH_DEL(*pnodes, node);
-            HASH_ITER(hh, node->subnodes, subnode, subnode_tmp) {
-                HASH_DEL(node->subnodes, subnode);
-                HASH_ADD_STR(*pnodes, physical_id, subnode);
-            }
-            /* Virtual Node */
-            utarray_done(&node->physical_links);
-            free(node->partitions);
-            free(node->description);
-            free(node);
-        }
-    }
-    return ret;
-}
