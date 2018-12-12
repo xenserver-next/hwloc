@@ -27,4 +27,4 @@ netloc_ib_extract_dats_SOURCES = \
 
 netloc_ib_extract_dats_LDADD = \
 	$(top_builddir)/netloc/libnetloc.la \
-	$(top_builddir)/utils/netloc/topology/explicit/libnetloc_topo_explicit.la
+	$(top_builddir)/utils/netloc/topology/libnetloc_topology.la

@@ -16,8 +16,6 @@
 #include <netloc.h>
 #include <private/netloc.h>
 
-#ifdef HWLOC_HAVE_LIBXML2
-
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlmemory.h>
@@ -38,37 +36,6 @@ typedef xmlDocPtr xml_doc_ptr;
 
 #define XML_LIB_CHECK_VERSION LIBXML_TEST_VERSION
 
-#else
-
-/* XML writing is made with netloc/xml.c and netloc/nolibxml.c */
-
-typedef void * xml_ns_ptr;
-
-typedef char xml_char;
-#define BAD_CAST (xml_char *)
-
-struct xml_node_t;
-typedef struct xml_node_t * xml_node_ptr;
-
-struct xml_doc_t;
-typedef struct xml_doc_t * xml_doc_ptr;
-
-#define xml_parser_cleanup()  do { /* do nothing */ } while (0)
-
-#define XML_LIB_CHECK_VERSION do { /* do nothing */ } while (0)
-
-/******************************************************************************/
-/* Private API for XML file import */
-xml_doc_ptr xml_node_read_file(const char *path);
-xml_node_ptr xml_doc_get_root_element(const xml_doc_ptr doc);
-char *xml_node_get_name(const xml_node_ptr node);
-size_t xml_node_get_num_children(const xml_node_ptr node);
-int xml_node_has_child_data(const xml_node_ptr node);
-xml_node_ptr xml_node_get_child(const xml_node_ptr node, const unsigned int idx);
-xml_char *xml_node_get_content(const xml_node_ptr node);
-char *xml_node_attr_get(xml_node_ptr node, const char *attrname);
-
-#endif /* HWLOC_HAVE_LIBXML2 */
 
 /******************************************************************************/
 /* Public API for XML file export */

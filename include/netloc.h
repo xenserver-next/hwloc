@@ -1,7 +1,7 @@
 #ifndef _WIP_H
 #define _WIP_H
-#include "uthash.h"
-#include "utarray.h"
+#include "utils/uthash.h"
+#include "utils/utarray.h"
 
 #include <hwloc.h>
 
@@ -26,8 +26,18 @@ enum {
 
 /* Pre declarations to avoid inter dependency problems */
 /** \cond IGNORE */
+struct netloc_machine_t;
+typedef struct netloc_machine_t netloc_machine_t;
+/** \endcond */
+
+typedef enum {
+    NETLOC_ARCH_TREE    =  0,  /* Fat tree */
+} netloc_arch_type_t;
+
 struct netloc_arch_t;
 typedef struct netloc_arch_t netloc_arch_t;
+struct netloc_machine_t;
+typedef struct netloc_machine_t netloc_machine_t;
 /** \endcond */
 
 
@@ -35,24 +45,16 @@ struct netloc_arch_t {
 };
 
 
-int netloc_arch_build(netloc_machine_t *machine);
-
-typedef enum {
-    NETLOC_ARCH_TREE    =  0,  /* Fat tree */
-} netloc_arch_type_t;
-
-
 /******************************************************************************/
 /* PUBLIC API */
 /******************************************************************************/
-int netloc_machine_build(netloc_machine_t *machine);
+int netloc_read_xml_from_path(netloc_machine_t **pmachine, const char *path);
+int netloc_read_xml_from_env(netloc_machine_t **pmachine);
 
 int netloc_get_local_coords(int *nlevels, int **types, int **ndims,
         int **dims, int **coords, int **costs);
 
 /* Scotch functions: TODO import */
-
-/* TODO functions to get nodes (neighbour with distance,..) */
 
 
 #endif

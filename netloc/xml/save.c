@@ -4,20 +4,19 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-#include "/usr/include/libxml2/libxml/parser.h"
-#include "/usr/include/libxml2/libxml/tree.h"
-#include "/usr/include/libxml2/libxml/xmlmemory.h"
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+#include <libxml/xmlmemory.h>
 
-#include "include/netloc-utils.h"
-#include "include/netloc-wip.h"
-#include "include/netloc-datatypes.h"
+#include <netloc.h>
+#include <private/netloc.h>
 
 void add_netloc_node(xmlNodePtr parent_node, netloc_node_t *node,
         netloc_machine_t *machine);
 
 char *str_join(int size, char **values) {
     /* Compute total length */
-    int total_len = 0;
+    unsigned int total_len = 0;
     for (int i = 0; i < size; i++) {
         total_len += strlen(values[i]);
     }

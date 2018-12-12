@@ -44,12 +44,10 @@ noinst_HEADERS = \
         private/components.h \
         private/cpuid-x86.h \
         private/netloc.h \
-        private/netloc-xml.h \
         private/xml.h \
-        private/utils/netloc.h \
         private/utils/xml.h \
-        netloc/utarray.h \
-        netloc/uthash.h
+        utils/utarray.h \
+        utils/uthash.h
 
 if HWLOC_HAVE_LINUX
 include_hwloc_HEADERS += \

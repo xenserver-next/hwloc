@@ -14,9 +14,10 @@
 
 #include <string.h>
 
-#include "uthash.h"
-#include "utarray.h"
+#include "utils/uthash.h"
+#include "utils/utarray.h"
 
+#include <netloc.h>
 #include <hwloc.h>
 
 /* Pre declarations to avoid inter dependency problems */
@@ -123,6 +124,27 @@ typedef enum {
     NETLOC_NODE_TYPE_HOST    = 1, /**< Host (a.k.a., network addressable endpoint - e.g., MAC Address) node */
     NETLOC_NODE_TYPE_SWITCH  = 2, /**< Switch node */
 } netloc_node_type_t;
+
+/**
+ * Decode the node type
+ *
+ * \param node_type A valid member of the \ref netloc_node_type_t type
+ *
+ * \returns NULL if the type is invalid
+ * \returns A string for that \ref netloc_node_type_t type
+ */
+static inline const char *
+netloc_node_type_encode(const netloc_node_type_t node_type) {
+    if( NETLOC_NODE_TYPE_SWITCH == node_type ) {
+        return "SW";
+    }
+    else if( NETLOC_NODE_TYPE_HOST == node_type ) {
+        return "CA";
+    }
+    else {
+        return NULL;
+    }
+}
 
 /**
  * Encode the node type
@@ -321,7 +343,7 @@ struct netloc_hwloc_topology_t {
 
 
 
-netloc_machine_t *netloc_machine_construct(char *topopath);
+netloc_machine_t *netloc_machine_construct(const char *topopath);
 
 int netloc_machine_add_partitions(netloc_machine_t *machine,
         int npartitions, netloc_partition_t *partitions);
@@ -404,7 +426,17 @@ char * netloc_link_pretty_print(netloc_physical_link_t* link);
 #define netloc_node_is_host(node) \
     ((node)->type == NETLOC_NODE_TYPE_HOST)
 
+#define netloc_node_is_switch(node)             \
+    ((node)->type == NETLOC_NODE_TYPE_SWITCH)
 
+#define netloc_edge_is_virtual(edge) \
+    (0 < (edge)->nsubedges)
 
+#define netloc_edge_get_num_links(edge)         \
+    utarray_len(&(edge)->physical_links)
 
+#define netloc_edge_get_link(edge,i)                                    \
+    (*(netloc_physical_link_t **)utarray_eltptr(&(edge)->physical_links, (i)))
+
+// TODO supprimer utarray pour structures définitives
 #endif /* !PRIVATE_NETLOC_H */

@@ -1,11 +1,10 @@
 #define _GNU_SOURCE         /* See feature_test_macros(7) */
 #include <stdio.h>
 
-#include "include/netloc-utils.h"
-#include "include/netloc-wip.h"
-#include "include/netloc-datatypes.h"
+#include <netloc.h>
+#include <private/netloc.h>
 
-netloc_machine_t *netloc_machine_construct(char *topopath)
+netloc_machine_t *netloc_machine_construct(const char *topopath)
 {
     netloc_machine_t *machine = (netloc_machine_t*)malloc(sizeof(netloc_machine_t));
     if (NULL == machine) {

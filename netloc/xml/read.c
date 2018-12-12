@@ -1,15 +1,14 @@
-#include "/usr/include/libxml2/libxml/parser.h"
-#include "/usr/include/libxml2/libxml/tree.h"
-#include "/usr/include/libxml2/libxml/xmlmemory.h"
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+#include <libxml/xmlmemory.h>
 
-#include "include/netloc-wip.h"
-#include "include/netloc-datatypes.h"
+#include <netloc.h>
+#include <private/netloc.h>
 
 #define NETLOC_FILE_VERSION "3.0"
 
 static int read_topology(xmlNode *topology_node, netloc_topology_t *topology);
-static xmlDoc *netloc_xml_reader_init(char *path);
-int netloc_read_xml(netloc_machine_t **pmachine, char *path);
+static xmlDoc *netloc_xml_reader_init(const char *path);
 int read_partitions(xmlNode *partitions_node, netloc_machine_t *machine);
 int read_explicit(xmlNode *explicit_node, netloc_machine_t *machine);
 int is_positive(long int value);
@@ -30,7 +29,7 @@ int read_connexions(xmlNode *connexions_node);
 int read_connexion(xmlNode *connexion_node);
 int str_count_char(char *str, char refchar);
 
-static xmlDoc *netloc_xml_reader_init(char *path)
+static xmlDoc *netloc_xml_reader_init(const char *path)
 {
     xmlDoc *doc;
 
@@ -50,8 +49,19 @@ static xmlDoc *netloc_xml_reader_init(char *path)
     return doc;
 }
 
+int netloc_read_xml_from_env(netloc_machine_t **pmachine)
+{
+    const char *topopath = getenv("NETLOC_TOPOFILE");
+    if (!topopath) {
+        fprintf(stderr, "Error: you need to set NETLOC_TOPOFILE in your "
+                "environment.\n");
+        return -1;
+    } else {
+        return netloc_read_xml_from_path(pmachine, topopath);
+    }
+}
 
-int netloc_read_xml(netloc_machine_t **pmachine, char *path)
+int netloc_read_xml_from_path(netloc_machine_t **pmachine, const char *path)
 {
     xmlNode *machine_node=NULL;
     xmlChar *buff = NULL;
@@ -577,17 +587,6 @@ int read_topology(xmlNode *topology_node, netloc_topology_t *topology)
 
 
     return 0;
-}
-
-int main()
-{
-    int ret;
-    netloc_machine_t *machine;
-    char *path = "fe80:0000:0000:0000/topo.xml";
-
-    ret = netloc_read_xml(&machine, path);
-
-    return ret;
 }
 
 // TODO check partition value, check dims, et coords (< max_coord)

@@ -1,10 +1,10 @@
+#include "tree.h"
+
 typedef struct netloc_analysis_data_t {
     int level;
     void *userdata;
 } netloc_analysis_data;
 
-
-static int partition_topology_to_tleaf(netloc_machine_t *machine);
 
 /* Complete the topology to have a complete balanced tree  */
 void netloc_arch_tree_complete(netloc_topology_t *topology, UT_array **down_degrees_by_level,

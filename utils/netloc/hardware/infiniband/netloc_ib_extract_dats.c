@@ -24,9 +24,9 @@
 #include <fcntl.h>
 #include <string.h>
 
-#include "include/netloc-utils.h"
-#include "include/netloc-wip.h"
-#include "include/netloc-datatypes.h"
+#include "netloc.h"
+#include "private/netloc.h"
+#include "private/netloc-utils.h"
 
 static int read_routes(route_source_t **proutes, char *subnet, char *path,
         char *route_dirname);

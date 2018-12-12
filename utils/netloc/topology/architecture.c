@@ -12,9 +12,10 @@
 #define _GNU_SOURCE	   /* See feature_test_macros(7) */
 #include <stdio.h>
 
-#include "include/netloc-utils.h"
-#include "include/netloc-wip.h"
-#include "include/netloc-datatypes.h"
+#include <netloc.h>
+#include <private/netloc.h>
+
+#include "tree.h"
 
 int netloc_arch_build(netloc_machine_t *machine)
 {
