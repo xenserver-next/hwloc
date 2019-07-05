@@ -57,13 +57,6 @@ int main(int argc, char **argv)
     ret = netloc_topology_get(machine, NULL,
         &nlevels, &ncoords, &dims, &types, &levelidx, &costs);
 
-    {
-        netloc_node_t *node;
-        netloc_node_find(machine, "miriel032", &node);
-        netloc_restriction_add_node(machine, node);
-        netloc_machine_save(machine, "/tmp/hop.xml");
-    }
-
     if( NETLOC_SUCCESS != ret ) {
         return ret;
     }
