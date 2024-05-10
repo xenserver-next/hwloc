@@ -185,8 +185,10 @@ static void cpuid_or_from_dump(unsigned *eax, unsigned *ebx, unsigned *ecx, unsi
  */
 
 enum hwloc_x86_disc_flags {
-  HWLOC_X86_DISC_FLAG_FULL = (1<<0), /* discover everything instead of only annotating */
-  HWLOC_X86_DISC_FLAG_TOPOEXT_NUMANODES = (1<<1) /* use AMD topoext numanode information */
+  HWLOC_X86_DISC_FLAG_FULL = (~0), /* discover everything instead of only annotating */
+  HWLOC_X86_DISC_FLAG_TOPOEXT_NUMANODES = (1<<1), /* use AMD topoext numanode information */
+  HWLOC_X86_CPUID_DISC_FLAG_CPUINFO = (1<<2),
+  HWLOC_X86_CPUID_DISC_FLAG_CACHES = (1<<3)
 };
 
 #define has_topoext(features) ((features)[6] & (1 << 22))
@@ -1095,7 +1097,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, uns
   }
 
   if (hwloc_filter_check_keep_object_type(topology, HWLOC_OBJ_GROUP)) {
-    if (fulldiscovery) {
+    if (flags & HWLOC_X86_CPUID_DISC_FLAG_CPUINFO) {
       if (data->found_unit_ids) {
         /* Look for AMD Complex inside packages */
         hwloc_bitmap_copy(remaining_cpuset, complete_cpuset);
@@ -1126,7 +1128,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, uns
       }
 
       /* Look for unknown objects */
-      if (infos[one].otherids) {
+      if (infos[one].otherids && fulldiscovery) {
 	for (level = infos[one].levels-1; level <= infos[one].levels-1; level--) {
 	  if (infos[one].otherids[level] != UINT_MAX) {
 	    hwloc_bitmap_t unknown_cpuset;
@@ -1247,6 +1249,9 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, uns
   }
 
   /* Look for caches */
+  if (!(flags & HWLOC_X86_CPUID_DISC_FLAG_CACHES))
+    goto out;
+
   /* First find max level */
   level = 0;
   for (i = 0; i < nbprocs; i++)
@@ -1346,6 +1351,7 @@ static void summarize(struct hwloc_backend *backend, struct procinfo *infos, uns
 
   /* FIXME: if KNL and L2 disabled, add tiles instead of L2 */
 
+out:
   hwloc_bitmap_free(remaining_cpuset);
   hwloc_bitmap_free(complete_cpuset);
 
