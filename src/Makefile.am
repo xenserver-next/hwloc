@@ -161,6 +161,17 @@ if HWLOC_HAVE_X86_CPUID
 sources += topology-x86.c
 endif HWLOC_HAVE_X86_CPUID
 
+if HWLOC_HAVE_XEN
+if HWLOC_XEN_BUILD_STATIC
+sources += topology-xen.c
+else
+plugins_LTLIBRARIES += hwloc_xen.la
+hwloc_xen_la_SOURCES = topology-xen.c
+hwloc_xen_la_CFLAGS = $(AM_CFLAGS) $(HWLOC_XEN_CFLAGS) -DHWLOC_INSIDE_PLUGIN
+hwloc_xen_la_LDFLAGS = $(plugins_ldflags) $(HWLOC_XEN_LIBS)
+endif
+endif HWLOC_HAVE_XEN
+
 if HWLOC_HAVE_GCC
 ldflags += -no-undefined
 endif HWLOC_HAVE_GCC

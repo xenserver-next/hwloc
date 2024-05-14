@@ -83,6 +83,11 @@ AC_DEFUN([HWLOC_DEFINE_ARGS],[
                   AS_HELP_STRING([--disable-nvml],
                                  [Disable the NVML device discovery]))
 
+    # Xen?
+    AC_ARG_ENABLE([xen],
+                  AS_HELP_STRING([--disable-xen],
+                                 [Disable Xen system discovery from dom0]))
+
     # GL/Display
     AC_ARG_ENABLE([gl],
 		  AS_HELP_STRING([--disable-gl],
@@ -417,6 +422,7 @@ int foo(void) {
 	hwloc_config_prefix[tests/ports/topology-netbsd.c]:hwloc_config_prefix[src/topology-netbsd.c]
 	hwloc_config_prefix[tests/ports/topology-hpux.c]:hwloc_config_prefix[src/topology-hpux.c]
 	hwloc_config_prefix[tests/ports/topology-bgq.c]:hwloc_config_prefix[src/topology-bgq.c]
+	hwloc_config_prefix[tests/ports/topology-xen.c]:hwloc_config_prefix[src/topology-xen.c]
 	hwloc_config_prefix[tests/ports/topology-opencl.c]:hwloc_config_prefix[src/topology-opencl.c]
 	hwloc_config_prefix[tests/ports/topology-cuda.c]:hwloc_config_prefix[src/topology-cuda.c]
 	hwloc_config_prefix[tests/ports/topology-nvml.c]:hwloc_config_prefix[src/topology-nvml.c]
