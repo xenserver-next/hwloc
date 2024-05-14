@@ -918,8 +918,8 @@ EOF])
     hwloc_xen_happy=no
     if test "x$enable_xen" != "xno"; then
 	hwloc_xen_happy=yes
-	AC_CHECK_HEADERS([xenctrl.h], [
-	  AC_CHECK_LIB([xenctrl], [xc_topologyinfo_bounced], [HWLOC_XEN_LIBS="-lxenctrl"], [hwloc_xen_happy=no])
+	AC_CHECK_HEADERS([libxl.h], [
+	  AC_CHECK_LIB([xenlight], [libxl_get_cpu_topology], [HWLOC_XEN_LIBS="-lxenlight"], [hwloc_xen_happy=no])
         ], [hwloc_xen_happy=no])
     fi
     AC_SUBST(HWLOC_XEN_LIBS)
