@@ -1499,6 +1499,30 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
     fi
     # don't add LIBS/CFLAGS yet, depends on plugins
 
+    # Xen support
+    hwloc_xen_happy=no
+    if test "x$enable_xen" != "xno"; then
+	hwloc_xen_happy=yes
+        AC_CHECK_HEADERS([libxl.h], [
+	  AC_CHECK_LIB([xenlight], [libxl_get_cpu_topology], [HWLOC_XEN_LIBS="-lxenlight"], [hwloc_xen_happy=no])
+        ], [hwloc_xen_happy=no])
+    fi
+    # If we asked for xen support but couldn't deliver, fail
+    AS_IF([test "$enable_xen" = "yes" -a "$hwloc_xen_happy" = "no"],
+	  [AC_MSG_WARN([Specified --enable-xen switch, but could not])
+	   AC_MSG_WARN([find appropriate support])
+	   AC_MSG_ERROR([Cannot continue])])
+    if test "x$hwloc_xen_happy" = "xyes"; then
+      AC_DEFINE([HWLOC_HAVE_XEN], [1], [Define to 1 if you have the `XEN' library.])
+      HWLOC_XEN_LIBS="-lxenlight"
+      AC_SUBST(HWLOC_XEN_LIBS)
+      hwloc_components="$hwloc_components xen"
+      hwloc_xen_component_maybeplugin=1
+      hwloc_xen=yes
+    else
+      AC_SUBST([HWLOC_HAVE_XEN], [0])
+    fi
+
     # libxml2 support
     hwloc_libxml2_happy=
     if test "x$enable_libxml2" != "xno"; then
@@ -1718,6 +1742,11 @@ return clGetDeviceIDs(0, 0, 0, NULL, NULL);
            HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_GL_CPPFLAGS $HWLOC_GL_CFLAGS"
            HWLOC_REQUIRES="$HWLOC_GL_REQUIRES $HWLOC_REQUIRES"
            AC_DEFINE([HWLOC_GL_COMPONENT_BUILTIN], 1, [Define if the GL component is built statically inside libhwloc])])
+    AS_IF([test "$hwloc_xen_component" = "static"],
+          [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_XEN_LIBS"
+           HWLOC_CFLAGS="$HWLOC_CFLAGS $HWLOC_XEN_CFLAGS"
+           HWLOC_REQUIRES="$HWLOC_XEN_REQUIRES $HWLOC_REQUIRES"
+           AC_DEFINE([HWLOC_XEN_COMPONENT_BUILTIN], 1, [Define if the GL component is built statically inside libhwloc])])
     AS_IF([test "$hwloc_xml_libxml_component" = "static"],
           [HWLOC_LIBS="$HWLOC_LIBS $HWLOC_LIBXML2_LIBS"
            HWLOC_LDFLAGS="$HWLOC_LDFLAGS $HWLOC_LIBXML2_LDFLAGS"
@@ -1837,6 +1866,7 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_HAVE_X86_32], [test "x$hwloc_x86_32" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_X86_64], [test "x$hwloc_x86_64" = "xyes"])
         AM_CONDITIONAL([HWLOC_HAVE_X86_CPUID], [test "x$hwloc_have_x86_cpuid" = "xyes"])
+        AM_CONDITIONAL([HWLOC_HAVE_XEN], [test "x$hwloc_xen" = "xyes"])
 
         AM_CONDITIONAL([HWLOC_HAVE_PLUGINS], [test "x$hwloc_have_plugins" = "xyes"])
         AM_CONDITIONAL([HWLOC_PCI_BUILD_STATIC], [test "x$hwloc_pci_component" = "xstatic"])
@@ -1846,6 +1876,7 @@ AC_DEFUN([HWLOC_DO_AM_CONDITIONALS],[
         AM_CONDITIONAL([HWLOC_RSMI_BUILD_STATIC], [test "x$hwloc_rsmi_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_LEVELZERO_BUILD_STATIC], [test "x$hwloc_levelzero_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_GL_BUILD_STATIC], [test "x$hwloc_gl_component" = "xstatic"])
+        AM_CONDITIONAL([HWLOC_XEN_BUILD_STATIC], [test "x$hwloc_xen_component" = "xstatic"])
         AM_CONDITIONAL([HWLOC_XML_LIBXML_BUILD_STATIC], [test "x$hwloc_xml_libxml_component" = "xstatic"])
 
         AM_CONDITIONAL([HWLOC_HAVE_CXX], [test "x$hwloc_have_cxx" = "xyes"])
