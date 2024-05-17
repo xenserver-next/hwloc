@@ -982,6 +982,10 @@ lstopo_obj_snprintf(struct lstopo_output *loutput, char *text, size_t textlen, h
       return hwloc_obj_type_snprintf(text, textlen, obj, loutput->obj_snprintf_flags);
     }
   }
+  /* Instead of prepending just "PCI" before the PCI bus, use PCI Class: */
+  if (obj->type == HWLOC_OBJ_PCI_DEVICE)
+    return snprintf(text, textlen, "%s:",
+      hwloc_pci_class_string(obj->attr->pcidev.class_id));
 
   /* subtype replaces the basic type name */
   if (obj->subtype) {

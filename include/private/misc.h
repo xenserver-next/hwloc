@@ -406,6 +406,9 @@ HWLOC_DECLSPEC int hwloc_bitmap_compare_inclusion(hwloc_const_bitmap_t bitmap1, 
 /* Return a stringified PCI class. */
 HWLOC_DECLSPEC extern const char * hwloc_pci_class_string(unsigned short class_id);
 
+HWLOC_DECLSPEC extern const char * hwloc_pciids_lookup_device(int vendor_id, int device_id,
+                                                              char *buf, int bufsz);
+
 /* Parse a PCI link speed (GT/s) string from Linux sysfs */
 #ifdef HWLOC_LINUX_SYS
 #include <stdlib.h> /* for atof() */
