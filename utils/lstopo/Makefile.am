@@ -101,6 +101,12 @@ if !HWLOC_HAVE_WINDOWS
 if !HWLOC_HAVE_CAIRO
 	rm -f $(DESTDIR)$(bindir)/$(lstopo_name)$(EXEEXT)
 	cd $(DESTDIR)$(bindir) && $(LN_S) $(lstopo_no_graphics_name)$(EXEEXT) $(lstopo_name)$(EXEEXT) || true
+else
+	if [ -e /usr/lib64/libfontconfig.so.1.7.0 ];then \
+	sed -i s/libcairo.so.2/libhwcai.so.2/g $(DESTDIR)$(bindir)/$(lstopo_name)$(EXEEXT);\
+	cp /usr/lib64/libcairo.so.2 $(DESTDIR)$(libdir)/libhwcai.so.2;\
+	sed -i s/libfontconfig.so.1/libhwcaifntcf.so.1/g $(DESTDIR)$(libdir)/libhwcai.so.2;\
+	cp /usr/lib64/libfontconfig.so.1 $(DESTDIR)$(libdir)/libhwcaifntcf.so.1;fi
 endif
 endif
 
