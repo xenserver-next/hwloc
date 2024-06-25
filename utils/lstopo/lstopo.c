@@ -614,7 +614,7 @@ void usage(const char *name, FILE *where)
   fprintf (where, "                        the numbers of first <F> and last <L> to keep,\n");
   fprintf (where, "                        for all or only the given object type <type>\n");
   fprintf (where, "  --no-cpukinds         Do not show CPU kinds\n");
-  fprintf (where, "  --fontsize 10         Set size of text font\n");
+  fprintf (where, "  --fontsize 13         Set size of text font\n");
   fprintf (where, "  --gridsize 7          Set size of margin between elements\n");
   fprintf (where, "  --linespacing 4       Set spacing between lines of text\n");
   fprintf (where, "  --thickness 1         Set thickness of lines and boxes\n");
@@ -964,7 +964,7 @@ main (int argc, char *argv[])
   loutput.methods = NULL;
 
   loutput.children_order = LSTOPO_ORDER_MEMORY_ABOVE | LSTOPO_ORDER_IO_RIGHT | LSTOPO_ORDER_MISC_RIGHT;
-  loutput.fontsize = 10;
+  loutput.fontsize = 13;
   loutput.gridsize = 7;
   loutput.linespacing = 4;
   loutput.thickness = 1;
