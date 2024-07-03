@@ -1,0 +1,4 @@
+<collect>
+<command label="lstopo-xml">lstopo-no-graphics --output-format xml</command>
+<command label="lstopo-txt">lstopo-no-graphics --output-format console -v</command>
+</collect>
