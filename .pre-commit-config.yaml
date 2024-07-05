@@ -1,0 +1,29 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+exclude: "^(tests/hwloc|contrib/android|doc/images|utils/hwloc/.*.(gz|bz2))"
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+    -   id: no-commit-to-branch
+        args: [--branch, master]
+        always_run: true
+
+    -   id: check-added-large-files
+        args: ['--maxkb=20']
+    -   id: check-executables-have-shebangs
+        exclude: "^tests/hwloc/embedded/autogen.sh"
+    -   id: check-merge-conflict
+    -   id: mixed-line-ending
+        args: ['--fix=lf']
+        description: Replace line endings with LF
+    -   id: check-symlinks
+
+-   repo: local
+    hooks:
+    -   id: forbidden_types
+        name: forbidden
+        entry: Binaries are not allowed in this repository, generate data if needed
+        types: [binary]
+        exclude: "^(tests/hwloc|contrib/android|doc/images|utils/hwloc/.*.(gz|bz2))"
+        language: fail

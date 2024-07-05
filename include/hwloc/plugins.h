@@ -25,6 +25,9 @@ struct hwloc_backend;
 #endif
 
 
+extern int
+hwloc_xen_backend_get_pci_busid_cpuset(struct hwloc_backend *backend,
+					 struct hwloc_pcidev_attr_s *busid, hwloc_bitmap_t cpuset);
 
 /** \defgroup hwlocality_disc_components Components and Plugins: Discovery components
  *
