@@ -75,9 +75,27 @@ output_console_obj (struct lstopo_output *loutput, hwloc_obj_t l, int collapse)
                "%s",
                pidxstr[0] == ' ' ? pidxstr+1 : pidxstr /* skip the starting space if any */
         );
-    if (l->type == HWLOC_OBJ_PCI_DEVICE && verbose_mode <= 1)
-      fprintf(output, " %s (%s)",
+    if (l->type == HWLOC_OBJ_PCI_DEVICE && verbose_mode <= 1) {
+      char *s, *dev = strdup(hwloc_obj_get_info_by_name(l, "PCIDevice"));
+      if (!dev) {
+        fprintf(output, " %s (%s)",
 	      busidstr, hwloc_pci_class_string(l->attr->pcidev.class_id));
+      } else {
+        char *v, *vendor = strdup(hwloc_obj_get_info_by_name(l, "PCIVendor"));
+        s = strstr(dev, " Ethernet");
+        if (s) *s = '\0';
+        s = strstr(dev, " Gigabit");
+        if (s) *s = '\0';
+        v = strstr(vendor, " ");
+        if (v) *v = '\0';
+        if (!strcmp("Hewlett-Packard", vendor))
+          vendor = (char *)"HP";
+        if (!strncmp("Integrated ", dev, strlen("Integrated ")))
+          dev += strlen("Integrated ");
+        fprintf(output, " %s (%s: %s %s)",
+          busidstr, hwloc_pci_class_string(l->attr->pcidev.class_id), vendor, dev);
+      }
+    }
     /* display attributes */
     len = hwloc_obj_attr_snprintf (NULL, 0, l, " ", loutput->obj_snprintf_flags);
     attr = malloc(len+1);

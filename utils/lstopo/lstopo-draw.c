@@ -982,6 +982,35 @@ lstopo_obj_snprintf(struct lstopo_output *loutput, char *text, size_t textlen, h
       return hwloc_obj_type_snprintf(text, textlen, obj, loutput->obj_snprintf_flags);
     }
   }
+  /* Instead of prepending just "PCI" before the PCI bus, use PCI Class: */
+  if (obj->type == HWLOC_OBJ_PCI_DEVICE) {
+    /* If the PCI backend added PCI device strings, include them in the SVG */
+    char *d, *dev = strdup(hwloc_obj_get_info_by_name(obj, "PCIDevice"));
+    if (dev) {
+      char *v, *vendor = strdup(hwloc_obj_get_info_by_name(obj, "PCIVendor"));
+
+      if (!(d = strstr(dev, " &")))
+        d = index(dev, '&');  // Forbidden in SVG 
+      // Shorten too verbose strings
+      if (d) *d = '\0';
+      d = strstr(dev, " and");
+      if (d) *d = '\0';
+      d = strstr(dev, " Ethernet");
+      if (d) *d = '\0';
+      d = strstr(dev, " Gigabit");
+      if (d) *d = '\0';
+      v = strstr(vendor, " ");
+      if (v) *v = '\0';
+      if (!strcmp("Hewlett-Packard", vendor))
+        vendor = (char *)"HP";
+      if (!strncmp("Integrated ", dev, strlen("Integrated ")))
+        dev += strlen("Integrated ");
+      return snprintf(text, textlen, "%s (%s %s):", 
+        hwloc_pci_class_string(obj->attr->pcidev.class_id), vendor, dev);
+    }
+    return snprintf(text, textlen, "%s:",
+      hwloc_pci_class_string(obj->attr->pcidev.class_id));
+  }
 
   /* subtype replaces the basic type name */
   if (obj->subtype) {
@@ -1273,7 +1302,7 @@ prepare_text(struct lstopo_output *loutput, hwloc_obj_t obj)
   if (obj->type == HWLOC_OBJ_PCI_DEVICE && loutput->show_attrs_enabled && loutput->show_attrs[HWLOC_OBJ_PCI_DEVICE]) {
     /* PCI text collapsing */
     char busid[32];
-    char _text[64];
+    char _text[80];
     lstopo_obj_snprintf(loutput, _text, sizeof(_text), obj);
     lstopo_busid_snprintf(loutput, busid, sizeof(busid), obj, lud->pci_collapsed, loutput->need_pci_domain);
     if (loutput->pci_collapse_enabled && lud->pci_collapsed > 1) {
