@@ -9,7 +9,7 @@
 
 major=2
 minor=11
-release=2
+release=1
 
 # greek is used for alpha or beta release tags.  If it is non-empty,
 # it will be appended to the version number.  It does not have to be
@@ -18,7 +18,7 @@ release=2
 # requirement is that it must be entirely printable ASCII characters
 # and have no white space.
 
-greek=rc1
+greek=-xen_1.1.0
 
 # The date when this release was created
 
@@ -27,7 +27,7 @@ date="Unreleased developer copy"
 # If snapshot=1, then use the value from snapshot_version as the
 # entire hwloc version (i.e., ignore major, minor, release, and
 # greek).  This is only set to 1 when making snapshot tarballs.
-snapshot=1
+snapshot=0
 snapshot_version=${major}.${minor}.${release}${greek}-git
 
 # The shared library version of hwloc's public library.  This version
