@@ -6258,6 +6258,9 @@ hwloc_linuxfs_find_osdev_parent(struct hwloc_backend *backend, int root_fd,
       parent = parent->parent;
     return parent;
   }
+#ifdef HWLOC_HAVE_XEN
+  return NULL;  /* Skip non-NUMA, virtual net/blk,tun/tap and vif network interfaces OSDevs */
+#endif
 
   /* don't use local_cpus, it's only available for PCI sysfs device, not for our osdevs */
 
